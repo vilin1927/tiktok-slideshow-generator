@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TikTok Slideshow Generator v2</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        [x-cloak] { display: none !important; }
+    </style>
+</head>
+<body class="bg-gray-900 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-2xl" x-data="slideshowGenerator()">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-white mb-2">TikTok Slideshow Generator</h1>
+            <p class="text-gray-400">Generate viral-style slideshows for your products</p>
+            <p class="text-purple-400 text-sm mt-1">v2 - AI-powered story adaptation</p>
+        </div>
+
+        <!-- Main Form -->
+        <form @submit.prevent="submitForm" class="bg-gray-800 rounded-xl p-6 shadow-xl">
+            <!-- TikTok URL -->
+            <div class="mb-6">
+                <label class="block text-gray-300 text-sm font-medium mb-2">
+                    Viral TikTok Slideshow URL
+                </label>
+                <input
+                    type="url"
+                    x-model="formData.tiktok_url"
+                    placeholder="https://www.tiktok.com/@user/photo/..."
+                    class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                    required
+                >
+            </div>
+
+            <!-- Product Image Upload (single) -->
+            <div class="mb-6">
+                <label class="block text-gray-300 text-sm font-medium mb-2">
+                    Your Product Image
+                </label>
+                <div
+                    class="border-2 border-dashed border-gray-600 rounded-lg p-6 text-center hover:border-purple-500 transition-colors cursor-pointer"
+                    @click="$refs.fileInput.click()"
+                    @dragover.prevent="dragOver = true"
+                    @dragleave.prevent="dragOver = false"
+                    @drop.prevent="handleDrop($event)"
+                    :class="{ 'border-purple-500 bg-purple-500/10': dragOver }"
+                >
+                    <input
+                        type="file"
+                        x-ref="fileInput"
+                        @change="handleFileSelect($event)"
+                        accept="image/*"
+                        class="hidden"
+                    >
+                    <div x-show="!previewImage" class="text-gray-400">
+                        <svg class="mx-auto h-12 w-12 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                        </svg>
+                        <p>Click to upload or drag and drop</p>
+                        <p class="text-sm mt-1">Your product image for the product slide</p>
+                    </div>
+                    <div x-show="previewImage" class="relative">
+                        <img :src="previewImage" class="max-h-40 mx-auto rounded-lg">
+                        <button
+                            type="button"
+                            @click.stop="removeImage()"
+                            class="absolute top-0 right-0 bg-red-500 text-white rounded-full w-6 h-6 text-sm"
+                        >&times;</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Product Context -->
+            <div class="mb-6">
+                <label class="block text-gray-300 text-sm font-medium mb-2">
+                    Product Description
+                </label>
+                <textarea
+                    x-model="formData.product_context"
+                    placeholder="Describe your product (e.g., 'Luxury skincare serum for anti-aging, reduces wrinkles in 2 weeks')"
+                    rows="3"
+                    class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 resize-none"
+                    required
+                ></textarea>
+            </div>
+
+            <!-- Folder Name -->
+            <div class="mb-6">
+                <label class="block text-gray-300 text-sm font-medium mb-2">
+                    Output Folder Name
+                </label>
+                <input
+                    type="text"
+                    x-model="formData.folder_name"
+                    placeholder="my-product-slideshow"
+                    class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                    required
+                >
+            </div>
+
+            <!-- Variations Section -->
+            <div class="mb-6 p-4 bg-gray-700/50 rounded-lg">
+                <label class="block text-gray-300 text-sm font-medium mb-3">
+                    Variations (1-5 per slide type)
+                </label>
+                <div class="grid grid-cols-3 gap-4">
+                    <!-- Hook Variations -->
+                    <div>
+                        <label class="block text-gray-400 text-xs mb-1">Hook</label>
+                        <input
+                            type="number"
+                            x-model.number="formData.hook_variations"
+                            min="1"
+                            max="5"
+                            class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-center focus:outline-none focus:border-purple-500"
+                        >
+                    </div>
+                    <!-- Body Variations -->
+                    <div>
+                        <label class="block text-gray-400 text-xs mb-1">Body (each)</label>
+                        <input
+                            type="number"
+                            x-model.number="formData.body_variations"
+                            min="1"
+                            max="5"
+                            class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-center focus:outline-none focus:border-purple-500"
+                        >
+                    </div>
+                    <!-- Product Variations -->
+                    <div>
+                        <label class="block text-gray-400 text-xs mb-1">Product</label>
+                        <input
+                            type="number"
+                            x-model.number="formData.product_variations"
+                            min="1"
+                            max="5"
+                            class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-center focus:outline-none focus:border-purple-500"
+                        >
+                    </div>
+                </div>
+                <p class="text-gray-500 text-xs mt-2">More variations = more options to choose from</p>
+            </div>
+
+            <!-- Submit Button -->
+            <button
+                type="submit"
+                :disabled="isLoading || !file"
+                class="w-full py-4 px-6 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+                <span x-show="!isLoading">Generate Slideshow</span>
+                <span x-show="isLoading" class="flex items-center justify-center">
+                    <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span x-text="statusMessage"></span>
+                </span>
+            </button>
+        </form>
+
+        <!-- Status Messages -->
+        <div x-show="isLoading" x-cloak class="mt-6 bg-gray-800 rounded-xl p-6">
+            <!-- Progress Bar -->
+            <div class="w-full bg-gray-700 rounded-full h-3 mb-4">
+                <div class="bg-gradient-to-r from-purple-600 to-pink-600 h-3 rounded-full transition-all duration-500"
+                     :style="`width: ${progressPercent}%`"></div>
+            </div>
+            <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center space-x-3">
+                    <div class="animate-spin w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full"></div>
+                    <p class="text-gray-300 font-medium" x-text="statusMessage"></p>
+                </div>
+                <span class="text-purple-400 font-bold" x-text="`${progressPercent}%`"></span>
+            </div>
+            <p class="text-gray-500 text-sm" x-text="statusDetail"></p>
+
+            <!-- Step indicators -->
+            <div class="flex justify-between mt-4 text-xs">
+                <div :class="currentStep >= 1 ? 'text-purple-400' : 'text-gray-600'">
+                    <span :class="currentStep >= 1 ? 'bg-purple-500' : 'bg-gray-600'" class="inline-block w-2 h-2 rounded-full mr-1"></span>
+                    Scraping
+                </div>
+                <div :class="currentStep >= 2 ? 'text-purple-400' : 'text-gray-600'">
+                    <span :class="currentStep >= 2 ? 'bg-purple-500' : 'bg-gray-600'" class="inline-block w-2 h-2 rounded-full mr-1"></span>
+                    Analyzing
+                </div>
+                <div :class="currentStep >= 3 ? 'text-purple-400' : 'text-gray-600'">
+                    <span :class="currentStep >= 3 ? 'bg-purple-500' : 'bg-gray-600'" class="inline-block w-2 h-2 rounded-full mr-1"></span>
+                    Generating
+                </div>
+                <div :class="currentStep >= 4 ? 'text-purple-400' : 'text-gray-600'">
+                    <span :class="currentStep >= 4 ? 'bg-purple-500' : 'bg-gray-600'" class="inline-block w-2 h-2 rounded-full mr-1"></span>
+                    Uploading
+                </div>
+            </div>
+        </div>
+
+        <!-- Success Result -->
+        <div x-show="result && result.status === 'success'" x-cloak class="mt-6 bg-green-900/50 border border-green-700 rounded-xl p-6">
+            <div class="flex items-center space-x-3 mb-4">
+                <svg class="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+                <h3 class="text-lg font-semibold text-green-400">Generation Complete!</h3>
+            </div>
+            <p class="text-gray-300 mb-4" x-text="result.message"></p>
+            <a
+                :href="result.folder_link"
+                target="_blank"
+                class="inline-flex items-center px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            >
+                <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"></path>
+                </svg>
+                Open Google Drive Folder
+            </a>
+            <div class="mt-4 text-sm text-gray-400">
+                <p>Generated <span x-text="result.stats?.generated_slides || 0"></span> slides from <span x-text="result.stats?.source_slides || 0"></span> source slides</p>
+            </div>
+
+            <!-- Analysis Toggle (collapsed by default) -->
+            <div x-show="result.analysis" class="mt-4">
+                <button
+                    @click="showAnalysis = !showAnalysis"
+                    class="text-purple-400 text-sm flex items-center hover:text-purple-300"
+                >
+                    <svg :class="showAnalysis ? 'rotate-90' : ''" class="w-4 h-4 mr-1 transition-transform" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
+                    </svg>
+                    Show AI Analysis
+                </button>
+                <div x-show="showAnalysis" x-cloak class="mt-2 p-4 bg-gray-800 rounded-lg overflow-auto max-h-96">
+                    <pre class="text-xs text-gray-300 whitespace-pre-wrap" x-text="JSON.stringify(result.analysis, null, 2)"></pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- Error Message -->
+        <div x-show="error" x-cloak class="mt-6 bg-red-900/50 border border-red-700 rounded-xl p-6">
+            <div class="flex items-center space-x-3">
+                <svg class="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+                <h3 class="text-lg font-semibold text-red-400">Error</h3>
+            </div>
+            <p class="text-gray-300 mt-2" x-text="error"></p>
+            <button
+                @click="error = null"
+                class="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+            >
+                Dismiss
+            </button>
+        </div>
+    </div>
+
+    <script>
+        function slideshowGenerator() {
+            return {
+                formData: {
+                    tiktok_url: '',
+                    folder_name: '',
+                    product_context: '',
+                    hook_variations: 1,
+                    body_variations: 1,
+                    product_variations: 1
+                },
+                file: null,
+                previewImage: null,
+                isLoading: false,
+                statusMessage: 'Starting...',
+                statusDetail: '',
+                progressPercent: 0,
+                currentStep: 0,
+                sessionId: null,
+                pollInterval: null,
+                result: null,
+                error: null,
+                dragOver: false,
+                showAnalysis: false,
+
+                handleFileSelect(event) {
+                    const file = event.target.files[0];
+                    if (file && file.type.startsWith('image/')) {
+                        this.file = file;
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            this.previewImage = e.target.result;
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                },
+
+                handleDrop(event) {
+                    this.dragOver = false;
+                    const file = event.dataTransfer.files[0];
+                    if (file && file.type.startsWith('image/')) {
+                        this.file = file;
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            this.previewImage = e.target.result;
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                },
+
+                removeImage() {
+                    this.file = null;
+                    this.previewImage = null;
+                },
+
+                startPolling(sessionId) {
+                    this.sessionId = sessionId;
+                    this.pollInterval = setInterval(async () => {
+                        try {
+                            const res = await fetch(`http://localhost:5001/api/status/${sessionId}`);
+                            const status = await res.json();
+
+                            this.statusMessage = status.message || 'Processing...';
+                            this.progressPercent = status.progress || 0;
+                            this.statusDetail = status.details?.detail || '';
+
+                            // Map step names to numbers
+                            const stepMap = { 'starting': 1, 'scraping': 1, 'analyzing': 2, 'generating': 3, 'uploading': 4, 'complete': 5 };
+                            this.currentStep = stepMap[status.step] || 0;
+
+                            if (status.step === 'complete') {
+                                this.stopPolling();
+                                this.isLoading = false;
+                                this.result = {
+                                    status: 'success',
+                                    message: 'Slideshow generated successfully!',
+                                    folder_link: status.details?.folder_link,
+                                    stats: status.details?.stats,
+                                    analysis: status.details?.analysis
+                                };
+                            } else if (status.step === 'error') {
+                                this.stopPolling();
+                                this.isLoading = false;
+                                this.error = status.message;
+                            }
+                        } catch (e) {
+                            // Ignore polling errors
+                        }
+                    }, 1000);
+                },
+
+                stopPolling() {
+                    if (this.pollInterval) {
+                        clearInterval(this.pollInterval);
+                        this.pollInterval = null;
+                    }
+                },
+
+                async submitForm() {
+                    if (!this.file) {
+                        this.error = 'Please upload a product image';
+                        return;
+                    }
+
+                    this.isLoading = true;
+                    this.error = null;
+                    this.result = null;
+                    this.showAnalysis = false;
+                    this.statusMessage = 'Starting...';
+                    this.progressPercent = 0;
+                    this.currentStep = 0;
+                    this.statusDetail = 'Preparing request...';
+
+                    const formData = new FormData();
+                    formData.append('tiktok_url', this.formData.tiktok_url);
+                    formData.append('folder_name', this.formData.folder_name);
+                    formData.append('product_context', this.formData.product_context);
+                    formData.append('product_images', this.file);
+                    formData.append('hook_variations', this.formData.hook_variations);
+                    formData.append('body_variations', this.formData.body_variations);
+                    formData.append('product_variations', this.formData.product_variations);
+
+                    try {
+                        this.statusMessage = 'Uploading...';
+                        this.progressPercent = 5;
+                        this.currentStep = 1;
+
+                        const response = await fetch('http://localhost:5001/api/generate', {
+                            method: 'POST',
+                            body: formData
+                        });
+
+                        const data = await response.json();
+
+                        if (!response.ok) {
+                            throw new Error(data.error || 'Generation failed');
+                        }
+
+                        // Start polling with the session ID
+                        if (data.session_id && data.status === 'started') {
+                            this.startPolling(data.session_id);
+                        } else if (data.status === 'success') {
+                            this.progressPercent = 100;
+                            this.currentStep = 5;
+                            this.result = data;
+                            this.isLoading = false;
+                        }
+                    } catch (err) {
+                        this.error = err.message;
+                        this.stopPolling();
+                        this.isLoading = false;
+                    }
+                }
+            };
+        }
+    </script>
+</body>
+</html>
