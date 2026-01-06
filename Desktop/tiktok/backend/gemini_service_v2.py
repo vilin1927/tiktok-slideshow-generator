@@ -465,12 +465,17 @@ def _generate_single_image(
         # PRODUCT SLIDE: User's product photo + style reference
         prompt = f"""Generate a TikTok slide featuring a product AS A CASUAL TIP.
 
+CRITICAL - TEXT STYLE (copy EXACTLY from [STYLE_REFERENCE]):
+▸ Match the EXACT font family
+▸ Match the EXACT font color
+▸ Match the EXACT font size relative to image
+▸ Match the EXACT text positioning style
+▸ Match any text effects (shadow, outline, etc.)
+The text style must be IDENTICAL to the reference - this is the most important element.
+
 [PRODUCT_PHOTO] - User's product image. THIS IS THE BASE IMAGE - keep it as the main visual.
 
-[STYLE_REFERENCE] - Reference slide. Copy text style EXACTLY as shown in reference:
-- EXACT same font
-- EXACT same color
-- EXACT same style
+[STYLE_REFERENCE] - Reference slide for text style only.
 
 TEXT TO ADD:
 {text_content}
@@ -498,11 +503,16 @@ GOAL: Look like "just another tip" - NOT an advertisement."""
         # CTA SLIDE: Usually text-focused, simple background
         prompt = f"""Generate a TikTok CTA (call-to-action) slide.
 
-[STYLE_REFERENCE] - Reference CTA slide. Copy EXACTLY as shown:
-- EXACT same font
-- EXACT same color
-- EXACT same style
-- EXACT same background
+CRITICAL - TEXT STYLE (copy EXACTLY from [STYLE_REFERENCE]):
+▸ Match the EXACT font family
+▸ Match the EXACT font color
+▸ Match the EXACT font size relative to image
+▸ Match the EXACT text positioning style
+▸ Match any text effects (shadow, outline, etc.)
+▸ Match the EXACT background style
+The text style must be IDENTICAL to the reference - this is the most important element.
+
+[STYLE_REFERENCE] - Reference CTA slide for text and background style.
 
 TEXT TO DISPLAY:
 {text_content}
@@ -526,14 +536,22 @@ LAYOUT: {text_position_hint}"""
             # With persona - need consistency
             prompt = f"""Generate a TikTok {slide_label} slide.
 
-[STYLE_REFERENCE] - Reference slide. Copy EXACTLY as shown:
-- EXACT same font
-- EXACT same color
-- EXACT same style
+CRITICAL - TEXT STYLE (copy EXACTLY from [STYLE_REFERENCE]):
+▸ Match the EXACT font family
+▸ Match the EXACT font color
+▸ Match the EXACT font size relative to image
+▸ Match the EXACT text positioning style
+▸ Match any text effects (shadow, outline, etc.)
+The text style must be IDENTICAL to the reference - this is the most important element.
 
-[PERSONA_REFERENCE] - Person to use. Generate the EXACT SAME person in new scene:
-- SAME person, SAME appearance
-- This must look like the same creator
+[STYLE_REFERENCE] - Reference slide for text style only.
+
+[PERSONA_REFERENCE] - Person to use. Generate the EXACT SAME PERSON in a new scene:
+- SAME face, hair color, skin tone, facial features
+- SAME body type and general appearance
+- DIFFERENT clothing appropriate for this scene context
+- The outfit should match the situation (casual at home, dressed for going out, workout clothes for gym, etc.)
+- This must look like the same creator, just in different clothes
 
 NEW SCENE: {scene_description}
 
@@ -562,15 +580,21 @@ IMPORTANT: Only ONE person in the image - never two people!"""
             # Has persona but NO reference yet - CREATE a new persona
             prompt = f"""Generate a TikTok {slide_label} slide.
 
-[STYLE_REFERENCE] - Reference slide. Copy EXACTLY as shown:
-- EXACT same font
-- EXACT same color
-- EXACT same style
+CRITICAL - TEXT STYLE (copy EXACTLY from [STYLE_REFERENCE]):
+▸ Match the EXACT font family
+▸ Match the EXACT font color
+▸ Match the EXACT font size relative to image
+▸ Match the EXACT text positioning style
+▸ Match any text effects (shadow, outline, etc.)
+The text style must be IDENTICAL to the reference - this is the most important element.
+
+[STYLE_REFERENCE] - Reference slide for text style only.
 (Do NOT copy the person - create a NEW person)
 
 CREATE A NEW PERSONA:
 - Attractive, relatable TikTok content creator
 - Natural, authentic appearance
+- Clothing appropriate for this scene context
 - Will be used as reference for other slides
 
 NEW SCENE: {scene_description}
@@ -595,10 +619,15 @@ IMPORTANT: Only ONE person in the image - never two people!"""
             # No persona needed - just style reference
             prompt = f"""Generate a TikTok {slide_label} slide.
 
-[STYLE_REFERENCE] - Reference slide. Copy EXACTLY as shown:
-- EXACT same font
-- EXACT same color
-- EXACT same style
+CRITICAL - TEXT STYLE (copy EXACTLY from [STYLE_REFERENCE]):
+▸ Match the EXACT font family
+▸ Match the EXACT font color
+▸ Match the EXACT font size relative to image
+▸ Match the EXACT text positioning style
+▸ Match any text effects (shadow, outline, etc.)
+The text style must be IDENTICAL to the reference - this is the most important element.
+
+[STYLE_REFERENCE] - Reference slide for text style only.
 
 NEW SCENE: {scene_description}
 
