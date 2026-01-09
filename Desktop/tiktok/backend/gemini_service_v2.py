@@ -196,7 +196,14 @@ Track:
 - persona_gender: "female" | "male" | "none" | "mixed"
 - persona_slides: list of slide indices that show a person
 
-This is critical for consistency - all persona slides must show similar person.
+⚠️ IMPORTANT FOR NEW SLIDESHOW GENERATION:
+- Hook slide: CAN have persona (if original does)
+- Body slides: MUST have has_persona: false (product/aesthetic shots only)
+- Product slide: MUST have has_persona: false (focus on product)
+- CTA slide: Can have persona OR be text-only
+
+Viral TikTok slideshows typically show the creator in hook/CTA only.
+Body slides should be aesthetic product/lifestyle shots WITHOUT faces.
 
 ═══════════════════════════════════════════════════════════════
 TASK 4: ANALYZE TEXT STYLE (CRITICAL FOR GENERATION)
@@ -660,7 +667,15 @@ TEXT TO DISPLAY:
 
 LAYOUT: {text_position_hint}
 
-IMPORTANT: Do NOT include any human faces or people in this image. This should be a faceless/object-only composition."""
+IMPORTANT: Do NOT include any human faces, hands, body parts, or people in this image.
+This MUST be a completely faceless composition showing ONLY:
+- Products
+- Objects
+- Flat lays
+- Aesthetic backgrounds
+- Text overlays
+
+If you generate a human face or body part, the image will be REJECTED."""
 
             contents = [
                 prompt,
