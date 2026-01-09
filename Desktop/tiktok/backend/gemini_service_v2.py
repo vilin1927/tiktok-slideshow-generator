@@ -24,8 +24,6 @@ logger = get_logger('gemini')
 from google import genai
 from google.genai import types
 
-GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
-
 # Model names
 ANALYSIS_MODEL = 'gemini-3-pro-preview'
 IMAGE_MODEL = 'gemini-3-pro-image-preview'
@@ -78,10 +76,11 @@ def _get_client(timeout: int = REQUEST_TIMEOUT):
     Args:
         timeout: HTTP request timeout in seconds (default: REQUEST_TIMEOUT)
     """
-    if not GEMINI_API_KEY:
+    api_key = os.getenv('GEMINI_API_KEY')  # Read dynamically for hot-reload support
+    if not api_key:
         raise GeminiServiceError('GEMINI_API_KEY environment variable not set')
     return genai.Client(
-        api_key=GEMINI_API_KEY,
+        api_key=api_key,
         http_options={'timeout': timeout * 1000}  # Convert to milliseconds
     )
 
@@ -1383,7 +1382,7 @@ if __name__ == '__main__':
     print('Gemini Service V2 - Redesigned Pipeline')
     print(f'Analysis Model: {ANALYSIS_MODEL}')
     print(f'Image Model: {IMAGE_MODEL}')
-    print(f'API Key configured: {bool(GEMINI_API_KEY)}')
+    print(f'API Key configured: {bool(os.getenv("GEMINI_API_KEY"))}')
     print()
     print('Changes from V1:')
     print('- Smart product insertion (6 slideshow types)')
