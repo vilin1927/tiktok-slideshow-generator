@@ -25,12 +25,16 @@ logger = get_logger('app')
 from tiktok_scraper import scrape_tiktok_slideshow, TikTokScraperError
 from gemini_service_v2 import run_pipeline, GeminiServiceError
 from google_drive import upload_slideshow_output, GoogleDriveError
+from batch_routes import batch_bp
 
 # Global progress tracking
 progress_status = {}
 
 app = Flask(__name__)
 CORS(app)
+
+# Register batch processing blueprint
+app.register_blueprint(batch_bp)
 
 # Configuration
 UPLOAD_FOLDER = 'temp/uploads'

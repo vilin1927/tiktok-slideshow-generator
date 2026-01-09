@@ -11,7 +11,7 @@
     </style>
 </head>
 <body class="bg-gray-900 min-h-screen">
-    <div class="container mx-auto px-4 py-8 max-w-2xl" x-data="slideshowGenerator()">
+    <div class="container mx-auto px-4 py-8 max-w-3xl" x-data="slideshowGenerator()">
         <!-- Header -->
         <div class="text-center mb-8">
             <h1 class="text-3xl font-bold text-white mb-2">TikTok Slideshow Generator</h1>
@@ -19,251 +19,583 @@
             <p class="text-purple-400 text-sm mt-1">v2 - AI-powered story adaptation</p>
         </div>
 
-        <!-- Main Form -->
-        <form @submit.prevent="submitForm" class="bg-gray-800 rounded-xl p-6 shadow-xl">
-            <!-- TikTok URL -->
-            <div class="mb-6">
-                <label class="block text-gray-300 text-sm font-medium mb-2">
-                    Viral TikTok Slideshow URL
-                </label>
-                <input
-                    type="url"
-                    x-model="formData.tiktok_url"
-                    placeholder="https://www.tiktok.com/@user/photo/..."
-                    class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
-                    required
-                >
-            </div>
-
-            <!-- Product Image Upload (single) -->
-            <div class="mb-6">
-                <label class="block text-gray-300 text-sm font-medium mb-2">
-                    Your Product Image
-                </label>
-                <div
-                    class="border-2 border-dashed border-gray-600 rounded-lg p-6 text-center hover:border-purple-500 transition-colors cursor-pointer"
-                    @click="$refs.fileInput.click()"
-                    @dragover.prevent="dragOver = true"
-                    @dragleave.prevent="dragOver = false"
-                    @drop.prevent="handleDrop($event)"
-                    :class="{ 'border-purple-500 bg-purple-500/10': dragOver }"
-                >
-                    <input
-                        type="file"
-                        x-ref="fileInput"
-                        @change="handleFileSelect($event)"
-                        accept="image/*"
-                        class="hidden"
-                    >
-                    <div x-show="!previewImage" class="text-gray-400">
-                        <svg class="mx-auto h-12 w-12 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                        </svg>
-                        <p>Click to upload or drag and drop</p>
-                        <p class="text-sm mt-1">Your product image for the product slide</p>
-                    </div>
-                    <div x-show="previewImage" class="relative">
-                        <img :src="previewImage" class="max-h-40 mx-auto rounded-lg">
-                        <button
-                            type="button"
-                            @click.stop="removeImage()"
-                            class="absolute top-0 right-0 bg-red-500 text-white rounded-full w-6 h-6 text-sm"
-                        >&times;</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Product Context -->
-            <div class="mb-6">
-                <label class="block text-gray-300 text-sm font-medium mb-2">
-                    Product Description
-                </label>
-                <textarea
-                    x-model="formData.product_context"
-                    placeholder="Describe your product (e.g., 'Luxury skincare serum for anti-aging, reduces wrinkles in 2 weeks')"
-                    rows="3"
-                    class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 resize-none"
-                    required
-                ></textarea>
-            </div>
-
-            <!-- Folder Name -->
-            <div class="mb-6">
-                <label class="block text-gray-300 text-sm font-medium mb-2">
-                    Output Folder Name
-                </label>
-                <input
-                    type="text"
-                    x-model="formData.folder_name"
-                    placeholder="my-product-slideshow"
-                    class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
-                    required
-                >
-            </div>
-
-            <!-- Variations Section -->
-            <div class="mb-6 p-4 bg-gray-700/50 rounded-lg">
-                <label class="block text-gray-300 text-sm font-medium mb-3">
-                    Variations (1-5 per slide type)
-                </label>
-                <div class="grid grid-cols-3 gap-4">
-                    <!-- Hook Variations -->
-                    <div>
-                        <label class="block text-gray-400 text-xs mb-1">Hook</label>
-                        <input
-                            type="number"
-                            x-model.number="formData.hook_variations"
-                            min="1"
-                            max="5"
-                            class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-center focus:outline-none focus:border-purple-500"
-                        >
-                    </div>
-                    <!-- Body Variations -->
-                    <div>
-                        <label class="block text-gray-400 text-xs mb-1">Body (each)</label>
-                        <input
-                            type="number"
-                            x-model.number="formData.body_variations"
-                            min="1"
-                            max="5"
-                            class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-center focus:outline-none focus:border-purple-500"
-                        >
-                    </div>
-                    <!-- Product Variations -->
-                    <div>
-                        <label class="block text-gray-400 text-xs mb-1">Product</label>
-                        <input
-                            type="number"
-                            x-model.number="formData.product_variations"
-                            min="1"
-                            max="5"
-                            class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-center focus:outline-none focus:border-purple-500"
-                        >
-                    </div>
-                </div>
-                <p class="text-gray-500 text-xs mt-2">More variations = more options to choose from</p>
-            </div>
-
-            <!-- Submit Button -->
-            <button
-                type="submit"
-                :disabled="isLoading || !file"
-                class="w-full py-4 px-6 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-                <span x-show="!isLoading">Generate Slideshow</span>
-                <span x-show="isLoading" class="flex items-center justify-center">
-                    <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    <span x-text="statusMessage"></span>
-                </span>
-            </button>
-        </form>
-
-        <!-- Status Messages -->
-        <div x-show="isLoading" x-cloak class="mt-6 bg-gray-800 rounded-xl p-6">
-            <!-- Progress Bar -->
-            <div class="w-full bg-gray-700 rounded-full h-3 mb-4">
-                <div class="bg-gradient-to-r from-purple-600 to-pink-600 h-3 rounded-full transition-all duration-500"
-                     :style="`width: ${progressPercent}%`"></div>
-            </div>
-            <div class="flex items-center justify-between mb-2">
-                <div class="flex items-center space-x-3">
-                    <div class="animate-spin w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full"></div>
-                    <p class="text-gray-300 font-medium" x-text="statusMessage"></p>
-                </div>
-                <span class="text-purple-400 font-bold" x-text="`${progressPercent}%`"></span>
-            </div>
-            <p class="text-gray-500 text-sm" x-text="statusDetail"></p>
-
-            <!-- Step indicators -->
-            <div class="flex justify-between mt-4 text-xs">
-                <div :class="currentStep >= 1 ? 'text-purple-400' : 'text-gray-600'">
-                    <span :class="currentStep >= 1 ? 'bg-purple-500' : 'bg-gray-600'" class="inline-block w-2 h-2 rounded-full mr-1"></span>
-                    Scraping
-                </div>
-                <div :class="currentStep >= 2 ? 'text-purple-400' : 'text-gray-600'">
-                    <span :class="currentStep >= 2 ? 'bg-purple-500' : 'bg-gray-600'" class="inline-block w-2 h-2 rounded-full mr-1"></span>
-                    Analyzing
-                </div>
-                <div :class="currentStep >= 3 ? 'text-purple-400' : 'text-gray-600'">
-                    <span :class="currentStep >= 3 ? 'bg-purple-500' : 'bg-gray-600'" class="inline-block w-2 h-2 rounded-full mr-1"></span>
-                    Generating
-                </div>
-                <div :class="currentStep >= 4 ? 'text-purple-400' : 'text-gray-600'">
-                    <span :class="currentStep >= 4 ? 'bg-purple-500' : 'bg-gray-600'" class="inline-block w-2 h-2 rounded-full mr-1"></span>
-                    Uploading
-                </div>
-            </div>
-        </div>
-
-        <!-- Success Result -->
-        <div x-show="result && result.status === 'success'" x-cloak class="mt-6 bg-green-900/50 border border-green-700 rounded-xl p-6">
-            <div class="flex items-center space-x-3 mb-4">
-                <svg class="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                </svg>
-                <h3 class="text-lg font-semibold text-green-400">Generation Complete!</h3>
-            </div>
-            <p class="text-gray-300 mb-4" x-text="result.message"></p>
-            <a
-                :href="result.folder_link"
-                target="_blank"
-                class="inline-flex items-center px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-            >
-                <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"></path>
-                </svg>
-                Open Google Drive Folder
-            </a>
-            <div class="mt-4 text-sm text-gray-400">
-                <p>Generated <span x-text="result.stats?.generated_slides || 0"></span> slides from <span x-text="result.stats?.source_slides || 0"></span> source slides</p>
-            </div>
-
-            <!-- Analysis Toggle (collapsed by default) -->
-            <div x-show="result.analysis" class="mt-4">
+        <!-- Mode Toggle -->
+        <div class="flex justify-center mb-6">
+            <div class="bg-gray-800 rounded-lg p-1 inline-flex">
                 <button
-                    @click="showAnalysis = !showAnalysis"
-                    class="text-purple-400 text-sm flex items-center hover:text-purple-300"
+                    @click="mode = 'single'"
+                    :class="mode === 'single' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'"
+                    class="px-6 py-2 rounded-md transition-all font-medium"
                 >
-                    <svg :class="showAnalysis ? 'rotate-90' : ''" class="w-4 h-4 mr-1 transition-transform" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
-                    </svg>
-                    Show AI Analysis
+                    Single Link
                 </button>
-                <div x-show="showAnalysis" x-cloak class="mt-2 p-4 bg-gray-800 rounded-lg overflow-auto max-h-96">
-                    <pre class="text-xs text-gray-300 whitespace-pre-wrap" x-text="JSON.stringify(result.analysis, null, 2)"></pre>
-                </div>
+                <button
+                    @click="mode = 'batch'"
+                    :class="mode === 'batch' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'"
+                    class="px-6 py-2 rounded-md transition-all font-medium"
+                >
+                    Batch Mode
+                </button>
             </div>
         </div>
 
-        <!-- Error Message -->
-        <div x-show="error" x-cloak class="mt-6 bg-red-900/50 border border-red-700 rounded-xl p-6">
-            <div class="flex items-center space-x-3">
-                <svg class="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                </svg>
-                <h3 class="text-lg font-semibold text-red-400">Error</h3>
+        <!-- ==================== SINGLE MODE ==================== -->
+        <template x-if="mode === 'single'">
+            <form @submit.prevent="submitSingleForm" class="bg-gray-800 rounded-xl p-6 shadow-xl">
+                <!-- TikTok URL -->
+                <div class="mb-6">
+                    <label class="block text-gray-300 text-sm font-medium mb-2">
+                        Viral TikTok Slideshow URL
+                    </label>
+                    <input
+                        type="url"
+                        x-model="formData.tiktok_url"
+                        placeholder="https://www.tiktok.com/@user/photo/..."
+                        class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                        required
+                    >
+                </div>
+
+                <!-- Product Image Upload (single) -->
+                <div class="mb-6">
+                    <label class="block text-gray-300 text-sm font-medium mb-2">
+                        Your Product Image
+                    </label>
+                    <div
+                        class="border-2 border-dashed border-gray-600 rounded-lg p-6 text-center hover:border-purple-500 transition-colors cursor-pointer"
+                        @click="$refs.fileInput.click()"
+                        @dragover.prevent="dragOver = true"
+                        @dragleave.prevent="dragOver = false"
+                        @drop.prevent="handleDrop($event)"
+                        :class="{ 'border-purple-500 bg-purple-500/10': dragOver }"
+                    >
+                        <input
+                            type="file"
+                            x-ref="fileInput"
+                            @change="handleFileSelect($event)"
+                            accept="image/*"
+                            class="hidden"
+                        >
+                        <div x-show="!previewImage" class="text-gray-400">
+                            <svg class="mx-auto h-12 w-12 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                            </svg>
+                            <p>Click to upload or drag and drop</p>
+                            <p class="text-sm mt-1">Your product image for the product slide</p>
+                        </div>
+                        <div x-show="previewImage" class="relative">
+                            <img :src="previewImage" class="max-h-40 mx-auto rounded-lg">
+                            <button
+                                type="button"
+                                @click.stop="removeImage()"
+                                class="absolute top-0 right-0 bg-red-500 text-white rounded-full w-6 h-6 text-sm"
+                            >&times;</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Product Context -->
+                <div class="mb-6">
+                    <label class="block text-gray-300 text-sm font-medium mb-2">
+                        Product Description
+                    </label>
+                    <textarea
+                        x-model="formData.product_context"
+                        placeholder="Describe your product (e.g., 'Luxury skincare serum for anti-aging, reduces wrinkles in 2 weeks')"
+                        rows="3"
+                        class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 resize-none"
+                        required
+                    ></textarea>
+                </div>
+
+                <!-- Folder Name -->
+                <div class="mb-6">
+                    <label class="block text-gray-300 text-sm font-medium mb-2">
+                        Output Folder Name
+                    </label>
+                    <input
+                        type="text"
+                        x-model="formData.folder_name"
+                        placeholder="my-product-slideshow"
+                        class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                        required
+                    >
+                </div>
+
+                <!-- Variations Section -->
+                <div class="mb-6 p-4 bg-gray-700/50 rounded-lg">
+                    <label class="block text-gray-300 text-sm font-medium mb-3">
+                        Variations (1-5 per slide type)
+                    </label>
+                    <div class="grid grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-gray-400 text-xs mb-1">Hook</label>
+                            <input
+                                type="number"
+                                x-model.number="formData.hook_variations"
+                                min="1"
+                                max="5"
+                                class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-center focus:outline-none focus:border-purple-500"
+                            >
+                        </div>
+                        <div>
+                            <label class="block text-gray-400 text-xs mb-1">Body (each)</label>
+                            <input
+                                type="number"
+                                x-model.number="formData.body_variations"
+                                min="1"
+                                max="5"
+                                class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-center focus:outline-none focus:border-purple-500"
+                            >
+                        </div>
+                        <div>
+                            <label class="block text-gray-400 text-xs mb-1">Product</label>
+                            <input
+                                type="number"
+                                x-model.number="formData.product_variations"
+                                min="1"
+                                max="5"
+                                class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-center focus:outline-none focus:border-purple-500"
+                            >
+                        </div>
+                    </div>
+                    <p class="text-gray-500 text-xs mt-2">More variations = more options to choose from</p>
+                </div>
+
+                <!-- Submit Button -->
+                <button
+                    type="submit"
+                    :disabled="isLoading || !file"
+                    class="w-full py-4 px-6 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    <span x-show="!isLoading">Generate Slideshow</span>
+                    <span x-show="isLoading" class="flex items-center justify-center">
+                        <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span x-text="statusMessage"></span>
+                    </span>
+                </button>
+            </form>
+        </template>
+
+        <!-- ==================== BATCH MODE ==================== -->
+        <template x-if="mode === 'batch'">
+            <div>
+                <!-- Step 1: Enter Links -->
+                <div x-show="batchStep === 1" class="bg-gray-800 rounded-xl p-6 shadow-xl">
+                    <h2 class="text-xl font-semibold text-white mb-4">Step 1: Enter TikTok Links</h2>
+
+                    <!-- Links Textarea -->
+                    <div class="mb-4">
+                        <label class="block text-gray-300 text-sm font-medium mb-2">
+                            Paste TikTok URLs (one per line, max 100)
+                        </label>
+                        <textarea
+                            x-model="batchData.linksText"
+                            @input="validateBatchLinks()"
+                            placeholder="https://www.tiktok.com/@user1/photo/123...
+https://www.tiktok.com/@user2/photo/456...
+https://vm.tiktok.com/abc..."
+                            rows="8"
+                            class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 font-mono text-sm"
+                        ></textarea>
+                    </div>
+
+                    <!-- Validation Summary -->
+                    <div class="mb-4 flex items-center justify-between">
+                        <div class="flex items-center space-x-4">
+                            <span class="text-green-400 flex items-center">
+                                <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                                </svg>
+                                <span x-text="batchValidation.valid"></span> valid
+                            </span>
+                            <span x-show="batchValidation.invalid > 0" class="text-red-400 flex items-center">
+                                <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                                </svg>
+                                <span x-text="batchValidation.invalid"></span> invalid
+                            </span>
+                        </div>
+                        <button
+                            x-show="batchValidation.invalid > 0"
+                            @click="showInvalidLinks = !showInvalidLinks"
+                            class="text-purple-400 text-sm hover:text-purple-300"
+                        >
+                            <span x-text="showInvalidLinks ? 'Hide' : 'Show'"></span> invalid
+                        </button>
+                    </div>
+
+                    <!-- Invalid Links List -->
+                    <div x-show="showInvalidLinks && batchValidation.invalidLinks.length > 0" class="mb-4 p-3 bg-red-900/30 border border-red-700 rounded-lg">
+                        <p class="text-red-400 text-sm font-medium mb-2">Invalid Links:</p>
+                        <ul class="text-sm text-gray-400 space-y-1">
+                            <template x-for="link in batchValidation.invalidLinks" :key="link.index">
+                                <li class="flex items-start">
+                                    <span class="text-red-400 mr-2">Line <span x-text="link.index + 1"></span>:</span>
+                                    <span class="truncate" x-text="link.url"></span>
+                                </li>
+                            </template>
+                        </ul>
+                    </div>
+
+                    <!-- Variations -->
+                    <div class="mb-6 p-4 bg-gray-700/50 rounded-lg">
+                        <label class="block text-gray-300 text-sm font-medium mb-3">Variations per Link</label>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-gray-400 text-xs mb-1">Photo Variations</label>
+                                <input
+                                    type="number"
+                                    x-model.number="batchData.photoVariations"
+                                    min="1"
+                                    max="10"
+                                    class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-center focus:outline-none focus:border-purple-500"
+                                >
+                            </div>
+                            <div>
+                                <label class="block text-gray-400 text-xs mb-1">Text Variations</label>
+                                <input
+                                    type="number"
+                                    x-model.number="batchData.textVariations"
+                                    min="1"
+                                    max="10"
+                                    class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-center focus:outline-none focus:border-purple-500"
+                                >
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Next Button -->
+                    <button
+                        @click="goToStep2()"
+                        :disabled="batchValidation.valid === 0"
+                        class="w-full py-4 px-6 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        Continue with <span x-text="batchValidation.valid"></span> Links
+                    </button>
+                </div>
+
+                <!-- Step 2: Product Mapping -->
+                <div x-show="batchStep === 2" class="bg-gray-800 rounded-xl p-6 shadow-xl">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-xl font-semibold text-white">Step 2: Add Products</h2>
+                        <button @click="batchStep = 1" class="text-purple-400 hover:text-purple-300 text-sm">
+                            &larr; Back to links
+                        </button>
+                    </div>
+
+                    <!-- Apply to All Toggle -->
+                    <div class="mb-4 p-3 bg-gray-700/50 rounded-lg flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-300 font-medium">Same product for all links?</p>
+                            <p class="text-gray-500 text-sm">Use the same photo and description for every link</p>
+                        </div>
+                        <button
+                            @click="batchData.applyToAll = !batchData.applyToAll"
+                            :class="batchData.applyToAll ? 'bg-purple-600' : 'bg-gray-600'"
+                            class="relative w-12 h-6 rounded-full transition-colors"
+                        >
+                            <span
+                                :class="batchData.applyToAll ? 'translate-x-6' : 'translate-x-1'"
+                                class="absolute top-1 left-0 w-4 h-4 bg-white rounded-full transition-transform"
+                            ></span>
+                        </button>
+                    </div>
+
+                    <!-- Product Mapping Table -->
+                    <div class="space-y-4 mb-6 max-h-96 overflow-y-auto">
+                        <!-- If Apply to All -->
+                        <template x-if="batchData.applyToAll">
+                            <div class="p-4 bg-gray-700/50 rounded-lg">
+                                <p class="text-gray-300 font-medium mb-3">Product for all <span x-text="batchValidation.valid"></span> links:</p>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <!-- Photo Upload -->
+                                    <div>
+                                        <label class="block text-gray-400 text-xs mb-1">Product Photo</label>
+                                        <div
+                                            class="border-2 border-dashed border-gray-600 rounded-lg p-4 text-center hover:border-purple-500 cursor-pointer"
+                                            @click="$refs.batchFileAll.click()"
+                                        >
+                                            <input
+                                                type="file"
+                                                x-ref="batchFileAll"
+                                                @change="handleBatchFileSelect($event, 0)"
+                                                accept="image/*"
+                                                class="hidden"
+                                            >
+                                            <template x-if="!batchData.products[0]?.preview">
+                                                <div class="text-gray-400 text-sm">
+                                                    <svg class="mx-auto h-8 w-8 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                                    </svg>
+                                                    Click to upload
+                                                </div>
+                                            </template>
+                                            <template x-if="batchData.products[0]?.preview">
+                                                <img :src="batchData.products[0].preview" class="max-h-20 mx-auto rounded">
+                                            </template>
+                                        </div>
+                                    </div>
+                                    <!-- Description -->
+                                    <div>
+                                        <label class="block text-gray-400 text-xs mb-1">Description</label>
+                                        <textarea
+                                            x-model="batchData.products[0].description"
+                                            placeholder="Product description..."
+                                            rows="3"
+                                            class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm placeholder-gray-400 focus:outline-none focus:border-purple-500 resize-none"
+                                        ></textarea>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+
+                        <!-- Individual Products -->
+                        <template x-if="!batchData.applyToAll">
+                            <div class="space-y-3">
+                                <template x-for="(link, index) in batchValidation.validLinks" :key="index">
+                                    <div class="p-4 bg-gray-700/50 rounded-lg">
+                                        <p class="text-gray-400 text-xs mb-2 truncate">
+                                            Link <span x-text="index + 1"></span>: <span x-text="link.url" class="text-gray-500"></span>
+                                        </p>
+                                        <div class="grid grid-cols-2 gap-3">
+                                            <!-- Photo Upload -->
+                                            <div>
+                                                <div
+                                                    class="border-2 border-dashed border-gray-600 rounded-lg p-3 text-center hover:border-purple-500 cursor-pointer"
+                                                    @click="$refs['batchFile' + index][0].click()"
+                                                >
+                                                    <input
+                                                        type="file"
+                                                        :x-ref="'batchFile' + index"
+                                                        @change="handleBatchFileSelect($event, index)"
+                                                        accept="image/*"
+                                                        class="hidden"
+                                                    >
+                                                    <template x-if="!batchData.products[index]?.preview">
+                                                        <div class="text-gray-400 text-xs">
+                                                            <svg class="mx-auto h-6 w-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                                                            </svg>
+                                                            Photo
+                                                        </div>
+                                                    </template>
+                                                    <template x-if="batchData.products[index]?.preview">
+                                                        <img :src="batchData.products[index].preview" class="max-h-16 mx-auto rounded">
+                                                    </template>
+                                                </div>
+                                            </div>
+                                            <!-- Description -->
+                                            <div>
+                                                <textarea
+                                                    x-model="batchData.products[index].description"
+                                                    placeholder="Description..."
+                                                    rows="2"
+                                                    class="w-full px-2 py-1 bg-gray-700 border border-gray-600 rounded-lg text-white text-xs placeholder-gray-400 focus:outline-none focus:border-purple-500 resize-none"
+                                                ></textarea>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                    </div>
+
+                    <!-- Submit Batch Button -->
+                    <button
+                        @click="submitBatch()"
+                        :disabled="!canSubmitBatch()"
+                        class="w-full py-4 px-6 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        Start Batch Processing
+                    </button>
+                </div>
+
+                <!-- Step 3: Progress -->
+                <div x-show="batchStep === 3" class="bg-gray-800 rounded-xl p-6 shadow-xl">
+                    <h2 class="text-xl font-semibold text-white mb-4">Batch Processing</h2>
+
+                    <!-- Overall Progress -->
+                    <div class="mb-6">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-gray-300">Overall Progress</span>
+                            <span class="text-purple-400 font-bold" x-text="`${batchProgress.percent}%`"></span>
+                        </div>
+                        <div class="w-full bg-gray-700 rounded-full h-4">
+                            <div
+                                class="bg-gradient-to-r from-purple-600 to-pink-600 h-4 rounded-full transition-all duration-500"
+                                :style="`width: ${batchProgress.percent}%`"
+                            ></div>
+                        </div>
+                    </div>
+
+                    <!-- Stats Grid -->
+                    <div class="grid grid-cols-4 gap-3 mb-6">
+                        <div class="bg-gray-700/50 rounded-lg p-3 text-center">
+                            <p class="text-2xl font-bold text-blue-400" x-text="batchProgress.pending"></p>
+                            <p class="text-xs text-gray-400">Pending</p>
+                        </div>
+                        <div class="bg-gray-700/50 rounded-lg p-3 text-center">
+                            <p class="text-2xl font-bold text-yellow-400" x-text="batchProgress.processing"></p>
+                            <p class="text-xs text-gray-400">Processing</p>
+                        </div>
+                        <div class="bg-gray-700/50 rounded-lg p-3 text-center">
+                            <p class="text-2xl font-bold text-green-400" x-text="batchProgress.completed"></p>
+                            <p class="text-xs text-gray-400">Completed</p>
+                        </div>
+                        <div class="bg-gray-700/50 rounded-lg p-3 text-center">
+                            <p class="text-2xl font-bold text-red-400" x-text="batchProgress.failed"></p>
+                            <p class="text-xs text-gray-400">Failed</p>
+                        </div>
+                    </div>
+
+                    <!-- Status Message -->
+                    <div class="flex items-center space-x-3 mb-4">
+                        <div x-show="batchProgress.status === 'processing'" class="animate-spin w-5 h-5 border-2 border-purple-500 border-t-transparent rounded-full"></div>
+                        <svg x-show="batchProgress.status === 'completed'" class="w-5 h-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                        </svg>
+                        <p class="text-gray-300" x-text="batchProgress.message"></p>
+                    </div>
+
+                    <!-- Drive Folder Link -->
+                    <div x-show="batchProgress.driveUrl" class="mb-4">
+                        <a
+                            :href="batchProgress.driveUrl"
+                            target="_blank"
+                            class="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                        >
+                            <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"></path>
+                            </svg>
+                            Open Google Drive Folder
+                        </a>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="flex space-x-3">
+                        <button
+                            x-show="batchProgress.status === 'processing'"
+                            @click="cancelBatch()"
+                            class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                        >
+                            Cancel Batch
+                        </button>
+                        <button
+                            x-show="batchProgress.status === 'completed' && batchProgress.failed > 0"
+                            @click="retryFailed()"
+                            class="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors"
+                        >
+                            Retry Failed (<span x-text="batchProgress.failed"></span>)
+                        </button>
+                        <button
+                            x-show="batchProgress.status === 'completed' || batchProgress.status === 'cancelled'"
+                            @click="startNewBatch()"
+                            class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                        >
+                            Start New Batch
+                        </button>
+                    </div>
+                </div>
             </div>
-            <p class="text-gray-300 mt-2" x-text="error"></p>
-            <button
-                @click="error = null"
-                class="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-            >
-                Dismiss
-            </button>
-        </div>
+        </template>
+
+        <!-- ==================== SINGLE MODE STATUS/RESULT ==================== -->
+        <template x-if="mode === 'single'">
+            <div>
+                <!-- Status Messages (Single Mode) -->
+                <div x-show="isLoading" x-cloak class="mt-6 bg-gray-800 rounded-xl p-6">
+                    <div class="w-full bg-gray-700 rounded-full h-3 mb-4">
+                        <div class="bg-gradient-to-r from-purple-600 to-pink-600 h-3 rounded-full transition-all duration-500"
+                             :style="`width: ${progressPercent}%`"></div>
+                    </div>
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center space-x-3">
+                            <div class="animate-spin w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full"></div>
+                            <p class="text-gray-300 font-medium" x-text="statusMessage"></p>
+                        </div>
+                        <span class="text-purple-400 font-bold" x-text="`${progressPercent}%`"></span>
+                    </div>
+                    <p class="text-gray-500 text-sm" x-text="statusDetail"></p>
+                    <div class="flex justify-between mt-4 text-xs">
+                        <div :class="currentStep >= 1 ? 'text-purple-400' : 'text-gray-600'">
+                            <span :class="currentStep >= 1 ? 'bg-purple-500' : 'bg-gray-600'" class="inline-block w-2 h-2 rounded-full mr-1"></span>
+                            Scraping
+                        </div>
+                        <div :class="currentStep >= 2 ? 'text-purple-400' : 'text-gray-600'">
+                            <span :class="currentStep >= 2 ? 'bg-purple-500' : 'bg-gray-600'" class="inline-block w-2 h-2 rounded-full mr-1"></span>
+                            Analyzing
+                        </div>
+                        <div :class="currentStep >= 3 ? 'text-purple-400' : 'text-gray-600'">
+                            <span :class="currentStep >= 3 ? 'bg-purple-500' : 'bg-gray-600'" class="inline-block w-2 h-2 rounded-full mr-1"></span>
+                            Generating
+                        </div>
+                        <div :class="currentStep >= 4 ? 'text-purple-400' : 'text-gray-600'">
+                            <span :class="currentStep >= 4 ? 'bg-purple-500' : 'bg-gray-600'" class="inline-block w-2 h-2 rounded-full mr-1"></span>
+                            Uploading
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Success Result (Single Mode) -->
+                <div x-show="result && result.status === 'success'" x-cloak class="mt-6 bg-green-900/50 border border-green-700 rounded-xl p-6">
+                    <div class="flex items-center space-x-3 mb-4">
+                        <svg class="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        <h3 class="text-lg font-semibold text-green-400">Generation Complete!</h3>
+                    </div>
+                    <p class="text-gray-300 mb-4" x-text="result.message"></p>
+                    <a
+                        :href="result.folder_link"
+                        target="_blank"
+                        class="inline-flex items-center px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                    >
+                        <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"></path>
+                        </svg>
+                        Open Google Drive Folder
+                    </a>
+                    <div class="mt-4 text-sm text-gray-400">
+                        <p>Generated <span x-text="result.stats?.generated_slides || 0"></span> slides</p>
+                    </div>
+                </div>
+
+                <!-- Error Message (Single Mode) -->
+                <div x-show="error" x-cloak class="mt-6 bg-red-900/50 border border-red-700 rounded-xl p-6">
+                    <div class="flex items-center space-x-3">
+                        <svg class="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                        <h3 class="text-lg font-semibold text-red-400">Error</h3>
+                    </div>
+                    <p class="text-gray-300 mt-2" x-text="error"></p>
+                    <button
+                        @click="error = null"
+                        class="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                    >
+                        Dismiss
+                    </button>
+                </div>
+            </div>
+        </template>
     </div>
 
     <script>
-        // API Base URL - change this for production
+        // API Base URL
         const API_BASE_URL = window.location.hostname === 'localhost'
             ? 'http://localhost:5001'
             : `http://${window.location.hostname}:5001`;
 
         function slideshowGenerator() {
             return {
+                // Mode toggle
+                mode: 'single',
+
+                // Single mode data
                 formData: {
                     tiktok_url: '',
                     folder_name: '',
@@ -284,8 +616,37 @@
                 result: null,
                 error: null,
                 dragOver: false,
-                showAnalysis: false,
 
+                // Batch mode data
+                batchStep: 1,
+                batchData: {
+                    linksText: '',
+                    photoVariations: 1,
+                    textVariations: 1,
+                    applyToAll: true,
+                    products: [{ file: null, preview: null, description: '' }]
+                },
+                batchValidation: {
+                    valid: 0,
+                    invalid: 0,
+                    validLinks: [],
+                    invalidLinks: []
+                },
+                showInvalidLinks: false,
+                batchId: null,
+                batchPollInterval: null,
+                batchProgress: {
+                    status: 'pending',
+                    percent: 0,
+                    pending: 0,
+                    processing: 0,
+                    completed: 0,
+                    failed: 0,
+                    message: 'Starting batch...',
+                    driveUrl: null
+                },
+
+                // Single mode methods
                 handleFileSelect(event) {
                     const file = event.target.files[0];
                     if (file && file.type.startsWith('image/')) {
@@ -327,7 +688,6 @@
                             this.progressPercent = status.progress || 0;
                             this.statusDetail = status.details?.detail || '';
 
-                            // Map step names to numbers
                             const stepMap = { 'starting': 1, 'scraping': 1, 'analyzing': 2, 'generating': 3, 'uploading': 4, 'complete': 5 };
                             this.currentStep = stepMap[status.step] || 0;
 
@@ -338,17 +698,14 @@
                                     status: 'success',
                                     message: 'Slideshow generated successfully!',
                                     folder_link: status.details?.folder_link,
-                                    stats: status.details?.stats,
-                                    analysis: status.details?.analysis
+                                    stats: status.details?.stats
                                 };
                             } else if (status.step === 'error') {
                                 this.stopPolling();
                                 this.isLoading = false;
                                 this.error = status.message;
                             }
-                        } catch (e) {
-                            // Ignore polling errors
-                        }
+                        } catch (e) {}
                     }, 1000);
                 },
 
@@ -359,7 +716,7 @@
                     }
                 },
 
-                async submitForm() {
+                async submitSingleForm() {
                     if (!this.file) {
                         this.error = 'Please upload a product image';
                         return;
@@ -368,7 +725,6 @@
                     this.isLoading = true;
                     this.error = null;
                     this.result = null;
-                    this.showAnalysis = false;
                     this.statusMessage = 'Starting...';
                     this.progressPercent = 0;
                     this.currentStep = 0;
@@ -399,7 +755,6 @@
                             throw new Error(data.error || 'Generation failed');
                         }
 
-                        // Start polling with the session ID
                         if (data.session_id && data.status === 'started') {
                             this.startPolling(data.session_id);
                         } else if (data.status === 'success') {
@@ -413,6 +768,222 @@
                         this.stopPolling();
                         this.isLoading = false;
                     }
+                },
+
+                // Batch mode methods
+                validateBatchLinks() {
+                    const text = this.batchData.linksText.trim();
+                    if (!text) {
+                        this.batchValidation = { valid: 0, invalid: 0, validLinks: [], invalidLinks: [] };
+                        return;
+                    }
+
+                    const lines = text.split(/[\n\r]+/).map(l => l.trim()).filter(l => l);
+                    const tiktokPatterns = [
+                        /^https?:\/\/(www\.)?tiktok\.com\/@[\w.-]+\/(video|photo)\/\d+/,
+                        /^https?:\/\/vm\.tiktok\.com\/[\w]+/,
+                        /^https?:\/\/(www\.)?tiktok\.com\/t\/[\w]+/,
+                    ];
+
+                    const validLinks = [];
+                    const invalidLinks = [];
+
+                    lines.forEach((url, index) => {
+                        const isValid = tiktokPatterns.some(p => p.test(url));
+                        if (isValid) {
+                            validLinks.push({ index, url });
+                        } else {
+                            invalidLinks.push({ index, url });
+                        }
+                    });
+
+                    this.batchValidation = {
+                        valid: validLinks.length,
+                        invalid: invalidLinks.length,
+                        validLinks,
+                        invalidLinks
+                    };
+                },
+
+                goToStep2() {
+                    // Initialize products array
+                    const count = this.batchValidation.valid;
+                    this.batchData.products = [];
+                    for (let i = 0; i < count; i++) {
+                        this.batchData.products.push({ file: null, preview: null, description: '' });
+                    }
+                    this.batchStep = 2;
+                },
+
+                handleBatchFileSelect(event, index) {
+                    const file = event.target.files[0];
+                    if (file && file.type.startsWith('image/')) {
+                        this.batchData.products[index].file = file;
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            this.batchData.products[index].preview = e.target.result;
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                },
+
+                canSubmitBatch() {
+                    if (this.batchData.applyToAll) {
+                        return this.batchData.products[0]?.file && this.batchData.products[0]?.description;
+                    }
+                    // Check all products have file and description
+                    return this.batchData.products.every(p => p.file && p.description);
+                },
+
+                async submitBatch() {
+                    const formData = new FormData();
+
+                    // Add links
+                    const validUrls = this.batchValidation.validLinks.map(l => l.url).join('\n');
+                    formData.append('links', validUrls);
+
+                    // Add variations
+                    formData.append('photo_variations', this.batchData.photoVariations);
+                    formData.append('text_variations', this.batchData.textVariations);
+
+                    // Add products
+                    if (this.batchData.applyToAll) {
+                        // Same product for all
+                        for (let i = 0; i < this.batchValidation.valid; i++) {
+                            formData.append(`product_photo_${i}`, this.batchData.products[0].file);
+                            formData.append(`product_description_${i}`, this.batchData.products[0].description);
+                        }
+                    } else {
+                        // Individual products
+                        this.batchData.products.forEach((product, i) => {
+                            formData.append(`product_photo_${i}`, product.file);
+                            formData.append(`product_description_${i}`, product.description);
+                        });
+                    }
+
+                    try {
+                        const response = await fetch(`${API_BASE_URL}/api/batch`, {
+                            method: 'POST',
+                            body: formData
+                        });
+
+                        const data = await response.json();
+
+                        if (!response.ok) {
+                            throw new Error(data.error || 'Failed to create batch');
+                        }
+
+                        this.batchId = data.batch_id;
+                        this.batchProgress = {
+                            status: 'processing',
+                            percent: 0,
+                            pending: data.total_links,
+                            processing: 0,
+                            completed: 0,
+                            failed: 0,
+                            message: 'Batch created, processing started...',
+                            driveUrl: null
+                        };
+                        this.batchStep = 3;
+                        this.startBatchPolling();
+
+                    } catch (err) {
+                        alert('Error: ' + err.message);
+                    }
+                },
+
+                startBatchPolling() {
+                    this.batchPollInterval = setInterval(async () => {
+                        try {
+                            const res = await fetch(`${API_BASE_URL}/api/batch/${this.batchId}/status`);
+                            const status = await res.json();
+
+                            this.batchProgress = {
+                                status: status.status,
+                                percent: status.progress,
+                                pending: status.links.pending,
+                                processing: status.links.processing,
+                                completed: status.links.completed,
+                                failed: status.links.failed,
+                                message: this.getBatchMessage(status),
+                                driveUrl: status.drive_folder_url
+                            };
+
+                            if (status.status === 'completed' || status.status === 'failed' || status.status === 'cancelled') {
+                                this.stopBatchPolling();
+                            }
+                        } catch (e) {}
+                    }, 3000);
+                },
+
+                stopBatchPolling() {
+                    if (this.batchPollInterval) {
+                        clearInterval(this.batchPollInterval);
+                        this.batchPollInterval = null;
+                    }
+                },
+
+                getBatchMessage(status) {
+                    if (status.status === 'completed') {
+                        if (status.links.failed > 0) {
+                            return `Completed with ${status.links.failed} failed links`;
+                        }
+                        return 'All links processed successfully!';
+                    }
+                    if (status.status === 'cancelled') return 'Batch cancelled';
+                    if (status.status === 'failed') return status.error_message || 'Batch failed';
+                    return `Processing ${status.links.processing} links...`;
+                },
+
+                async cancelBatch() {
+                    if (!confirm('Are you sure you want to cancel this batch?')) return;
+
+                    try {
+                        await fetch(`${API_BASE_URL}/api/batch/${this.batchId}/cancel`, { method: 'POST' });
+                        this.batchProgress.status = 'cancelled';
+                        this.batchProgress.message = 'Batch cancelled';
+                        this.stopBatchPolling();
+                    } catch (e) {
+                        alert('Failed to cancel batch');
+                    }
+                },
+
+                async retryFailed() {
+                    try {
+                        const res = await fetch(`${API_BASE_URL}/api/batch/${this.batchId}/retry-failed`, { method: 'POST' });
+                        const data = await res.json();
+
+                        if (data.status === 'retry_started') {
+                            this.batchProgress.status = 'processing';
+                            this.batchProgress.message = `Retrying ${data.retry_count} failed links...`;
+                            this.startBatchPolling();
+                        }
+                    } catch (e) {
+                        alert('Failed to retry');
+                    }
+                },
+
+                startNewBatch() {
+                    this.batchStep = 1;
+                    this.batchData = {
+                        linksText: '',
+                        photoVariations: 1,
+                        textVariations: 1,
+                        applyToAll: true,
+                        products: [{ file: null, preview: null, description: '' }]
+                    };
+                    this.batchValidation = { valid: 0, invalid: 0, validLinks: [], invalidLinks: [] };
+                    this.batchId = null;
+                    this.batchProgress = {
+                        status: 'pending',
+                        percent: 0,
+                        pending: 0,
+                        processing: 0,
+                        completed: 0,
+                        failed: 0,
+                        message: '',
+                        driveUrl: null
+                    };
                 }
             };
         }
