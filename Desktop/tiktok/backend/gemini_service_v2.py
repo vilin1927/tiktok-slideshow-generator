@@ -754,7 +754,8 @@ def _generate_single_image(
     product_image_path: Optional[str] = None,
     persona_reference_path: Optional[str] = None,
     has_persona: bool = False,
-    text_style: Optional[dict] = None
+    text_style: Optional[dict] = None,
+    version: int = 1
 ) -> str:
     """
     Generate a single image with clear image labeling.
@@ -881,12 +882,23 @@ LAYOUT: {text_position_hint}
         # HOOK or BODY SLIDE
         slide_label = "HOOK" if slide_type == "hook" else "TIP"
 
+        # Add variation instruction for versions > 1
+        variation_instruction = ""
+        if version > 1:
+            variation_instruction = f"""
+VARIATION #{version}: Create a DIFFERENT visual interpretation:
+- Use a different camera angle or perspective
+- Change the pose or body position
+- Adjust the lighting or mood slightly
+- Keep the same text and message, but make the image visually distinct
+"""
+
         if has_persona and persona_reference_path:
             # With persona - need consistency
             prompt = f"""Generate a TikTok {slide_label} slide.
 
 {text_style_instruction}
-
+{variation_instruction}
 [STYLE_REFERENCE] - Reference slide for visual composition and mood.
 
 [PERSONA_REFERENCE] - Person to use. Generate the EXACT SAME PERSON in a new scene:
@@ -925,7 +937,7 @@ IMPORTANT: Only ONE person in the image - never two people!
             prompt = f"""Generate a TikTok {slide_label} slide.
 
 {text_style_instruction}
-
+{variation_instruction}
 [STYLE_REFERENCE] - Reference slide for visual composition and mood.
 (Do NOT copy the person - create a NEW person)
 
@@ -959,7 +971,7 @@ IMPORTANT: Only ONE person in the image - never two people!
             prompt = f"""Generate a TikTok {slide_label} slide.
 
 {text_style_instruction}
-
+{variation_instruction}
 [STYLE_REFERENCE] - Reference slide for visual composition and mood.
 
 NEW SCENE: {scene_description}
@@ -1169,7 +1181,8 @@ def generate_all_images(
                     task['product_image_path'],
                     persona_ref_path,
                     task['has_persona'],
-                    text_style  # Pass text style from analysis
+                    text_style,  # Pass text style from analysis
+                    task['version']  # Pass version for variation diversity
                 )
             finally:
                 rate_limiter.release()
