@@ -164,7 +164,6 @@ def process_link(self, batch_link_id: str, parent_drive_folder_id: str):
                 output_dir=output_dir,
                 hook_variations=photo_variations,
                 body_variations=photo_variations,
-                product_variations=photo_variations,
                 request_id=batch_link_id[:8]
             )
 
@@ -318,7 +317,6 @@ def generate_variation(self, variation_id: str, slide_paths: list, product_image
             output_dir=output_dir,
             hook_variations=1,
             body_variations=1,
-            product_variations=1,
             request_id=f"var_{variation_id[:8]}"
         )
 

@@ -1052,7 +1052,6 @@ def generate_all_images(
     progress_callback: Optional[ImageProgressCallback] = None,
     hook_variations: int = 1,
     body_variations: int = 1,
-    product_variations: int = 1,
     request_id: str = None
 ) -> dict:
     """
@@ -1071,7 +1070,6 @@ def generate_all_images(
         progress_callback: Optional callback with signature (current, total, message)
         hook_variations: Number of variations for hook slide (default 1)
         body_variations: Number of variations per body slide (default 1)
-        product_variations: Number of variations for product slide (default 1)
         request_id: Optional request ID for logging
 
     Returns:
@@ -1103,7 +1101,7 @@ def generate_all_images(
             num_variations = hook_variations
             slide_key = 'hook'
         elif slide_type == 'product':
-            num_variations = product_variations
+            num_variations = 1  # Product always 1 variation
             slide_key = 'product'
         elif slide_type == 'cta':
             num_variations = 1  # CTA always 1
@@ -1270,7 +1268,6 @@ def run_pipeline(
     progress_callback: Optional[PipelineProgressCallback] = None,
     hook_variations: int = 1,
     body_variations: int = 1,
-    product_variations: int = 1,
     request_id: str = None
 ) -> dict:
     """
@@ -1287,7 +1284,6 @@ def run_pipeline(
             - percent: Progress percentage (0-100)
         hook_variations: Number of variations for hook slide (default 1)
         body_variations: Number of variations per body slide (default 1)
-        product_variations: Number of variations for product slide (default 1)
         request_id: Optional request ID for logging
 
     Returns:
@@ -1304,9 +1300,9 @@ def run_pipeline(
     log = get_request_logger('gemini', request_id) if request_id else logger
     start_time = time.time()
 
-    total_variations = hook_variations + (len(slide_paths) - 2) * body_variations + product_variations
+    total_variations = hook_variations + (len(slide_paths) - 2) * body_variations + 1
     log.info(f"Starting pipeline: {len(slide_paths)} slides, ~{total_variations} total images")
-    log.debug(f"Variations: hook={hook_variations}, body={body_variations}, product={product_variations}")
+    log.debug(f"Variations: hook={hook_variations}, body={body_variations}")
 
     if progress_callback:
         progress_callback('analyzing', 'Analyzing slideshow and planning new story...', 30)
@@ -1370,7 +1366,6 @@ def run_pipeline(
         progress_callback=image_progress,
         hook_variations=hook_variations,
         body_variations=body_variations,
-        product_variations=product_variations,
         request_id=request_id
     )
 

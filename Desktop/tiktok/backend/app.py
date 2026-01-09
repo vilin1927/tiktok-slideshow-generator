@@ -26,6 +26,7 @@ from tiktok_scraper import scrape_tiktok_slideshow, TikTokScraperError
 from gemini_service_v2 import run_pipeline, GeminiServiceError
 from google_drive import upload_slideshow_output, GoogleDriveError
 from batch_routes import batch_bp
+from admin_routes import admin_bp
 
 # Global progress tracking
 progress_status = {}
@@ -35,6 +36,9 @@ CORS(app)
 
 # Register batch processing blueprint
 app.register_blueprint(batch_bp)
+
+# Register admin blueprint
+app.register_blueprint(admin_bp)
 
 # Configuration
 UPLOAD_FOLDER = 'temp/uploads'
@@ -80,13 +84,13 @@ def update_progress(session_id, step, message, progress, details=None):
 
 def run_generation(session_id, tiktok_url, folder_name, product_context,
                    saved_product_images, session_scraped, session_generated,
-                   hook_variations=1, body_variations=1, product_variations=1):
+                   hook_variations=1, body_variations=1):
     """Background task for generation using v2 pipeline with variations support"""
     log = get_request_logger('app', session_id)
     start_time = time.time()
 
     log.info(f"Starting generation pipeline - URL: {tiktok_url[:60]}...")
-    log.debug(f"Params: folder={folder_name}, variations=H{hook_variations}/B{body_variations}/P{product_variations}")
+    log.debug(f"Params: folder={folder_name}, variations=H{hook_variations}/B{body_variations}")
 
     try:
         # ===== STEP 1: Scrape TikTok =====
@@ -124,7 +128,6 @@ def run_generation(session_id, tiktok_url, folder_name, product_context,
                 progress_callback=progress_callback,
                 hook_variations=hook_variations,
                 body_variations=body_variations,
-                product_variations=product_variations,
                 request_id=session_id
             )
         except GeminiServiceError as e:
@@ -206,15 +209,13 @@ def generate_slideshow():
         # Variation params (default to 1 if not provided)
         hook_variations = int(request.form.get('hook_variations', 1))
         body_variations = int(request.form.get('body_variations', 1))
-        product_variations = int(request.form.get('product_variations', 1))
 
         # Clamp to valid range (1-5)
         hook_variations = max(1, min(5, hook_variations))
         body_variations = max(1, min(5, body_variations))
-        product_variations = max(1, min(5, product_variations))
 
         log.info(f"New request: url={tiktok_url[:50]}... folder={folder_name}")
-        log.debug(f"Variations: hook={hook_variations}, body={body_variations}, product={product_variations}")
+        log.debug(f"Variations: hook={hook_variations}, body={body_variations}")
 
         if not tiktok_url:
             log.warning("Validation failed: missing TikTok URL")
@@ -251,7 +252,7 @@ def generate_slideshow():
         thread = threading.Thread(target=run_generation, args=(
             session_id, tiktok_url, folder_name, product_context,
             saved_product_images, session_scraped, session_generated,
-            hook_variations, body_variations, product_variations
+            hook_variations, body_variations
         ))
         thread.start()
         log.info("Background thread started")
