@@ -836,7 +836,12 @@ TEXT TO ADD:
 {text_content}
 
 LAYOUT: {text_position_hint}
-Product must remain FULLY VISIBLE.
+
+CRITICAL TEXT PLACEMENT RULES:
+- Product must remain FULLY VISIBLE - NEVER place text over the product
+- Text should be in empty/background areas only
+- If unsure, place text at TOP or BOTTOM edges of image
+- Main subject/object must be completely unobstructed
 
 GOAL: Look like "just another tip" - NOT an advertisement.
 {quality_constraints}"""
@@ -914,7 +919,12 @@ TEXT TO DISPLAY:
 {text_content}
 
 LAYOUT: {text_position_hint}
-Never cover face with text
+
+CRITICAL TEXT PLACEMENT RULES:
+- NEVER cover face or person with text
+- NEVER cover main objects/products with text
+- Text should be in empty/background areas only
+- If unsure, place text at TOP or BOTTOM edges of image
 
 IMPORTANT: Only ONE person in the image - never two people!
 {quality_constraints}"""
@@ -953,7 +963,12 @@ TEXT TO DISPLAY:
 {text_content}
 
 LAYOUT: {text_position_hint}
-Never cover face with text
+
+CRITICAL TEXT PLACEMENT RULES:
+- NEVER cover face or person with text
+- NEVER cover main objects/products with text
+- Text should be in empty/background areas only
+- If unsure, place text at TOP or BOTTOM edges of image
 
 IMPORTANT: Only ONE person in the image - never two people!
 {quality_constraints}"""
@@ -980,6 +995,12 @@ TEXT TO DISPLAY:
 {text_content}
 
 LAYOUT: {text_position_hint}
+
+CRITICAL TEXT PLACEMENT RULES:
+- NEVER cover main objects/products with text
+- Text should be in empty/background areas only
+- If unsure, place text at TOP or BOTTOM edges of image
+- Main subject must be completely unobstructed
 
 IMPORTANT: Do NOT include any human faces, hands, body parts, or people in this image.
 This MUST be a completely faceless composition showing ONLY:
