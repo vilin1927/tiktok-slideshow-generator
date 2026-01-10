@@ -28,10 +28,10 @@ from google.genai import types
 ANALYSIS_MODEL = 'gemini-3-pro-preview'
 IMAGE_MODEL = 'gemini-3-pro-image-preview'
 
-# Rate limiting config
-MAX_CONCURRENT = 10
-RPM_LIMIT = 60
-MAX_RETRIES = 3
+# Rate limiting config (respect Gemini quota: 20 RPM for image generation)
+MAX_CONCURRENT = 3    # Fewer concurrent to reduce bursts
+RPM_LIMIT = 15        # Stay safely under 20 RPM limit
+MAX_RETRIES = 5       # More retries for rate limit recovery
 REQUEST_TIMEOUT = 120  # seconds per API call
 
 # Rate limiter using semaphore + delay
@@ -1061,8 +1061,21 @@ If you generate a human face or body part, the image will be REJECTED.
 
         except Exception as e:
             last_error = e
+            error_str = str(e)
+
+            # Check for rate limit error and extract retry delay
+            if '429' in error_str or 'RESOURCE_EXHAUSTED' in error_str:
+                # Try to extract retry delay from error (e.g., "retry in 51s")
+                match = re.search(r'retry in (\d+\.?\d*)s', error_str)
+                if match:
+                    wait_time = float(match.group(1)) + 5  # Add buffer
+                else:
+                    wait_time = 60  # Default 60s for rate limits
+                logger.warning(f"Rate limited (429), waiting {wait_time:.0f}s before retry {attempt + 2}/{MAX_RETRIES}")
+            else:
+                wait_time = (2 ** attempt) + 1  # Normal exponential backoff
+
             if attempt < MAX_RETRIES - 1:
-                wait_time = (2 ** attempt) + 1
                 time.sleep(wait_time)
 
     raise GeminiServiceError(f'Failed after {MAX_RETRIES} retries: {last_error}')
