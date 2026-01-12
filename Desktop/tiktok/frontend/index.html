@@ -28,16 +28,23 @@
                 <button
                     @click="mode = 'single'"
                     :class="mode === 'single' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'"
-                    class="px-6 py-2 rounded-md transition-all font-medium"
+                    class="px-4 py-2 rounded-md transition-all font-medium"
                 >
                     Single Link
                 </button>
                 <button
                     @click="mode = 'batch'"
                     :class="mode === 'batch' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'"
-                    class="px-6 py-2 rounded-md transition-all font-medium"
+                    class="px-4 py-2 rounded-md transition-all font-medium"
                 >
                     Batch Mode
+                </button>
+                <button
+                    @click="mode = 'video'"
+                    :class="mode === 'video' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'"
+                    class="px-4 py-2 rounded-md transition-all font-medium"
+                >
+                    Create Video
                 </button>
             </div>
         </div>
@@ -231,6 +238,21 @@
                             <span class="text-purple-400 font-bold" x-text="calculateTotal()"></span>
                         </p>
                     </div>
+                </div>
+
+                <!-- Video Generation Option -->
+                <div class="mb-6 p-4 bg-gray-700/50 rounded-lg">
+                    <label class="flex items-center cursor-pointer">
+                        <input
+                            type="checkbox"
+                            x-model="formData.generate_video"
+                            class="w-5 h-5 text-purple-600 bg-gray-700 border-gray-600 rounded focus:ring-purple-500 focus:ring-2"
+                        >
+                        <span class="ml-3 text-gray-300 font-medium">Also generate video</span>
+                    </label>
+                    <p class="text-gray-500 text-xs mt-2 ml-8">
+                        Combine slides + TikTok audio into MP4 videos (one per variation set)
+                    </p>
                 </div>
 
                 <!-- Submit Button -->
@@ -574,6 +596,171 @@ https://vm.tiktok.com/abc..."
             </div>
         </template>
 
+        <!-- ==================== VIDEO MODE ==================== -->
+        <template x-if="mode === 'video'">
+            <div class="bg-gray-800 rounded-xl p-6 shadow-xl">
+                <h2 class="text-xl font-semibold text-white mb-4">Create Video from Photos</h2>
+                <p class="text-gray-400 text-sm mb-6">Upload photos and music to create a 9:16 slideshow video</p>
+
+                <!-- Photo Upload -->
+                <div class="mb-6">
+                    <label class="block text-gray-300 text-sm font-medium mb-2">
+                        Upload Photos
+                        <span class="text-gray-500 text-xs font-normal">(in order)</span>
+                    </label>
+                    <div
+                        class="border-2 border-dashed border-gray-600 rounded-lg p-6 text-center hover:border-purple-500 transition-colors cursor-pointer"
+                        @click="$refs.videoFileInput.click()"
+                        @dragover.prevent="videoDragOver = true"
+                        @dragleave.prevent="videoDragOver = false"
+                        @drop.prevent="handleVideoFileDrop($event)"
+                        :class="{ 'border-purple-500 bg-purple-500/10': videoDragOver }"
+                    >
+                        <input
+                            type="file"
+                            x-ref="videoFileInput"
+                            @change="handleVideoFileSelect($event)"
+                            accept="image/*"
+                            multiple
+                            class="hidden"
+                        >
+                        <div x-show="videoData.images.length === 0" class="text-gray-400">
+                            <svg class="mx-auto h-12 w-12 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                            </svg>
+                            <p>Click to upload or drag and drop photos</p>
+                            <p class="text-sm mt-1">Photos will appear in the video in upload order</p>
+                        </div>
+                        <div x-show="videoData.images.length > 0" class="relative">
+                            <div class="flex flex-wrap gap-2 justify-center">
+                                <template x-for="(preview, index) in videoData.previews" :key="index">
+                                    <div class="relative">
+                                        <img :src="preview" class="h-20 w-20 object-cover rounded-lg">
+                                        <span class="absolute top-0 left-0 bg-purple-600 text-white text-xs px-1 rounded-br" x-text="index + 1"></span>
+                                        <button
+                                            type="button"
+                                            @click.stop="removeVideoImage(index)"
+                                            class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center"
+                                        >&times;</button>
+                                    </div>
+                                </template>
+                            </div>
+                            <p class="text-purple-400 text-sm mt-3">
+                                <span x-text="videoData.images.length"></span> photo(s) selected
+                                <button type="button" @click.stop="clearVideoImages()" class="text-red-400 ml-2 hover:text-red-300">(clear all)</button>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Audio Upload -->
+                <div class="mb-6">
+                    <label class="block text-gray-300 text-sm font-medium mb-2">
+                        Upload Music
+                        <span class="text-gray-500 text-xs font-normal">(MP3)</span>
+                    </label>
+                    <div
+                        class="border-2 border-dashed border-gray-600 rounded-lg p-4 text-center hover:border-purple-500 transition-colors cursor-pointer"
+                        @click="$refs.audioFileInput.click()"
+                    >
+                        <input
+                            type="file"
+                            x-ref="audioFileInput"
+                            @change="handleAudioFileSelect($event)"
+                            accept="audio/*"
+                            class="hidden"
+                        >
+                        <div x-show="!videoData.audio" class="text-gray-400">
+                            <svg class="mx-auto h-8 w-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path>
+                            </svg>
+                            <p>Click to upload audio file</p>
+                        </div>
+                        <div x-show="videoData.audio" class="text-purple-400">
+                            <svg class="mx-auto h-6 w-6 mb-1" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"></path>
+                            </svg>
+                            <span x-text="videoData.audioName"></span>
+                            <button type="button" @click.stop="clearAudio()" class="text-red-400 ml-2 hover:text-red-300">(remove)</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Folder Name -->
+                <div class="mb-6">
+                    <label class="block text-gray-300 text-sm font-medium mb-2">
+                        Output Folder Name
+                    </label>
+                    <input
+                        type="text"
+                        x-model="videoData.folder_name"
+                        placeholder="my-slideshow-video"
+                        class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                    >
+                </div>
+
+                <!-- Info box -->
+                <div class="mb-6 p-3 bg-gray-700/50 rounded-lg text-sm text-gray-400">
+                    <p><span class="text-purple-400 font-medium">Output:</span> 9:16 vertical video (1080x1920)</p>
+                    <p><span class="text-purple-400 font-medium">Timing:</span> 3 seconds per photo</p>
+                    <p><span class="text-purple-400 font-medium">Format:</span> MP4 (H.264)</p>
+                </div>
+
+                <!-- Submit Button -->
+                <button
+                    @click="submitVideoForm()"
+                    :disabled="videoLoading || videoData.images.length === 0"
+                    class="w-full py-4 px-6 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    <span x-show="!videoLoading">Create Video</span>
+                    <span x-show="videoLoading" class="flex items-center justify-center">
+                        <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span x-text="videoStatus"></span>
+                    </span>
+                </button>
+
+                <!-- Video Result -->
+                <div x-show="videoResult" x-cloak class="mt-6 bg-green-900/50 border border-green-700 rounded-xl p-6">
+                    <div class="flex items-center space-x-3 mb-4">
+                        <svg class="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        <h3 class="text-lg font-semibold text-green-400">Video Created!</h3>
+                    </div>
+                    <a
+                        :href="videoResult.drive_url"
+                        target="_blank"
+                        class="inline-flex items-center px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                    >
+                        <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"></path>
+                        </svg>
+                        Open Google Drive Folder
+                    </a>
+                </div>
+
+                <!-- Video Error -->
+                <div x-show="videoError" x-cloak class="mt-6 bg-red-900/50 border border-red-700 rounded-xl p-6">
+                    <div class="flex items-center space-x-3">
+                        <svg class="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                        <h3 class="text-lg font-semibold text-red-400">Error</h3>
+                    </div>
+                    <p class="text-gray-300 mt-2" x-text="videoError"></p>
+                    <button
+                        @click="videoError = null"
+                        class="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                    >
+                        Dismiss
+                    </button>
+                </div>
+            </div>
+        </template>
+
         <!-- ==================== SINGLE MODE STATUS/RESULT ==================== -->
         <template x-if="mode === 'single'">
             <div>
@@ -675,7 +862,8 @@ https://vm.tiktok.com/abc..."
                     hook_text_var: 1,
                     body_photo_var: 1,
                     body_text_var: 1,
-                    product_text_var: 1
+                    product_text_var: 1,
+                    generate_video: false
                 },
                 productFiles: [],
                 previewImages: [],
@@ -718,6 +906,22 @@ https://vm.tiktok.com/abc..."
                     message: 'Starting batch...',
                     driveUrl: null
                 },
+
+                // Video mode data
+                videoData: {
+                    images: [],
+                    previews: [],
+                    audio: null,
+                    audioName: '',
+                    folder_name: ''
+                },
+                videoDragOver: false,
+                videoLoading: false,
+                videoStatus: 'Processing...',
+                videoJobId: null,
+                videoResult: null,
+                videoError: null,
+                videoPollInterval: null,
 
                 // Single mode methods - multiple file support
                 handleFileSelect(event) {
@@ -862,6 +1066,9 @@ https://vm.tiktok.com/abc..."
                     formData.append('body_photo_var', this.formData.body_photo_var);
                     formData.append('body_text_var', this.formData.body_text_var);
                     formData.append('product_text_var', this.formData.product_text_var);
+
+                    // Video generation option
+                    formData.append('generate_video', this.formData.generate_video);
 
                     try {
                         this.statusMessage = 'Uploading...';
@@ -1108,6 +1315,136 @@ https://vm.tiktok.com/abc..."
                         message: '',
                         driveUrl: null
                     };
+                },
+
+                // Video mode methods
+                handleVideoFileSelect(event) {
+                    const files = Array.from(event.target.files);
+                    files.forEach(file => {
+                        if (file && file.type.startsWith('image/')) {
+                            this.videoData.images.push(file);
+                            const reader = new FileReader();
+                            reader.onload = (e) => {
+                                this.videoData.previews.push(e.target.result);
+                            };
+                            reader.readAsDataURL(file);
+                        }
+                    });
+                },
+
+                handleVideoFileDrop(event) {
+                    this.videoDragOver = false;
+                    const files = Array.from(event.dataTransfer.files);
+                    files.forEach(file => {
+                        if (file && file.type.startsWith('image/')) {
+                            this.videoData.images.push(file);
+                            const reader = new FileReader();
+                            reader.onload = (e) => {
+                                this.videoData.previews.push(e.target.result);
+                            };
+                            reader.readAsDataURL(file);
+                        }
+                    });
+                },
+
+                removeVideoImage(index) {
+                    this.videoData.images.splice(index, 1);
+                    this.videoData.previews.splice(index, 1);
+                },
+
+                clearVideoImages() {
+                    this.videoData.images = [];
+                    this.videoData.previews = [];
+                },
+
+                handleAudioFileSelect(event) {
+                    const file = event.target.files[0];
+                    if (file && file.type.startsWith('audio/')) {
+                        this.videoData.audio = file;
+                        this.videoData.audioName = file.name;
+                    }
+                },
+
+                clearAudio() {
+                    this.videoData.audio = null;
+                    this.videoData.audioName = '';
+                },
+
+                async submitVideoForm() {
+                    if (this.videoData.images.length === 0) {
+                        this.videoError = 'Please upload at least one image';
+                        return;
+                    }
+
+                    this.videoLoading = true;
+                    this.videoError = null;
+                    this.videoResult = null;
+                    this.videoStatus = 'Uploading...';
+
+                    const formData = new FormData();
+
+                    // Add images in order
+                    this.videoData.images.forEach(file => {
+                        formData.append('images', file);
+                    });
+
+                    // Add audio if provided
+                    if (this.videoData.audio) {
+                        formData.append('audio', this.videoData.audio);
+                    }
+
+                    // Add folder name
+                    formData.append('folder_name', this.videoData.folder_name || 'Slideshow_Video');
+
+                    try {
+                        const response = await fetch(`${API_BASE_URL}/api/video/create`, {
+                            method: 'POST',
+                            body: formData
+                        });
+
+                        const data = await response.json();
+
+                        if (!response.ok) {
+                            throw new Error(data.error || 'Video creation failed');
+                        }
+
+                        if (data.job_id) {
+                            this.videoJobId = data.job_id;
+                            this.videoStatus = 'Processing video...';
+                            this.startVideoPoll();
+                        }
+                    } catch (err) {
+                        this.videoError = err.message;
+                        this.videoLoading = false;
+                    }
+                },
+
+                startVideoPoll() {
+                    this.videoPollInterval = setInterval(async () => {
+                        try {
+                            const res = await fetch(`${API_BASE_URL}/api/video/status/${this.videoJobId}`);
+                            const status = await res.json();
+
+                            if (status.status === 'completed') {
+                                this.stopVideoPoll();
+                                this.videoLoading = false;
+                                this.videoResult = status;
+                            } else if (status.status === 'failed') {
+                                this.stopVideoPoll();
+                                this.videoLoading = false;
+                                this.videoError = status.error_message || 'Video creation failed';
+                            } else if (status.status === 'processing') {
+                                this.videoStatus = 'Creating video...';
+                            }
+                        } catch (e) {}
+                    }, 2000);
+                },
+
+                stopVideoPoll() {
+                    if (this.videoPollInterval) {
+                        clearInterval(this.videoPollInterval);
+                        this.videoPollInterval = null;
+                    }
                 }
             };
         }

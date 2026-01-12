@@ -32,7 +32,7 @@ IMAGE_MODEL = 'gemini-3-pro-image-preview'
 MAX_CONCURRENT = 3    # Fewer concurrent to reduce bursts
 RPM_LIMIT = 15        # Stay safely under 20 RPM limit
 MAX_RETRIES = 5       # More retries for rate limit recovery
-REQUEST_TIMEOUT = 120  # seconds per API call
+REQUEST_TIMEOUT = 300  # seconds per API call (5 min for complex analysis)
 
 # Rate limiter using semaphore + delay
 class RateLimiter:
@@ -169,8 +169,8 @@ def _validate_required_keywords(analysis: dict) -> tuple[bool, list[str]]:
 
     # Get required keywords from analysis
     keywords = analysis.get('required_keywords', {})
-    brand_name = keywords.get('brand_name', '')
-    purchase_location = keywords.get('purchase_location', 'amazon')
+    brand_name = keywords.get('brand_name', '') or 'Lumidew'  # Default to Lumidew
+    purchase_location = keywords.get('purchase_location', '') or 'amazon'  # Default to amazon
 
     # Find product slide
     product_slides = [s for s in analysis.get('new_slides', [])
@@ -202,8 +202,8 @@ def _inject_missing_keywords(analysis: dict) -> dict:
     Last resort if AI doesn't include them.
     """
     keywords = analysis.get('required_keywords', {})
-    brand = keywords.get('brand_name', '')
-    location = keywords.get('purchase_location', 'amazon')
+    brand = keywords.get('brand_name', '') or 'Lumidew'  # Default to Lumidew
+    location = keywords.get('purchase_location', '') or 'amazon'  # Default to amazon
 
     for slide in analysis.get('new_slides', []):
         if slide.get('slide_type') == 'product':
@@ -354,9 +354,10 @@ EXAMPLES:
 - Description: "Lumidew Steam Eye Mask..." → brand_name: "Lumidew" ✓
 - Description: "CeraVe Moisturizing Cream..." → brand_name: "CeraVe" ✓
 - Description: "Premium Sleep Mask (no brand)" → brand_name: "Premium Sleep Mask" (use product name)
+- If no brand found, default to "Lumidew"
 
 OUTPUT in "required_keywords":
-- brand_name: [EXACT brand from description - MUST exist in text above]
+- brand_name: [EXACT brand from description - if none found, use "Lumidew"]
 - brand_source_quote: [quote the phrase from description proving brand exists]
 - product_type: [what the product is]
 - purchase_location: [amazon, website, etc. - default to "amazon"]
@@ -529,6 +530,8 @@ TEXT RULES FOR ALL SLIDES:
 - NEVER end sentences with "."
 - Use "!" only if it fits the vibe, otherwise no punctuation
 - Emojis are encouraged ✨⚡💫
+- NEVER repeat the same text twice in one image (no duplicate lines!)
+- Keep text SHORT - max 2 lines, each line under 6 words
 
 HOOK SLIDE (slide 0):
 - Create a NEW attention-grabbing hook for the product category
@@ -567,8 +570,10 @@ They should flow naturally in conversational text, not feel forced.
   - Emojis are encouraged ✨⚡💫
 
 - Example with keywords naturally included:
-  "total game changer for my sleep! I keep [brand_name] masks on my nightstand,
-  they warm up on their own and feel like a cozy spa moment ✨ got them on [purchase_location]"
+  "total game changer for my sleep! I keep Lumidew masks on my nightstand,
+  they warm up on their own and feel like a cozy spa moment ✨ got them on amazon"
+
+⚠️ IMPORTANT: Use the ACTUAL brand name, NOT brackets or placeholders like "[brand]"!
 
 CTA SLIDE (only if original has one):
 - Keep engagement style
@@ -837,14 +842,15 @@ TEXT EFFECTS:
 OVERALL VIBE: {text_style.get('visual_vibe', 'clean minimal')}
 Position: {text_style.get('position_style', 'varies by slide')}
 
-TEXT SIZE AESTHETIC (CRITICAL):
-- Text should be SUBTLE and understated - think whispered, not shouted
-- Headers: Small enough that the image dominates, text complements
-- Body text: Compact, almost like Instagram story captions
-- The image is the hero, text is the supporting actor
-- Match the aesthetic of minimalist TikTok slideshows where text is an accent, not the focus
-- Reference style: Text you'd need to tap to read closely, not text that screams at you
-- Think "elegant magazine caption" not "billboard advertisement"
+TEXT SIZE (CRITICAL - FOLLOW EXACTLY):
+- Text must be SMALL - approximately 3-5% of image height
+- Maximum 2 lines of text total
+- Each line maximum 6 words
+- NEVER generate large/bold/dominant text that takes over the image
+- The IMAGE is the focus, text is a subtle accent only
+- Think "small Instagram caption" not "poster headline"
+- If in doubt, make text SMALLER
+- NEVER duplicate/repeat the same text line twice in the image
 
 The text appearance is CRITICAL for authenticity - match this exact visual style!
 """
