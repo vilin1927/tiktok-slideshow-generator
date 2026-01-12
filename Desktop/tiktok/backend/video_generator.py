@@ -77,14 +77,17 @@ def create_concat_file(image_paths: List[str], duration: float, output_dir: str)
 
     with open(concat_path, 'w') as f:
         for img_path in image_paths:
+            # Use absolute path to avoid issues with FFmpeg working directory
+            abs_path = os.path.abspath(img_path)
             # Escape single quotes in paths
-            escaped_path = img_path.replace("'", "'\\''")
+            escaped_path = abs_path.replace("'", "'\\''")
             f.write(f"file '{escaped_path}'\n")
             f.write(f"duration {duration}\n")
 
         # FFmpeg concat demuxer quirk: repeat last image to avoid cut-off
         if image_paths:
-            escaped_path = image_paths[-1].replace("'", "'\\''")
+            abs_path = os.path.abspath(image_paths[-1])
+            escaped_path = abs_path.replace("'", "'\\''")
             f.write(f"file '{escaped_path}'\n")
 
     return concat_path

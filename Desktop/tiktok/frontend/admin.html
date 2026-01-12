@@ -124,9 +124,71 @@
                 </p>
             </div>
 
+            <!-- Job Queue Section -->
+            <div class="mt-8 bg-gray-800/50 backdrop-blur rounded-xl p-6 shadow-xl">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-semibold">Job Queue</h2>
+                    <button @click="refreshJobs" class="text-sm px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded">
+                        Refresh
+                    </button>
+                </div>
+
+                <!-- Queue Stats -->
+                <div class="grid grid-cols-4 gap-2 mb-4 text-center text-xs">
+                    <div class="bg-yellow-500/20 rounded p-2">
+                        <div class="text-yellow-400 font-bold" x-text="queueStats.pending">0</div>
+                        <div class="text-gray-400">Pending</div>
+                    </div>
+                    <div class="bg-blue-500/20 rounded p-2">
+                        <div class="text-blue-400 font-bold" x-text="queueStats.processing">0</div>
+                        <div class="text-gray-400">Processing</div>
+                    </div>
+                    <div class="bg-green-500/20 rounded p-2">
+                        <div class="text-green-400 font-bold" x-text="queueStats.completed">0</div>
+                        <div class="text-gray-400">Completed</div>
+                    </div>
+                    <div class="bg-red-500/20 rounded p-2">
+                        <div class="text-red-400 font-bold" x-text="queueStats.failed">0</div>
+                        <div class="text-gray-400">Failed</div>
+                    </div>
+                </div>
+
+                <!-- Jobs List -->
+                <div class="space-y-2 max-h-64 overflow-y-auto">
+                    <template x-for="job in jobs" :key="job.id">
+                        <div class="bg-gray-700/50 rounded p-3 text-sm">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <span class="font-mono text-xs text-gray-400" x-text="job.id.substring(0, 8)"></span>
+                                    <span class="ml-2" x-text="job.folder_name || 'Unnamed'"></span>
+                                </div>
+                                <span class="px-2 py-0.5 rounded text-xs"
+                                      :class="{
+                                          'bg-yellow-500/30 text-yellow-400': job.status === 'pending',
+                                          'bg-blue-500/30 text-blue-400': job.status === 'processing',
+                                          'bg-green-500/30 text-green-400': job.status === 'completed',
+                                          'bg-red-500/30 text-red-400': job.status === 'failed'
+                                      }"
+                                      x-text="job.status">
+                                </span>
+                            </div>
+                            <div x-show="job.drive_url" class="mt-1">
+                                <a :href="job.drive_url" target="_blank" class="text-xs text-pink-400 hover:text-pink-300">
+                                    View in Drive &rarr;
+                                </a>
+                            </div>
+                            <div x-show="job.error_message" class="mt-1 text-xs text-red-400" x-text="job.error_message"></div>
+                        </div>
+                    </template>
+                    <div x-show="jobs.length === 0" class="text-center text-gray-500 py-4">
+                        No jobs found
+                    </div>
+                </div>
+            </div>
+
             <!-- Back to App Link -->
             <div class="mt-6 text-center">
-                <a href="index.html" class="text-pink-400 hover:text-pink-300 text-sm">
+                <a href="/" class="text-pink-400 hover:text-pink-300 text-sm">
                     &larr; Back to Generator
                 </a>
             </div>
@@ -158,6 +220,10 @@
                 message: '',
                 messageType: 'success',
 
+                // Job queue state
+                jobs: [],
+                queueStats: { pending: 0, processing: 0, completed: 0, failed: 0 },
+
                 init() {
                     // Check for stored token
                     const storedToken = localStorage.getItem('adminToken');
@@ -175,6 +241,7 @@
                         if (res.ok) {
                             this.isAuthenticated = true;
                             this.fetchKeys();
+                            this.refreshJobs();
                         } else {
                             this.clearToken();
                         }
@@ -208,6 +275,7 @@
                             localStorage.setItem('adminToken', data.token);
                             this.password = '';
                             this.fetchKeys();
+                            this.refreshJobs();
                         } else {
                             this.loginError = data.error || 'Login failed';
                         }
@@ -292,6 +360,25 @@
                         this.saving = false;
                         // Clear message after 5 seconds
                         setTimeout(() => { this.message = ''; }, 5000);
+                    }
+                },
+
+                async refreshJobs() {
+                    try {
+                        const res = await fetch(`${API_BASE}/api/jobs?limit=20`);
+                        if (res.ok) {
+                            const data = await res.json();
+                            this.jobs = data.jobs || [];
+                            // Calculate stats
+                            this.queueStats = {
+                                pending: this.jobs.filter(j => j.status === 'pending').length,
+                                processing: this.jobs.filter(j => j.status === 'processing').length,
+                                completed: this.jobs.filter(j => j.status === 'completed').length,
+                                failed: this.jobs.filter(j => j.status === 'failed').length
+                            };
+                        }
+                    } catch (e) {
+                        console.error('Failed to fetch jobs:', e);
                     }
                 }
             };
