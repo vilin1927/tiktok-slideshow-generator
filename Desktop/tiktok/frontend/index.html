@@ -128,6 +128,14 @@
                         class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 resize-none"
                         required
                     ></textarea>
+                    <!-- Product Presets -->
+                    <div class="mt-2 flex gap-2">
+                        <button type="button"
+                                @click="applyPreset('face_tape')"
+                                class="text-xs px-3 py-1 bg-gray-600 hover:bg-gray-500 rounded text-gray-300 transition-colors">
+                            Face Tape
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Folder Name -->
@@ -878,6 +886,21 @@ https://vm.tiktok.com/abc..."
                 error: null,
                 dragOver: false,
 
+                // Product description presets
+                presets: {
+                    face_tape: `LumiDew Smile Line & Anti Wrinkle Patches - Face Tape for Wrinkles
+
+ONE SHAPE, EASY APPLICATION: Pre-cut face tape targets forehead wrinkles, smile lines, and marionette lines. Breathable beauty tape smooths fine lines in seconds - no measuring, no fuss.
+
+BREATHABLE, NOT SILICONE: Unlike silicone patches that feel sticky or trap moisture, this soft stretch skin tape is flexible, lightweight, and gentle enough for nightly use - ideal for sensitive skin.
+
+OVERNIGHT FACE-LIFT EFFECT: Facial patches work while you sleep to firm loose skin, smooth wrinkles around the mouth - wake up to refreshed, younger-looking skin.
+
+GENTLE HOLD, STRONG RESULTS: Soft stretch fabric gently supports forehead and eye wrinkles. Comfortable to wear, easy to remove, effective for consistent overnight use.
+
+INSPIRED BY JAPANESE SKIN CARE: Delivers a lifted, contoured look without silicone or harsh ingredients. A minimalist skin tightening tape that enhances firmness and facial definition naturally.`
+                },
+
                 // Batch mode data
                 batchStep: 1,
                 batchData: {
@@ -1033,6 +1056,12 @@ https://vm.tiktok.com/abc..."
                     if (this.pollInterval) {
                         clearInterval(this.pollInterval);
                         this.pollInterval = null;
+                    }
+                },
+
+                applyPreset(presetKey) {
+                    if (this.presets[presetKey]) {
+                        this.formData.product_context = this.presets[presetKey];
                     }
                 },
 

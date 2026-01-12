@@ -198,34 +198,56 @@ def _validate_required_keywords(analysis: dict) -> tuple[bool, list[str]]:
 
 def _inject_missing_keywords(analysis: dict) -> dict:
     """
-    Manually inject missing keywords into product slide text.
-    Last resort if AI doesn't include them.
+    Manually inject missing keywords into product slide text and remove redundancy.
+    Also processes text_variations array.
     """
     keywords = analysis.get('required_keywords', {})
     brand = keywords.get('brand_name', '') or 'Lumidew'  # Default to Lumidew
     location = keywords.get('purchase_location', '') or 'amazon'  # Default to amazon
 
+    def process_text(text: str) -> str:
+        """Process a single text: inject keywords and remove redundancy."""
+        if not text:
+            return text
+        original_text = text
+
+        # Check and inject brand
+        if brand and brand.lower() not in text.lower():
+            # Add brand mention naturally
+            if '!' in text:
+                # Insert after first exclamation
+                text = text.replace('!', f'! love my {brand}', 1)
+            else:
+                text = f"obsessed with {brand} ✨ " + text
+
+        # Check and inject purchase location
+        if location and location.lower() not in text.lower() and 'amazon' not in text.lower():
+            text = text.rstrip() + f" ✨ got mine on {location}"
+
+        # Remove redundant brand mentions (e.g., "LumiDew X from LumiDew")
+        text = _remove_brand_redundancy(text, brand)
+
+        return text
+
     for slide in analysis.get('new_slides', []):
         if slide.get('slide_type') == 'product':
+            # Process text_variations array if present
+            text_variations = slide.get('text_variations', [])
+            if text_variations:
+                processed_variations = []
+                for text in text_variations:
+                    processed_text = process_text(text)
+                    processed_variations.append(processed_text)
+                slide['text_variations'] = processed_variations
+                logger.info(f"Processed {len(processed_variations)} text variations for product slide")
+
+            # Also process text_content for backward compatibility
             text = slide.get('text_content', '')
-            original_text = text
-
-            # Check and inject brand
-            if brand and brand.lower() not in text.lower():
-                # Add brand mention naturally
-                if '!' in text:
-                    # Insert after first exclamation
-                    text = text.replace('!', f'! love my {brand}', 1)
-                else:
-                    text = f"obsessed with {brand} ✨ " + text
-
-            # Check and inject purchase location
-            if location and location.lower() not in text.lower() and 'amazon' not in text.lower():
-                text = text.rstrip() + f" ✨ got mine on {location}"
-
-            if text != original_text:
-                slide['text_content'] = text
-                logger.info(f"Injected keywords into product slide")
+            if text:
+                processed_text = process_text(text)
+                if processed_text != text:
+                    slide['text_content'] = processed_text
+                    logger.info(f"Injected keywords into product slide text_content")
 
     return analysis
 
@@ -299,6 +321,34 @@ def _validate_brand_not_hallucinated(
 
     # Give up - return AI's brand anyway
     return False, ai_brand
+
+
+def _remove_brand_redundancy(text: str, brand_name: str) -> str:
+    """
+    Remove redundant brand mentions like 'Product from Brand' when
+    the product name already contains the brand.
+
+    Examples:
+    - "LumiDew Steam Eye Mask from LumiDew" -> "LumiDew Steam Eye Mask"
+    - "I love my CeraVe cleanser from CeraVe" -> "I love my CeraVe cleanser"
+    """
+    if not brand_name or not text:
+        return text
+
+    # Count how many times brand appears (case-insensitive)
+    brand_lower = brand_name.lower()
+    occurrences = text.lower().count(brand_lower)
+
+    # Only remove if brand appears more than once (redundant)
+    if occurrences > 1:
+        # Pattern: "from [brand]" anywhere in text
+        pattern = rf'\s+from\s+{re.escape(brand_name)}(?=\s|$|,|!|\?|\.)'
+        text = re.sub(pattern, '', text, flags=re.IGNORECASE)
+
+        # Clean up any double spaces left behind
+        text = re.sub(r'\s+', ' ', text).strip()
+
+    return text
 
 
 def analyze_and_plan(
