@@ -1,0 +1,1647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TikTok Slideshow Generator v2</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        [x-cloak] { display: none !important; }
+    </style>
+</head>
+<body class="bg-gray-900 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-3xl" x-data="slideshowGenerator()">
+        <!-- Header -->
+        <div class="text-center mb-8 relative">
+            <a href="admin.html" class="absolute top-0 right-0 text-gray-500 hover:text-gray-300 text-sm transition-colors">
+                Settings
+            </a>
+            <h1 class="text-3xl font-bold text-white mb-2">TikTok Slideshow Generator</h1>
+            <p class="text-gray-400">Generate viral-style slideshows for your products</p>
+            <p class="text-purple-400 text-sm mt-1">v2 - AI-powered story adaptation</p>
+        </div>
+
+        <!-- Mode Toggle -->
+        <div class="flex justify-center mb-6">
+            <div class="bg-gray-800 rounded-lg p-1 inline-flex">
+                <button
+                    @click="mode = 'single'"
+                    :class="mode === 'single' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'"
+                    class="px-4 py-2 rounded-md transition-all font-medium"
+                >
+                    Single Link
+                </button>
+                <button
+                    disabled
+                    class="px-4 py-2 rounded-md transition-all font-medium text-gray-600 cursor-not-allowed"
+                >
+                    Batch Mode
+                </button>
+                <button
+                    @click="mode = 'video'"
+                    :class="mode === 'video' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'"
+                    class="px-4 py-2 rounded-md transition-all font-medium"
+                >
+                    Create Video
+                </button>
+            </div>
+        </div>
+
+        <!-- ==================== SINGLE MODE ==================== -->
+        <template x-if="mode === 'single'">
+            <form @submit.prevent="submitSingleForm" class="bg-gray-800 rounded-xl p-6 shadow-xl">
+                <!-- TikTok URL -->
+                <div class="mb-6">
+                    <label class="block text-gray-300 text-sm font-medium mb-2">
+                        Viral TikTok Slideshow URL
+                    </label>
+                    <input
+                        type="url"
+                        x-model="formData.tiktok_url"
+                        placeholder="https://www.tiktok.com/@user/photo/..."
+                        class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                        required
+                    >
+                </div>
+
+                <!-- Product Image Upload (multiple) -->
+                <div class="mb-6">
+                    <label class="block text-gray-300 text-sm font-medium mb-2">
+                        Your Product Images
+                        <span class="text-gray-500 text-xs font-normal">(upload multiple for photo variations)</span>
+                    </label>
+                    <div
+                        class="border-2 border-dashed border-gray-600 rounded-lg p-6 text-center hover:border-purple-500 transition-colors cursor-pointer"
+                        @click="$refs.fileInput.click()"
+                        @dragover.prevent="dragOver = true"
+                        @dragleave.prevent="dragOver = false"
+                        @drop.prevent="handleDrop($event)"
+                        :class="{ 'border-purple-500 bg-purple-500/10': dragOver }"
+                    >
+                        <input
+                            type="file"
+                            x-ref="fileInput"
+                            @change="handleFileSelect($event)"
+                            accept="image/*"
+                            multiple
+                            class="hidden"
+                        >
+                        <div x-show="productFiles.length === 0" class="text-gray-400">
+                            <svg class="mx-auto h-12 w-12 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                            </svg>
+                            <p>Click to upload or drag and drop</p>
+                            <p class="text-sm mt-1">Upload multiple product images for photo variations</p>
+                        </div>
+                        <div x-show="productFiles.length > 0" class="relative">
+                            <div class="flex flex-wrap gap-2 justify-center">
+                                <template x-for="(preview, index) in previewImages" :key="index">
+                                    <div class="relative">
+                                        <img :src="preview" class="h-20 w-20 object-cover rounded-lg">
+                                        <button
+                                            type="button"
+                                            @click.stop="removeImageAt(index)"
+                                            class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center"
+                                        >&times;</button>
+                                    </div>
+                                </template>
+                            </div>
+                            <p class="text-purple-400 text-sm mt-3">
+                                <span x-text="productFiles.length"></span> image(s) selected
+                                <button type="button" @click.stop="clearAllImages()" class="text-red-400 ml-2 hover:text-red-300">(clear all)</button>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Product Context -->
+                <div class="mb-6">
+                    <label class="block text-gray-300 text-sm font-medium mb-2">
+                        Product Description
+                    </label>
+                    <textarea
+                        x-model="formData.product_context"
+                        placeholder="Describe your product (e.g., 'Luxury skincare serum for anti-aging, reduces wrinkles in 2 weeks')"
+                        rows="3"
+                        class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 resize-none"
+                        required
+                    ></textarea>
+                    <!-- Product Presets -->
+                    <div class="mt-2 flex gap-2">
+                        <button type="button"
+                                @click="applyPreset('face_tape')"
+                                class="text-xs px-3 py-1 bg-gray-600 hover:bg-gray-500 rounded text-gray-300 transition-colors">
+                            Face Tape
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Folder Name -->
+                <div class="mb-6">
+                    <label class="block text-gray-300 text-sm font-medium mb-2">
+                        Output Folder Name
+                    </label>
+                    <input
+                        type="text"
+                        x-model="formData.folder_name"
+                        placeholder="my-product-slideshow"
+                        class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                        required
+                    >
+                </div>
+
+                <!-- Variations Section (Photo × Text) -->
+                <div class="mb-6 p-4 bg-gray-700/50 rounded-lg">
+                    <label class="block text-gray-300 text-sm font-medium mb-3">
+                        Variations (Photo × Text)
+                    </label>
+
+                    <!-- Hook variations -->
+                    <div class="mb-4 pb-3 border-b border-gray-600">
+                        <p class="text-gray-400 text-xs mb-2 font-medium">Hook Slide</p>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-gray-500 text-xs mb-1">Photo</label>
+                                <input
+                                    type="number"
+                                    x-model.number="formData.hook_photo_var"
+                                    min="1"
+                                    max="5"
+                                    class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-center text-sm focus:outline-none focus:border-purple-500"
+                                >
+                            </div>
+                            <div>
+                                <label class="block text-gray-500 text-xs mb-1">Text</label>
+                                <input
+                                    type="number"
+                                    x-model.number="formData.hook_text_var"
+                                    min="1"
+                                    max="5"
+                                    class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-center text-sm focus:outline-none focus:border-purple-500"
+                                >
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Body variations -->
+                    <div class="mb-4 pb-3 border-b border-gray-600">
+                        <p class="text-gray-400 text-xs mb-2 font-medium">Body Slides (each)</p>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-gray-500 text-xs mb-1">Photo</label>
+                                <input
+                                    type="number"
+                                    x-model.number="formData.body_photo_var"
+                                    min="1"
+                                    max="5"
+                                    class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-center text-sm focus:outline-none focus:border-purple-500"
+                                >
+                            </div>
+                            <div>
+                                <label class="block text-gray-500 text-xs mb-1">Text</label>
+                                <input
+                                    type="number"
+                                    x-model.number="formData.body_text_var"
+                                    min="1"
+                                    max="5"
+                                    class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-center text-sm focus:outline-none focus:border-purple-500"
+                                >
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Product variations -->
+                    <div class="mb-3">
+                        <p class="text-gray-400 text-xs mb-2 font-medium">Product Slide</p>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-gray-500 text-xs mb-1">Photos</label>
+                                <p class="px-3 py-2 bg-gray-600/50 border border-gray-600 rounded-lg text-center text-sm"
+                                   :class="productFiles.length > 0 ? 'text-purple-400' : 'text-gray-500'">
+                                    <span x-show="productFiles.length > 0" x-text="productFiles.length + ' uploaded'"></span>
+                                    <span x-show="productFiles.length === 0">0 uploaded</span>
+                                </p>
+                            </div>
+                            <div>
+                                <label class="block text-gray-500 text-xs mb-1">Text</label>
+                                <input
+                                    type="number"
+                                    x-model.number="formData.product_text_var"
+                                    min="1"
+                                    max="5"
+                                    class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-center text-sm focus:outline-none focus:border-purple-500"
+                                >
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Total calculation with formula -->
+                    <div class="mt-3 pt-3 border-t border-gray-600 text-center">
+                        <p class="text-gray-500 text-xs mb-1">Total images (assuming ~5 body slides):</p>
+                        <p class="text-sm">
+                            <span class="text-gray-400" x-text="getFormula()"></span>
+                            <span class="text-gray-500"> = </span>
+                            <span class="text-purple-400 font-bold" x-text="calculateTotal()"></span>
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Video Generation Option -->
+                <div class="mb-6 p-4 bg-gray-700/50 rounded-lg">
+                    <label class="flex items-center cursor-pointer">
+                        <input
+                            type="checkbox"
+                            x-model="formData.generate_video"
+                            class="w-5 h-5 text-purple-600 bg-gray-700 border-gray-600 rounded focus:ring-purple-500 focus:ring-2"
+                        >
+                        <span class="ml-3 text-gray-300 font-medium">Also generate video</span>
+                    </label>
+                    <p class="text-gray-500 text-xs mt-2 ml-8">
+                        Combine slides + TikTok audio into MP4 videos (one per variation set)
+                    </p>
+                </div>
+
+                <!-- Submit Button -->
+                <button
+                    type="submit"
+                    :disabled="isLoading || productFiles.length === 0"
+                    class="w-full py-4 px-6 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    <span x-show="!isLoading">Generate Slideshow</span>
+                    <span x-show="isLoading" class="flex items-center justify-center">
+                        <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span x-text="statusMessage"></span>
+                    </span>
+                </button>
+            </form>
+        </template>
+
+        <!-- ==================== BATCH MODE ==================== -->
+        <template x-if="mode === 'batch'">
+            <div>
+                <!-- Step 1: Enter Links -->
+                <div x-show="batchStep === 1" class="bg-gray-800 rounded-xl p-6 shadow-xl">
+                    <h2 class="text-xl font-semibold text-white mb-4">Step 1: Enter TikTok Links</h2>
+
+                    <!-- Links Textarea -->
+                    <div class="mb-4">
+                        <label class="block text-gray-300 text-sm font-medium mb-2">
+                            Paste TikTok URLs (one per line, max 100)
+                        </label>
+                        <textarea
+                            x-model="batchData.linksText"
+                            @input="validateBatchLinks()"
+                            placeholder="https://www.tiktok.com/@user1/photo/123...
+https://www.tiktok.com/@user2/photo/456...
+https://vm.tiktok.com/abc..."
+                            rows="8"
+                            class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 font-mono text-sm"
+                        ></textarea>
+                    </div>
+
+                    <!-- Validation Summary -->
+                    <div class="mb-4 flex items-center justify-between">
+                        <div class="flex items-center space-x-4">
+                            <span class="text-green-400 flex items-center">
+                                <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                                </svg>
+                                <span x-text="batchValidation.valid"></span> valid
+                            </span>
+                            <span x-show="batchValidation.invalid > 0" class="text-red-400 flex items-center">
+                                <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                                </svg>
+                                <span x-text="batchValidation.invalid"></span> invalid
+                            </span>
+                        </div>
+                        <button
+                            x-show="batchValidation.invalid > 0"
+                            @click="showInvalidLinks = !showInvalidLinks"
+                            class="text-purple-400 text-sm hover:text-purple-300"
+                        >
+                            <span x-text="showInvalidLinks ? 'Hide' : 'Show'"></span> invalid
+                        </button>
+                    </div>
+
+                    <!-- Invalid Links List -->
+                    <div x-show="showInvalidLinks && batchValidation.invalidLinks.length > 0" class="mb-4 p-3 bg-red-900/30 border border-red-700 rounded-lg">
+                        <p class="text-red-400 text-sm font-medium mb-2">Invalid Links:</p>
+                        <ul class="text-sm text-gray-400 space-y-1">
+                            <template x-for="link in batchValidation.invalidLinks" :key="link.index">
+                                <li class="flex items-start">
+                                    <span class="text-red-400 mr-2">Line <span x-text="link.index + 1"></span>:</span>
+                                    <a :href="link.url" target="_blank" x-text="link.url" class="truncate text-gray-400 hover:text-gray-200 hover:underline"></a>
+                                </li>
+                            </template>
+                        </ul>
+                    </div>
+
+                    <!-- Variations Section (Photo × Text) - Same as single mode -->
+                    <div class="mb-6 p-4 bg-gray-700/50 rounded-lg">
+                        <label class="block text-gray-300 text-sm font-medium mb-3">
+                            Variations (Photo × Text)
+                        </label>
+
+                        <!-- Hook variations -->
+                        <div class="mb-4 pb-3 border-b border-gray-600">
+                            <p class="text-gray-400 text-xs mb-2 font-medium">Hook Slide</p>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-gray-500 text-xs mb-1">Photo</label>
+                                    <input
+                                        type="number"
+                                        x-model.number="batchData.hook_photo_var"
+                                        min="1"
+                                        max="5"
+                                        class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-center text-sm focus:outline-none focus:border-purple-500"
+                                    >
+                                </div>
+                                <div>
+                                    <label class="block text-gray-500 text-xs mb-1">Text</label>
+                                    <input
+                                        type="number"
+                                        x-model.number="batchData.hook_text_var"
+                                        min="1"
+                                        max="5"
+                                        class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-center text-sm focus:outline-none focus:border-purple-500"
+                                    >
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Body variations -->
+                        <div class="mb-4 pb-3 border-b border-gray-600">
+                            <p class="text-gray-400 text-xs mb-2 font-medium">Body Slides (each)</p>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-gray-500 text-xs mb-1">Photo</label>
+                                    <input
+                                        type="number"
+                                        x-model.number="batchData.body_photo_var"
+                                        min="1"
+                                        max="5"
+                                        class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-center text-sm focus:outline-none focus:border-purple-500"
+                                    >
+                                </div>
+                                <div>
+                                    <label class="block text-gray-500 text-xs mb-1">Text</label>
+                                    <input
+                                        type="number"
+                                        x-model.number="batchData.body_text_var"
+                                        min="1"
+                                        max="5"
+                                        class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-center text-sm focus:outline-none focus:border-purple-500"
+                                    >
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Product variations -->
+                        <div class="mb-3">
+                            <p class="text-gray-400 text-xs mb-2 font-medium">Product Slide</p>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-gray-500 text-xs mb-1">Photo</label>
+                                    <p class="px-3 py-2 bg-gray-600/50 border border-gray-600 rounded-lg text-gray-500 text-center text-sm">
+                                        1 per link
+                                    </p>
+                                </div>
+                                <div>
+                                    <label class="block text-gray-500 text-xs mb-1">Text</label>
+                                    <input
+                                        type="number"
+                                        x-model.number="batchData.product_text_var"
+                                        min="1"
+                                        max="5"
+                                        class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-center text-sm focus:outline-none focus:border-purple-500"
+                                    >
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Total calculation -->
+                        <div class="mt-3 pt-3 border-t border-gray-600 text-center">
+                            <p class="text-gray-500 text-xs mb-1">Total images per link (assuming ~5 body slides):</p>
+                            <p class="text-sm">
+                                <span class="text-gray-400" x-text="getBatchFormula()"></span>
+                                <span class="text-gray-500"> = </span>
+                                <span class="text-purple-400 font-bold" x-text="calculateBatchTotal()"></span>
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Next Button -->
+                    <button
+                        @click="goToStep2()"
+                        :disabled="batchValidation.valid === 0"
+                        class="w-full py-4 px-6 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        Continue with <span x-text="batchValidation.valid"></span> Links
+                    </button>
+                </div>
+
+                <!-- Step 2: Product Mapping -->
+                <div x-show="batchStep === 2" class="bg-gray-800 rounded-xl p-6 shadow-xl">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-xl font-semibold text-white">Step 2: Add Products</h2>
+                        <button @click="batchStep = 1" class="text-purple-400 hover:text-purple-300 text-sm">
+                            &larr; Back to links
+                        </button>
+                    </div>
+
+                    <!-- Apply to All Toggle -->
+                    <div class="mb-4 p-3 bg-gray-700/50 rounded-lg flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-300 font-medium">Same product for all links?</p>
+                            <p class="text-gray-500 text-sm">Use the same photo and description for every link</p>
+                        </div>
+                        <button
+                            @click="batchData.applyToAll = !batchData.applyToAll"
+                            :class="batchData.applyToAll ? 'bg-purple-600' : 'bg-gray-600'"
+                            class="relative w-12 h-6 rounded-full transition-colors"
+                        >
+                            <span
+                                :class="batchData.applyToAll ? 'translate-x-6' : 'translate-x-1'"
+                                class="absolute top-1 left-0 w-4 h-4 bg-white rounded-full transition-transform"
+                            ></span>
+                        </button>
+                    </div>
+
+                    <!-- Product Mapping Table -->
+                    <div class="space-y-4 mb-6 max-h-96 overflow-y-auto">
+                        <!-- If Apply to All -->
+                        <template x-if="batchData.applyToAll">
+                            <div class="p-4 bg-gray-700/50 rounded-lg">
+                                <p class="text-gray-300 font-medium mb-3">Product for all <span x-text="batchValidation.valid"></span> links:</p>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <!-- Photo Upload -->
+                                    <div>
+                                        <label class="block text-gray-400 text-xs mb-1">Product Photo</label>
+                                        <div
+                                            class="border-2 border-dashed border-gray-600 rounded-lg p-4 text-center hover:border-purple-500 cursor-pointer"
+                                            @click="$refs.batchFileAll.click()"
+                                        >
+                                            <input
+                                                type="file"
+                                                x-ref="batchFileAll"
+                                                @change="handleBatchFileSelect($event, 0)"
+                                                accept="image/*"
+                                                class="hidden"
+                                            >
+                                            <template x-if="!batchData.products[0]?.preview">
+                                                <div class="text-gray-400 text-sm">
+                                                    <svg class="mx-auto h-8 w-8 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                                    </svg>
+                                                    Click to upload
+                                                </div>
+                                            </template>
+                                            <template x-if="batchData.products[0]?.preview">
+                                                <img :src="batchData.products[0].preview" class="max-h-20 mx-auto rounded">
+                                            </template>
+                                        </div>
+                                    </div>
+                                    <!-- Description -->
+                                    <div>
+                                        <label class="block text-gray-400 text-xs mb-1">Description</label>
+                                        <textarea
+                                            x-model="batchData.products[0].description"
+                                            placeholder="Product description..."
+                                            rows="3"
+                                            class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm placeholder-gray-400 focus:outline-none focus:border-purple-500 resize-none"
+                                        ></textarea>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+
+                        <!-- Individual Products -->
+                        <template x-if="!batchData.applyToAll">
+                            <div class="space-y-3">
+                                <template x-for="(link, index) in batchValidation.validLinks" :key="index">
+                                    <div class="p-4 bg-gray-700/50 rounded-lg">
+                                        <p class="text-gray-400 text-xs mb-2 truncate">
+                                            Link <span x-text="index + 1"></span>: <a :href="link.url" target="_blank" x-text="link.url" class="text-purple-400 hover:text-purple-300 hover:underline"></a>
+                                        </p>
+                                        <div class="grid grid-cols-2 gap-3">
+                                            <!-- Photo Upload -->
+                                            <div>
+                                                <div
+                                                    class="border-2 border-dashed border-gray-600 rounded-lg p-3 text-center hover:border-purple-500 cursor-pointer"
+                                                    @click="$refs['batchFile' + index][0].click()"
+                                                >
+                                                    <input
+                                                        type="file"
+                                                        :x-ref="'batchFile' + index"
+                                                        @change="handleBatchFileSelect($event, index)"
+                                                        accept="image/*"
+                                                        class="hidden"
+                                                    >
+                                                    <template x-if="!batchData.products[index]?.preview">
+                                                        <div class="text-gray-400 text-xs">
+                                                            <svg class="mx-auto h-6 w-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                                                            </svg>
+                                                            Photo
+                                                        </div>
+                                                    </template>
+                                                    <template x-if="batchData.products[index]?.preview">
+                                                        <img :src="batchData.products[index].preview" class="max-h-16 mx-auto rounded">
+                                                    </template>
+                                                </div>
+                                            </div>
+                                            <!-- Description -->
+                                            <div>
+                                                <textarea
+                                                    x-model="batchData.products[index].description"
+                                                    placeholder="Description..."
+                                                    rows="2"
+                                                    class="w-full px-2 py-1 bg-gray-700 border border-gray-600 rounded-lg text-white text-xs placeholder-gray-400 focus:outline-none focus:border-purple-500 resize-none"
+                                                ></textarea>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                    </div>
+
+                    <!-- Video Generation Option -->
+                    <div class="mb-6 p-4 bg-gray-700/50 rounded-lg">
+                        <label class="flex items-center cursor-pointer">
+                            <input
+                                type="checkbox"
+                                x-model="batchData.generateVideo"
+                                class="w-5 h-5 text-purple-600 bg-gray-700 border-gray-600 rounded focus:ring-purple-500 focus:ring-2"
+                            >
+                            <span class="ml-3 text-gray-300 font-medium">Also generate videos</span>
+                        </label>
+                        <p class="text-gray-500 text-xs mt-2 ml-8">
+                            Create MP4 video for each link using scraped TikTok audio
+                        </p>
+                    </div>
+
+                    <!-- Submit Batch Button -->
+                    <button
+                        @click="submitBatch()"
+                        :disabled="!canSubmitBatch()"
+                        class="w-full py-4 px-6 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        Start Batch Processing
+                    </button>
+                </div>
+
+                <!-- Step 3: Progress -->
+                <div x-show="batchStep === 3" class="bg-gray-800 rounded-xl p-6 shadow-xl">
+                    <h2 class="text-xl font-semibold text-white mb-4">Batch Processing</h2>
+
+                    <!-- Overall Progress -->
+                    <div class="mb-6">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-gray-300">Overall Progress</span>
+                            <span class="text-purple-400 font-bold" x-text="`${batchProgress.percent}%`"></span>
+                        </div>
+                        <div class="w-full bg-gray-700 rounded-full h-4">
+                            <div
+                                class="bg-gradient-to-r from-purple-600 to-pink-600 h-4 rounded-full transition-all duration-500"
+                                :style="`width: ${batchProgress.percent}%`"
+                            ></div>
+                        </div>
+                    </div>
+
+                    <!-- Stats Grid -->
+                    <div class="grid grid-cols-4 gap-3 mb-6">
+                        <div class="bg-gray-700/50 rounded-lg p-3 text-center">
+                            <p class="text-2xl font-bold text-blue-400" x-text="batchProgress.pending"></p>
+                            <p class="text-xs text-gray-400">Pending</p>
+                        </div>
+                        <div class="bg-gray-700/50 rounded-lg p-3 text-center">
+                            <p class="text-2xl font-bold text-yellow-400" x-text="batchProgress.processing"></p>
+                            <p class="text-xs text-gray-400">Processing</p>
+                        </div>
+                        <div class="bg-gray-700/50 rounded-lg p-3 text-center">
+                            <p class="text-2xl font-bold text-green-400" x-text="batchProgress.completed"></p>
+                            <p class="text-xs text-gray-400">Completed</p>
+                        </div>
+                        <div class="bg-gray-700/50 rounded-lg p-3 text-center">
+                            <p class="text-2xl font-bold text-red-400" x-text="batchProgress.failed"></p>
+                            <p class="text-xs text-gray-400">Failed</p>
+                        </div>
+                    </div>
+
+                    <!-- Status Message -->
+                    <div class="flex items-center space-x-3 mb-4">
+                        <div x-show="batchProgress.status === 'processing'" class="animate-spin w-5 h-5 border-2 border-purple-500 border-t-transparent rounded-full"></div>
+                        <svg x-show="batchProgress.status === 'completed'" class="w-5 h-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                        </svg>
+                        <p class="text-gray-300" x-text="batchProgress.message"></p>
+                    </div>
+
+                    <!-- Drive Folder Link -->
+                    <div x-show="batchProgress.driveUrl" class="mb-4">
+                        <a
+                            :href="batchProgress.driveUrl"
+                            target="_blank"
+                            class="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                        >
+                            <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"></path>
+                            </svg>
+                            Open Google Drive Folder
+                        </a>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="flex space-x-3">
+                        <button
+                            x-show="batchProgress.status === 'processing'"
+                            @click="cancelBatch()"
+                            class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                        >
+                            Cancel Batch
+                        </button>
+                        <button
+                            x-show="batchProgress.status === 'completed' && batchProgress.failed > 0"
+                            @click="retryFailed()"
+                            class="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors"
+                        >
+                            Retry Failed (<span x-text="batchProgress.failed"></span>)
+                        </button>
+                        <button
+                            x-show="batchProgress.status === 'completed' || batchProgress.status === 'cancelled'"
+                            @click="startNewBatch()"
+                            class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                        >
+                            Start New Batch
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </template>
+
+        <!-- ==================== VIDEO MODE ==================== -->
+        <template x-if="mode === 'video'">
+            <div class="bg-gray-800 rounded-xl p-6 shadow-xl">
+                <h2 class="text-xl font-semibold text-white mb-4">Create Video from Photos</h2>
+                <p class="text-gray-400 text-sm mb-6">Upload photos and music to create a 9:16 slideshow video</p>
+
+                <!-- Photo Upload -->
+                <div class="mb-6">
+                    <label class="block text-gray-300 text-sm font-medium mb-2">
+                        Upload Photos
+                        <span class="text-gray-500 text-xs font-normal">(in order)</span>
+                    </label>
+                    <div
+                        class="border-2 border-dashed border-gray-600 rounded-lg p-6 text-center hover:border-purple-500 transition-colors cursor-pointer"
+                        @click="$refs.videoFileInput.click()"
+                        @dragover.prevent="videoDragOver = true"
+                        @dragleave.prevent="videoDragOver = false"
+                        @drop.prevent="handleVideoFileDrop($event)"
+                        :class="{ 'border-purple-500 bg-purple-500/10': videoDragOver }"
+                    >
+                        <input
+                            type="file"
+                            x-ref="videoFileInput"
+                            @change="handleVideoFileSelect($event)"
+                            accept="image/*"
+                            multiple
+                            class="hidden"
+                        >
+                        <div x-show="videoData.images.length === 0" class="text-gray-400">
+                            <svg class="mx-auto h-12 w-12 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                            </svg>
+                            <p>Click to upload or drag and drop photos</p>
+                            <p class="text-sm mt-1">Photos will appear in the video in upload order</p>
+                        </div>
+                        <div x-show="videoData.images.length > 0" class="relative">
+                            <p class="text-gray-400 text-xs mb-2 text-center">Drag to reorder slides</p>
+                            <div class="flex flex-wrap gap-2 justify-center" @dragover.prevent @drop="handleVideoDrop($event)">
+                                <template x-for="(preview, index) in videoData.previews" :key="index">
+                                    <div class="relative cursor-grab active:cursor-grabbing"
+                                         draggable="true"
+                                         @dragstart="dragVideoStart($event, index)"
+                                         @dragend="dragVideoEnd($event)"
+                                         @dragover.prevent="dragVideoOver($event, index)"
+                                         :class="{ 'opacity-50 ring-2 ring-purple-500 scale-105': draggingVideoIndex === index }">
+                                        <img :src="preview" class="h-20 w-20 object-cover rounded-lg pointer-events-none">
+                                        <span class="absolute top-0 left-0 bg-purple-600 text-white text-xs px-1.5 py-0.5 rounded-br font-medium" x-text="index + 1"></span>
+                                        <button
+                                            type="button"
+                                            @click.stop="removeVideoImage(index)"
+                                            class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center hover:bg-red-400"
+                                        >&times;</button>
+                                    </div>
+                                </template>
+                            </div>
+                            <p class="text-purple-400 text-sm mt-3 text-center">
+                                <span x-text="videoData.images.length"></span> photo(s) - slides 1 to <span x-text="videoData.images.length"></span>
+                                <button type="button" @click.stop="clearVideoImages()" class="text-red-400 ml-2 hover:text-red-300">(clear all)</button>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Audio Upload -->
+                <div class="mb-6">
+                    <label class="block text-gray-300 text-sm font-medium mb-2">
+                        Upload Music
+                        <span class="text-gray-500 text-xs font-normal">(MP3)</span>
+                    </label>
+                    <div
+                        class="border-2 border-dashed border-gray-600 rounded-lg p-4 text-center hover:border-purple-500 transition-colors cursor-pointer"
+                        @click="$refs.audioFileInput.click()"
+                    >
+                        <input
+                            type="file"
+                            x-ref="audioFileInput"
+                            @change="handleAudioFileSelect($event)"
+                            accept="audio/*"
+                            class="hidden"
+                        >
+                        <div x-show="!videoData.audio" class="text-gray-400">
+                            <svg class="mx-auto h-8 w-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path>
+                            </svg>
+                            <p>Click to upload audio file</p>
+                        </div>
+                        <div x-show="videoData.audio" class="text-purple-400">
+                            <svg class="mx-auto h-6 w-6 mb-1" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"></path>
+                            </svg>
+                            <span x-text="videoData.audioName"></span>
+                            <button type="button" @click.stop="clearAudio()" class="text-red-400 ml-2 hover:text-red-300">(remove)</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Folder Name -->
+                <div class="mb-6">
+                    <label class="block text-gray-300 text-sm font-medium mb-2">
+                        Output Folder Name
+                    </label>
+                    <input
+                        type="text"
+                        x-model="videoData.folder_name"
+                        placeholder="my-slideshow-video"
+                        class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                    >
+                </div>
+
+                <!-- Info box -->
+                <div class="mb-6 p-3 bg-gray-700/50 rounded-lg text-sm text-gray-400">
+                    <p><span class="text-purple-400 font-medium">Output:</span> 9:16 vertical video (1080x1920)</p>
+                    <p><span class="text-purple-400 font-medium">Timing:</span> 3 seconds per photo</p>
+                    <p><span class="text-purple-400 font-medium">Format:</span> MP4 (H.264)</p>
+                </div>
+
+                <!-- Submit Button -->
+                <button
+                    @click="submitVideoForm()"
+                    :disabled="videoLoading || videoData.images.length === 0"
+                    class="w-full py-4 px-6 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    <span x-show="!videoLoading">Create Video</span>
+                    <span x-show="videoLoading" class="flex items-center justify-center">
+                        <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span x-text="videoStatus"></span>
+                    </span>
+                </button>
+
+                <!-- Video Result -->
+                <div x-show="videoResult" x-cloak class="mt-6 bg-green-900/50 border border-green-700 rounded-xl p-6">
+                    <div class="flex items-center space-x-3 mb-4">
+                        <svg class="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        <h3 class="text-lg font-semibold text-green-400">Video Created!</h3>
+                    </div>
+                    <a
+                        :href="videoResult.drive_url"
+                        target="_blank"
+                        class="inline-flex items-center px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                    >
+                        <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"></path>
+                        </svg>
+                        Open Google Drive Folder
+                    </a>
+                </div>
+
+                <!-- Video Error -->
+                <div x-show="videoError" x-cloak class="mt-6 bg-red-900/50 border border-red-700 rounded-xl p-6">
+                    <div class="flex items-center space-x-3">
+                        <svg class="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                        <h3 class="text-lg font-semibold text-red-400">Error</h3>
+                    </div>
+                    <p class="text-gray-300 mt-2" x-text="videoError"></p>
+                    <button
+                        @click="videoError = null"
+                        class="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                    >
+                        Dismiss
+                    </button>
+                </div>
+            </div>
+        </template>
+
+        <!-- ==================== SINGLE MODE STATUS/RESULT ==================== -->
+        <template x-if="mode === 'single'">
+            <div>
+                <!-- Status Messages (Single Mode) -->
+                <div x-show="isLoading" x-cloak class="mt-6 bg-gray-800 rounded-xl p-6">
+                    <div class="w-full bg-gray-700 rounded-full h-3 mb-4">
+                        <div class="bg-gradient-to-r from-purple-600 to-pink-600 h-3 rounded-full transition-all duration-500"
+                             :style="`width: ${progressPercent}%`"></div>
+                    </div>
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center space-x-3">
+                            <div class="animate-spin w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full"></div>
+                            <p class="text-gray-300 font-medium" x-text="statusMessage"></p>
+                        </div>
+                        <span class="text-purple-400 font-bold" x-text="`${progressPercent}%`"></span>
+                    </div>
+                    <p class="text-gray-500 text-sm" x-text="statusDetail"></p>
+                    <div class="flex justify-between mt-4 text-xs">
+                        <div :class="currentStep >= 1 ? 'text-purple-400' : 'text-gray-600'">
+                            <span :class="currentStep >= 1 ? 'bg-purple-500' : 'bg-gray-600'" class="inline-block w-2 h-2 rounded-full mr-1"></span>
+                            Scraping
+                        </div>
+                        <div :class="currentStep >= 2 ? 'text-purple-400' : 'text-gray-600'">
+                            <span :class="currentStep >= 2 ? 'bg-purple-500' : 'bg-gray-600'" class="inline-block w-2 h-2 rounded-full mr-1"></span>
+                            Analyzing
+                        </div>
+                        <div :class="currentStep >= 3 ? 'text-purple-400' : 'text-gray-600'">
+                            <span :class="currentStep >= 3 ? 'bg-purple-500' : 'bg-gray-600'" class="inline-block w-2 h-2 rounded-full mr-1"></span>
+                            Generating
+                        </div>
+                        <div :class="currentStep >= 4 ? 'text-purple-400' : 'text-gray-600'">
+                            <span :class="currentStep >= 4 ? 'bg-purple-500' : 'bg-gray-600'" class="inline-block w-2 h-2 rounded-full mr-1"></span>
+                            Uploading
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Success Result (Single Mode) -->
+                <div x-show="result && result.status === 'success'" x-cloak class="mt-6 bg-green-900/50 border border-green-700 rounded-xl p-6">
+                    <div class="flex items-center space-x-3 mb-4">
+                        <svg class="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        <h3 class="text-lg font-semibold text-green-400">Generation Complete!</h3>
+                    </div>
+                    <p class="text-gray-300 mb-4" x-text="result.message"></p>
+                    <a
+                        :href="result.folder_link"
+                        target="_blank"
+                        class="inline-flex items-center px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                    >
+                        <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"></path>
+                        </svg>
+                        Open Google Drive Folder
+                    </a>
+                    <div class="mt-4 text-sm text-gray-400">
+                        <p>Generated <span x-text="result.stats?.generated_slides || 0"></span> slides</p>
+                    </div>
+                </div>
+
+                <!-- Error Message (Single Mode) -->
+                <div x-show="error" x-cloak class="mt-6 bg-red-900/50 border border-red-700 rounded-xl p-6">
+                    <div class="flex items-center space-x-3">
+                        <svg class="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                        <h3 class="text-lg font-semibold text-red-400">Error</h3>
+                    </div>
+                    <p class="text-gray-300 mt-2" x-text="error"></p>
+                    <button
+                        @click="error = null"
+                        class="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                    >
+                        Dismiss
+                    </button>
+                </div>
+            </div>
+        </template>
+    </div>
+
+    <script>
+        // API Base URL
+        const API_BASE_URL = window.location.hostname === 'localhost'
+            ? 'http://localhost:5001'
+            : '';
+
+        function slideshowGenerator() {
+            return {
+                // Mode toggle
+                mode: 'single',
+
+                // Single mode data
+                formData: {
+                    tiktok_url: '',
+                    folder_name: '',
+                    product_context: '',
+                    hook_photo_var: 1,
+                    hook_text_var: 1,
+                    body_photo_var: 1,
+                    body_text_var: 1,
+                    product_text_var: 1,
+                    generate_video: false
+                },
+                productFiles: [],
+                previewImages: [],
+                isLoading: false,
+                statusMessage: 'Starting...',
+                statusDetail: '',
+                progressPercent: 0,
+                currentStep: 0,
+                sessionId: null,
+                pollInterval: null,
+                result: null,
+                error: null,
+                dragOver: false,
+
+                // Product description presets
+                presets: {
+                    face_tape: `LumiDew Smile Line & Anti Wrinkle Patches - Face Tape for Wrinkles
+
+ONE SHAPE, EASY APPLICATION: Pre-cut face tape targets forehead wrinkles, smile lines, and marionette lines. Breathable beauty tape smooths fine lines in seconds - no measuring, no fuss.
+
+BREATHABLE, NOT SILICONE: Unlike silicone patches that feel sticky or trap moisture, this soft stretch skin tape is flexible, lightweight, and gentle enough for nightly use - ideal for sensitive skin.
+
+OVERNIGHT FACE-LIFT EFFECT: Facial patches work while you sleep to firm loose skin, smooth wrinkles around the mouth - wake up to refreshed, younger-looking skin.
+
+GENTLE HOLD, STRONG RESULTS: Soft stretch fabric gently supports forehead and eye wrinkles. Comfortable to wear, easy to remove, effective for consistent overnight use.
+
+INSPIRED BY JAPANESE SKIN CARE: Delivers a lifted, contoured look without silicone or harsh ingredients. A minimalist skin tightening tape that enhances firmness and facial definition naturally.`
+                },
+
+                // Batch mode data
+                batchStep: 1,
+                batchData: {
+                    linksText: '',
+                    hook_photo_var: 1,
+                    hook_text_var: 1,
+                    body_photo_var: 1,
+                    body_text_var: 1,
+                    product_text_var: 1,
+                    applyToAll: true,
+                    generateVideo: false,
+                    products: [{ file: null, preview: null, description: '' }]
+                },
+                batchValidation: {
+                    valid: 0,
+                    invalid: 0,
+                    validLinks: [],
+                    invalidLinks: []
+                },
+                showInvalidLinks: false,
+                batchId: null,
+                batchPollInterval: null,
+                batchProgress: {
+                    status: 'pending',
+                    percent: 0,
+                    pending: 0,
+                    processing: 0,
+                    completed: 0,
+                    failed: 0,
+                    message: 'Starting batch...',
+                    driveUrl: null
+                },
+
+                // Video mode data
+                videoData: {
+                    images: [],
+                    previews: [],
+                    audio: null,
+                    audioName: '',
+                    folder_name: ''
+                },
+                videoDragOver: false,
+                videoLoading: false,
+                videoStatus: 'Processing...',
+                videoJobId: null,
+                videoResult: null,
+                videoError: null,
+                videoPollInterval: null,
+                draggingVideoIndex: null,
+
+                // Single mode methods - multiple file support
+                handleFileSelect(event) {
+                    const files = Array.from(event.target.files);
+                    files.forEach(file => {
+                        if (file && file.type.startsWith('image/')) {
+                            this.productFiles.push(file);
+                            const reader = new FileReader();
+                            reader.onload = (e) => {
+                                this.previewImages.push(e.target.result);
+                            };
+                            reader.readAsDataURL(file);
+                        }
+                    });
+                },
+
+                handleDrop(event) {
+                    this.dragOver = false;
+                    const files = Array.from(event.dataTransfer.files);
+                    files.forEach(file => {
+                        if (file && file.type.startsWith('image/')) {
+                            this.productFiles.push(file);
+                            const reader = new FileReader();
+                            reader.onload = (e) => {
+                                this.previewImages.push(e.target.result);
+                            };
+                            reader.readAsDataURL(file);
+                        }
+                    });
+                },
+
+                removeImageAt(index) {
+                    this.productFiles.splice(index, 1);
+                    this.previewImages.splice(index, 1);
+                },
+
+                clearAllImages() {
+                    this.productFiles = [];
+                    this.previewImages = [];
+                },
+
+                calculateTotal() {
+                    const hookTotal = this.formData.hook_photo_var * this.formData.hook_text_var;
+                    const bodyCount = 5; // Estimate ~5 body slides
+                    const bodyTotal = bodyCount * this.formData.body_photo_var * this.formData.body_text_var;
+                    const productPhotos = this.productFiles.length || 1;
+                    const productTotal = productPhotos * this.formData.product_text_var;
+                    return hookTotal + bodyTotal + productTotal;
+                },
+
+                getFormula() {
+                    const hp = this.formData.hook_photo_var;
+                    const ht = this.formData.hook_text_var;
+                    const bp = this.formData.body_photo_var;
+                    const bt = this.formData.body_text_var;
+                    const pp = this.productFiles.length || 1;
+                    const pt = this.formData.product_text_var;
+
+                    // Hook part
+                    const hookPart = hp === 1 && ht === 1 ? '1' : `${hp}×${ht}`;
+
+                    // Body part (5 slides estimate)
+                    let bodyPart;
+                    if (bp === 1 && bt === 1) {
+                        bodyPart = '5×1';
+                    } else {
+                        bodyPart = `5×${bp}×${bt}`;
+                    }
+
+                    // Product part
+                    const productPart = pp === 1 && pt === 1 ? '1' : `${pp}×${pt}`;
+
+                    return `${hookPart} + ${bodyPart} + ${productPart}`;
+                },
+
+                // Batch mode formula and calculation
+                calculateBatchTotal() {
+                    const hookTotal = this.batchData.hook_photo_var * this.batchData.hook_text_var;
+                    const bodyCount = 5; // Estimate ~5 body slides
+                    const bodyTotal = bodyCount * this.batchData.body_photo_var * this.batchData.body_text_var;
+                    const productTotal = this.batchData.product_text_var; // 1 photo per link
+                    return hookTotal + bodyTotal + productTotal;
+                },
+
+                getBatchFormula() {
+                    const hp = this.batchData.hook_photo_var;
+                    const ht = this.batchData.hook_text_var;
+                    const bp = this.batchData.body_photo_var;
+                    const bt = this.batchData.body_text_var;
+                    const pt = this.batchData.product_text_var;
+
+                    const hookPart = hp === 1 && ht === 1 ? '1' : `${hp}×${ht}`;
+                    let bodyPart;
+                    if (bp === 1 && bt === 1) {
+                        bodyPart = '5×1';
+                    } else {
+                        bodyPart = `5×${bp}×${bt}`;
+                    }
+                    const productPart = pt === 1 ? '1' : `1×${pt}`;
+
+                    return `${hookPart} + ${bodyPart} + ${productPart}`;
+                },
+
+                startPolling(sessionId) {
+                    this.sessionId = sessionId;
+                    this.pollInterval = setInterval(async () => {
+                        try {
+                            const res = await fetch(`${API_BASE_URL}/api/status/${sessionId}`);
+                            const status = await res.json();
+
+                            this.statusMessage = status.message || 'Processing...';
+                            this.progressPercent = status.progress || 0;
+                            this.statusDetail = status.details?.detail || '';
+
+                            const stepMap = { 'starting': 1, 'scraping': 1, 'analyzing': 2, 'generating': 3, 'uploading': 4, 'complete': 5 };
+                            this.currentStep = stepMap[status.step] || 0;
+
+                            if (status.step === 'complete') {
+                                this.stopPolling();
+                                this.isLoading = false;
+                                this.result = {
+                                    status: 'success',
+                                    message: 'Slideshow generated successfully!',
+                                    folder_link: status.details?.folder_link,
+                                    stats: status.details?.stats
+                                };
+                            } else if (status.step === 'error') {
+                                this.stopPolling();
+                                this.isLoading = false;
+                                this.error = status.message;
+                            }
+                        } catch (e) {}
+                    }, 1000);
+                },
+
+                stopPolling() {
+                    if (this.pollInterval) {
+                        clearInterval(this.pollInterval);
+                        this.pollInterval = null;
+                    }
+                },
+
+                applyPreset(presetKey) {
+                    if (this.presets[presetKey]) {
+                        this.formData.product_context = this.presets[presetKey];
+                    }
+                },
+
+                async submitSingleForm() {
+                    if (this.productFiles.length === 0) {
+                        this.error = 'Please upload at least one product image';
+                        return;
+                    }
+
+                    this.isLoading = true;
+                    this.error = null;
+                    this.result = null;
+                    this.statusMessage = 'Starting...';
+                    this.progressPercent = 0;
+                    this.currentStep = 0;
+                    this.statusDetail = 'Preparing request...';
+
+                    const formData = new FormData();
+                    formData.append('tiktok_url', this.formData.tiktok_url);
+                    formData.append('folder_name', this.formData.folder_name);
+                    formData.append('product_context', this.formData.product_context);
+
+                    // Add all product images
+                    this.productFiles.forEach(file => {
+                        formData.append('product_images', file);
+                    });
+
+                    // Photo × Text variation params
+                    formData.append('hook_photo_var', this.formData.hook_photo_var);
+                    formData.append('hook_text_var', this.formData.hook_text_var);
+                    formData.append('body_photo_var', this.formData.body_photo_var);
+                    formData.append('body_text_var', this.formData.body_text_var);
+                    formData.append('product_text_var', this.formData.product_text_var);
+
+                    // Video generation option
+                    formData.append('generate_video', this.formData.generate_video);
+
+                    try {
+                        this.statusMessage = 'Uploading...';
+                        this.progressPercent = 5;
+                        this.currentStep = 1;
+
+                        const response = await fetch(`${API_BASE_URL}/api/generate`, {
+                            method: 'POST',
+                            body: formData
+                        });
+
+                        const data = await response.json();
+
+                        if (!response.ok) {
+                            throw new Error(data.error || 'Generation failed');
+                        }
+
+                        if (data.session_id && data.status === 'started') {
+                            this.startPolling(data.session_id);
+                        } else if (data.status === 'success') {
+                            this.progressPercent = 100;
+                            this.currentStep = 5;
+                            this.result = data;
+                            this.isLoading = false;
+                        }
+                    } catch (err) {
+                        this.error = err.message;
+                        this.stopPolling();
+                        this.isLoading = false;
+                    }
+                },
+
+                // Batch mode methods
+                validateBatchLinks() {
+                    const text = this.batchData.linksText.trim();
+                    if (!text) {
+                        this.batchValidation = { valid: 0, invalid: 0, validLinks: [], invalidLinks: [] };
+                        return;
+                    }
+
+                    const lines = text.split(/[\n\r]+/).map(l => l.trim()).filter(l => l);
+                    const tiktokPatterns = [
+                        /^https?:\/\/(www\.)?tiktok\.com\/@[\w.-]+\/(video|photo)\/\d+/,
+                        /^https?:\/\/vm\.tiktok\.com\/[\w]+/,
+                        /^https?:\/\/(www\.)?tiktok\.com\/t\/[\w]+/,
+                    ];
+
+                    const validLinks = [];
+                    const invalidLinks = [];
+
+                    lines.forEach((url, index) => {
+                        const isValid = tiktokPatterns.some(p => p.test(url));
+                        if (isValid) {
+                            validLinks.push({ index, url });
+                        } else {
+                            invalidLinks.push({ index, url });
+                        }
+                    });
+
+                    this.batchValidation = {
+                        valid: validLinks.length,
+                        invalid: invalidLinks.length,
+                        validLinks,
+                        invalidLinks
+                    };
+                },
+
+                goToStep2() {
+                    // Initialize products array
+                    const count = this.batchValidation.valid;
+                    this.batchData.products = [];
+                    for (let i = 0; i < count; i++) {
+                        this.batchData.products.push({ file: null, preview: null, description: '' });
+                    }
+                    this.batchStep = 2;
+                },
+
+                handleBatchFileSelect(event, index) {
+                    const file = event.target.files[0];
+                    if (file && file.type.startsWith('image/')) {
+                        this.batchData.products[index].file = file;
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            this.batchData.products[index].preview = e.target.result;
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                },
+
+                canSubmitBatch() {
+                    if (this.batchData.applyToAll) {
+                        return this.batchData.products[0]?.file && this.batchData.products[0]?.description;
+                    }
+                    // Check all products have file and description
+                    return this.batchData.products.every(p => p.file && p.description);
+                },
+
+                async submitBatch() {
+                    const formData = new FormData();
+
+                    // Add links
+                    const validUrls = this.batchValidation.validLinks.map(l => l.url).join('\n');
+                    formData.append('links', validUrls);
+
+                    // Add variations (Photo × Text per slide type)
+                    formData.append('hook_photo_var', this.batchData.hook_photo_var);
+                    formData.append('hook_text_var', this.batchData.hook_text_var);
+                    formData.append('body_photo_var', this.batchData.body_photo_var);
+                    formData.append('body_text_var', this.batchData.body_text_var);
+                    formData.append('product_text_var', this.batchData.product_text_var);
+
+                    // Add video generation flag
+                    formData.append('generate_video', this.batchData.generateVideo);
+
+                    // Add products
+                    if (this.batchData.applyToAll) {
+                        // Same product for all
+                        for (let i = 0; i < this.batchValidation.valid; i++) {
+                            formData.append(`product_photo_${i}`, this.batchData.products[0].file);
+                            formData.append(`product_description_${i}`, this.batchData.products[0].description);
+                        }
+                    } else {
+                        // Individual products
+                        this.batchData.products.forEach((product, i) => {
+                            formData.append(`product_photo_${i}`, product.file);
+                            formData.append(`product_description_${i}`, product.description);
+                        });
+                    }
+
+                    try {
+                        const response = await fetch(`${API_BASE_URL}/api/batch`, {
+                            method: 'POST',
+                            body: formData
+                        });
+
+                        const data = await response.json();
+
+                        if (!response.ok) {
+                            throw new Error(data.error || 'Failed to create batch');
+                        }
+
+                        this.batchId = data.batch_id;
+                        this.batchProgress = {
+                            status: 'processing',
+                            percent: 0,
+                            pending: data.total_links,
+                            processing: 0,
+                            completed: 0,
+                            failed: 0,
+                            message: 'Batch created, processing started...',
+                            driveUrl: null
+                        };
+                        this.batchStep = 3;
+                        this.startBatchPolling();
+
+                    } catch (err) {
+                        alert('Error: ' + err.message);
+                    }
+                },
+
+                startBatchPolling() {
+                    this.batchPollInterval = setInterval(async () => {
+                        try {
+                            const res = await fetch(`${API_BASE_URL}/api/batch/${this.batchId}/status`);
+                            const status = await res.json();
+
+                            this.batchProgress = {
+                                status: status.status,
+                                percent: status.progress,
+                                pending: status.links.pending,
+                                processing: status.links.processing,
+                                completed: status.links.completed,
+                                failed: status.links.failed,
+                                message: this.getBatchMessage(status),
+                                driveUrl: status.drive_folder_url
+                            };
+
+                            if (status.status === 'completed' || status.status === 'failed' || status.status === 'cancelled') {
+                                this.stopBatchPolling();
+                            }
+                        } catch (e) {}
+                    }, 3000);
+                },
+
+                stopBatchPolling() {
+                    if (this.batchPollInterval) {
+                        clearInterval(this.batchPollInterval);
+                        this.batchPollInterval = null;
+                    }
+                },
+
+                getBatchMessage(status) {
+                    if (status.status === 'completed') {
+                        if (status.links.failed > 0) {
+                            return `Completed with ${status.links.failed} failed links`;
+                        }
+                        return 'All links processed successfully!';
+                    }
+                    if (status.status === 'cancelled') return 'Batch cancelled';
+                    if (status.status === 'failed') return status.error_message || 'Batch failed';
+                    return `Processing ${status.links.processing} links...`;
+                },
+
+                async cancelBatch() {
+                    if (!confirm('Are you sure you want to cancel this batch?')) return;
+
+                    try {
+                        await fetch(`${API_BASE_URL}/api/batch/${this.batchId}/cancel`, { method: 'POST' });
+                        this.batchProgress.status = 'cancelled';
+                        this.batchProgress.message = 'Batch cancelled';
+                        this.stopBatchPolling();
+                    } catch (e) {
+                        alert('Failed to cancel batch');
+                    }
+                },
+
+                async retryFailed() {
+                    try {
+                        const res = await fetch(`${API_BASE_URL}/api/batch/${this.batchId}/retry-failed`, { method: 'POST' });
+                        const data = await res.json();
+
+                        if (data.status === 'retry_started') {
+                            this.batchProgress.status = 'processing';
+                            this.batchProgress.message = `Retrying ${data.retry_count} failed links...`;
+                            this.startBatchPolling();
+                        }
+                    } catch (e) {
+                        alert('Failed to retry');
+                    }
+                },
+
+                startNewBatch() {
+                    this.batchStep = 1;
+                    this.batchData = {
+                        linksText: '',
+                        hook_photo_var: 1,
+                        hook_text_var: 1,
+                        body_photo_var: 1,
+                        body_text_var: 1,
+                        product_text_var: 1,
+                        applyToAll: true,
+                        generateVideo: false,
+                        products: [{ file: null, preview: null, description: '' }]
+                    };
+                    this.batchValidation = { valid: 0, invalid: 0, validLinks: [], invalidLinks: [] };
+                    this.batchId = null;
+                    this.batchProgress = {
+                        status: 'pending',
+                        percent: 0,
+                        pending: 0,
+                        processing: 0,
+                        completed: 0,
+                        failed: 0,
+                        message: '',
+                        driveUrl: null
+                    };
+                },
+
+                // Video mode methods
+                handleVideoFileSelect(event) {
+                    const files = Array.from(event.target.files);
+                    files.forEach(file => {
+                        if (file && file.type.startsWith('image/')) {
+                            this.videoData.images.push(file);
+                            const reader = new FileReader();
+                            reader.onload = (e) => {
+                                this.videoData.previews.push(e.target.result);
+                            };
+                            reader.readAsDataURL(file);
+                        }
+                    });
+                },
+
+                handleVideoFileDrop(event) {
+                    this.videoDragOver = false;
+                    const files = Array.from(event.dataTransfer.files);
+                    files.forEach(file => {
+                        if (file && file.type.startsWith('image/')) {
+                            this.videoData.images.push(file);
+                            const reader = new FileReader();
+                            reader.onload = (e) => {
+                                this.videoData.previews.push(e.target.result);
+                            };
+                            reader.readAsDataURL(file);
+                        }
+                    });
+                },
+
+                removeVideoImage(index) {
+                    this.videoData.images.splice(index, 1);
+                    this.videoData.previews.splice(index, 1);
+                },
+
+                clearVideoImages() {
+                    this.videoData.images = [];
+                    this.videoData.previews = [];
+                },
+
+                // Drag and drop reordering for video images
+                dragVideoStart(e, index) {
+                    this.draggingVideoIndex = index;
+                    e.dataTransfer.effectAllowed = 'move';
+                },
+
+                dragVideoEnd(e) {
+                    this.draggingVideoIndex = null;
+                },
+
+                dragVideoOver(e, index) {
+                    if (this.draggingVideoIndex === null || this.draggingVideoIndex === index) return;
+
+                    // Swap images and previews
+                    const images = [...this.videoData.images];
+                    const previews = [...this.videoData.previews];
+
+                    const draggedImage = images[this.draggingVideoIndex];
+                    const draggedPreview = previews[this.draggingVideoIndex];
+
+                    images.splice(this.draggingVideoIndex, 1);
+                    previews.splice(this.draggingVideoIndex, 1);
+
+                    images.splice(index, 0, draggedImage);
+                    previews.splice(index, 0, draggedPreview);
+
+                    this.videoData.images = images;
+                    this.videoData.previews = previews;
+                    this.draggingVideoIndex = index;
+                },
+
+                handleVideoDrop(e) {
+                    this.draggingVideoIndex = null;
+                },
+
+                handleAudioFileSelect(event) {
+                    const file = event.target.files[0];
+                    if (file && file.type.startsWith('audio/')) {
+                        this.videoData.audio = file;
+                        this.videoData.audioName = file.name;
+                    }
+                },
+
+                clearAudio() {
+                    this.videoData.audio = null;
+                    this.videoData.audioName = '';
+                },
+
+                async submitVideoForm() {
+                    if (this.videoData.images.length === 0) {
+                        this.videoError = 'Please upload at least one image';
+                        return;
+                    }
+
+                    this.videoLoading = true;
+                    this.videoError = null;
+                    this.videoResult = null;
+                    this.videoStatus = 'Uploading...';
+
+                    const formData = new FormData();
+
+                    // Add images in order
+                    this.videoData.images.forEach(file => {
+                        formData.append('images', file);
+                    });
+
+                    // Add audio if provided
+                    if (this.videoData.audio) {
+                        formData.append('audio', this.videoData.audio);
+                    }
+
+                    // Add folder name
+                    formData.append('folder_name', this.videoData.folder_name || 'Slideshow_Video');
+
+                    try {
+                        const response = await fetch(`${API_BASE_URL}/api/video/create`, {
+                            method: 'POST',
+                            body: formData
+                        });
+
+                        const data = await response.json();
+
+                        if (!response.ok) {
+                            throw new Error(data.error || 'Video creation failed');
+                        }
+
+                        if (data.job_id) {
+                            this.videoJobId = data.job_id;
+                            this.videoStatus = 'Processing video...';
+                            this.startVideoPoll();
+                        }
+                    } catch (err) {
+                        this.videoError = err.message;
+                        this.videoLoading = false;
+                    }
+                },
+
+                startVideoPoll() {
+                    this.videoPollInterval = setInterval(async () => {
+                        try {
+                            const res = await fetch(`${API_BASE_URL}/api/video/status/${this.videoJobId}`);
+                            const status = await res.json();
+
+                            if (status.status === 'completed') {
+                                this.stopVideoPoll();
+                                this.videoLoading = false;
+                                this.videoResult = status;
+                            } else if (status.status === 'failed') {
+                                this.stopVideoPoll();
+                                this.videoLoading = false;
+                                this.videoError = status.error_message || 'Video creation failed';
+                            } else if (status.status === 'processing') {
+                                this.videoStatus = 'Creating video...';
+                            }
+                        } catch (e) {}
+                    }, 2000);
+                },
+
+                stopVideoPoll() {
+                    if (this.videoPollInterval) {
+                        clearInterval(this.videoPollInterval);
+                        this.videoPollInterval = null;
+                    }
+                }
+            };
+        }
+    </script>
+</body>
+</html>
