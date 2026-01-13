@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+        }
+        [x-cloak] { display: none !important; }
+    </style>
+</head>
+<body class="text-gray-100">
+    <div x-data="adminApp()" class="container mx-auto px-4 py-8 max-w-2xl">
+        <!-- Header -->
+        <div class="text-center mb-6">
+            <h1 class="text-3xl font-bold mb-2">Admin Panel</h1>
+        </div>
+
+        <!-- Login Form -->
+        <div x-show="!isAuthenticated" class="bg-gray-800/50 backdrop-blur rounded-xl p-6 shadow-xl">
+            <h2 class="text-xl font-semibold mb-4">Login</h2>
+
+            <form @submit.prevent="login">
+                <div class="mb-4">
+                    <label class="block text-gray-300 text-sm font-medium mb-2">Password</label>
+                    <input
+                        type="password"
+                        x-model="password"
+                        placeholder="Enter admin password"
+                        class="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent text-white"
+                        :disabled="loading"
+                    >
+                </div>
+
+                <div x-show="loginError" class="mb-4 p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 text-sm">
+                    <span x-text="loginError"></span>
+                </div>
+
+                <button
+                    type="submit"
+                    class="w-full py-3 bg-gradient-to-r from-pink-500 to-purple-600 rounded-lg font-semibold hover:from-pink-600 hover:to-purple-700 transition-all disabled:opacity-50"
+                    :disabled="loading || !password"
+                >
+                    <span x-show="!loading">Login</span>
+                    <span x-show="loading">Authenticating...</span>
+                </button>
+            </form>
+        </div>
+
+        <!-- Authenticated Content -->
+        <div x-show="isAuthenticated" x-cloak>
+            <!-- Navigation Tabs -->
+            <div class="flex items-center justify-between mb-6">
+                <div class="flex space-x-2">
+                    <a href="/admin/keys"
+                       class="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                       :class="currentPage === 'keys' ? 'bg-pink-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'">
+                        API Keys
+                    </a>
+                    <a href="/admin/queue"
+                       class="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                       :class="currentPage === 'queue' ? 'bg-pink-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'">
+                        Job Queue
+                    </a>
+                </div>
+                <button
+                    @click="logout"
+                    class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm transition-colors"
+                >
+                    Logout
+                </button>
+            </div>
+
+            <!-- ==================== API KEYS PAGE ==================== -->
+            <div x-show="currentPage === 'keys'" x-cloak>
+                <!-- Success/Error Messages -->
+                <div x-show="message" x-transition class="mb-4 p-3 rounded-lg text-sm"
+                     :class="messageType === 'success' ? 'bg-green-500/20 border border-green-500/50 text-green-400' : 'bg-red-500/20 border border-red-500/50 text-red-400'">
+                    <span x-text="message"></span>
+                </div>
+
+                <!-- Keys Form -->
+                <div class="bg-gray-800/50 backdrop-blur rounded-xl p-6 shadow-xl space-y-6">
+                    <h2 class="text-xl font-semibold">API Keys</h2>
+
+                    <!-- Gemini API Key -->
+                    <div>
+                        <label class="block text-gray-300 text-sm font-medium mb-2">
+                            Gemini API Key
+                            <span x-show="keys.GEMINI_API_KEY?.is_set" class="text-green-400 text-xs ml-2">(Set)</span>
+                            <span x-show="!keys.GEMINI_API_KEY?.is_set" class="text-yellow-400 text-xs ml-2">(Not set)</span>
+                        </label>
+                        <div class="text-xs text-gray-500 mb-2" x-show="keys.GEMINI_API_KEY?.masked">
+                            Current: <span x-text="keys.GEMINI_API_KEY?.masked"></span>
+                        </div>
+                        <input
+                            type="password"
+                            x-model="newKeys.GEMINI_API_KEY"
+                            placeholder="Enter new Gemini API key"
+                            class="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent text-white"
+                        >
+                    </div>
+
+                    <!-- RapidAPI Key -->
+                    <div>
+                        <label class="block text-gray-300 text-sm font-medium mb-2">
+                            RapidAPI Key
+                            <span x-show="keys.RAPIDAPI_KEY?.is_set" class="text-green-400 text-xs ml-2">(Set)</span>
+                            <span x-show="!keys.RAPIDAPI_KEY?.is_set" class="text-yellow-400 text-xs ml-2">(Not set)</span>
+                        </label>
+                        <div class="text-xs text-gray-500 mb-2" x-show="keys.RAPIDAPI_KEY?.masked">
+                            Current: <span x-text="keys.RAPIDAPI_KEY?.masked"></span>
+                        </div>
+                        <input
+                            type="password"
+                            x-model="newKeys.RAPIDAPI_KEY"
+                            placeholder="Enter new RapidAPI key"
+                            class="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent text-white"
+                        >
+                    </div>
+
+                    <!-- Save Button -->
+                    <button
+                        @click="saveKeys"
+                        class="w-full py-3 bg-gradient-to-r from-pink-500 to-purple-600 rounded-lg font-semibold hover:from-pink-600 hover:to-purple-700 transition-all disabled:opacity-50"
+                        :disabled="saving || (!newKeys.GEMINI_API_KEY && !newKeys.RAPIDAPI_KEY)"
+                    >
+                        <span x-show="!saving">Save Changes</span>
+                        <span x-show="saving">Saving...</span>
+                    </button>
+
+                    <p class="text-xs text-gray-500 text-center">
+                        Only filled fields will be updated. Leave empty to keep current value.
+                    </p>
+                </div>
+            </div>
+
+            <!-- ==================== JOB QUEUE PAGE ==================== -->
+            <div x-show="currentPage === 'queue'" x-cloak>
+                <div class="bg-gray-800/50 backdrop-blur rounded-xl p-6 shadow-xl">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-semibold">Job Queue</h2>
+                        <button @click="queueTab === 'slideshow' ? refreshJobs() : fetchVideoJobs()" class="text-sm px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded">
+                            Refresh
+                        </button>
+                    </div>
+
+                    <!-- Queue Type Tabs -->
+                    <div class="flex space-x-2 mb-4">
+                        <button
+                            @click="queueTab = 'slideshow'"
+                            class="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                            :class="queueTab === 'slideshow' ? 'bg-pink-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'"
+                        >
+                            Slideshow Jobs
+                        </button>
+                        <button
+                            @click="queueTab = 'video'; fetchVideoJobs()"
+                            class="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                            :class="queueTab === 'video' ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'"
+                        >
+                            Video Jobs
+                        </button>
+                    </div>
+
+                    <!-- Slideshow Queue Stats -->
+                    <div x-show="queueTab === 'slideshow'" class="grid grid-cols-4 gap-2 mb-4 text-center text-xs">
+                        <div class="bg-yellow-500/20 rounded p-2">
+                            <div class="text-yellow-400 font-bold" x-text="queueStats.pending">0</div>
+                            <div class="text-gray-400">Pending</div>
+                        </div>
+                        <div class="bg-blue-500/20 rounded p-2">
+                            <div class="text-blue-400 font-bold" x-text="queueStats.processing">0</div>
+                            <div class="text-gray-400">Processing</div>
+                        </div>
+                        <div class="bg-green-500/20 rounded p-2">
+                            <div class="text-green-400 font-bold" x-text="queueStats.completed">0</div>
+                            <div class="text-gray-400">Completed</div>
+                        </div>
+                        <div class="bg-red-500/20 rounded p-2">
+                            <div class="text-red-400 font-bold" x-text="queueStats.failed">0</div>
+                            <div class="text-gray-400">Failed</div>
+                        </div>
+                    </div>
+
+                    <!-- Video Queue Stats -->
+                    <div x-show="queueTab === 'video'" class="grid grid-cols-4 gap-2 mb-4 text-center text-xs">
+                        <div class="bg-yellow-500/20 rounded p-2">
+                            <div class="text-yellow-400 font-bold" x-text="videoQueueStats.pending">0</div>
+                            <div class="text-gray-400">Pending</div>
+                        </div>
+                        <div class="bg-blue-500/20 rounded p-2">
+                            <div class="text-blue-400 font-bold" x-text="videoQueueStats.processing">0</div>
+                            <div class="text-gray-400">Processing</div>
+                        </div>
+                        <div class="bg-green-500/20 rounded p-2">
+                            <div class="text-green-400 font-bold" x-text="videoQueueStats.completed">0</div>
+                            <div class="text-gray-400">Completed</div>
+                        </div>
+                        <div class="bg-red-500/20 rounded p-2">
+                            <div class="text-red-400 font-bold" x-text="videoQueueStats.failed">0</div>
+                            <div class="text-gray-400">Failed</div>
+                        </div>
+                    </div>
+
+                    <!-- Slideshow Jobs List -->
+                    <div x-show="queueTab === 'slideshow'" class="space-y-2 mb-4">
+                        <template x-for="job in jobs" :key="job.id">
+                            <div
+                                class="bg-gray-700/50 rounded p-3 text-sm transition-colors"
+                                :class="{ 'hover:bg-gray-600/50 cursor-pointer': job.drive_folder_url }"
+                                @click="job.drive_folder_url && window.open(job.drive_folder_url, '_blank')"
+                            >
+                                <div class="flex justify-between items-start">
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-center space-x-2">
+                                            <span class="font-mono text-xs text-gray-400" x-text="job.id.substring(0, 8)"></span>
+                                            <span class="truncate" x-text="job.folder_name || 'Unnamed'"></span>
+                                        </div>
+                                        <div class="text-xs text-gray-500 mt-1" x-text="formatDate(job.created_at)"></div>
+                                    </div>
+                                    <div class="flex items-center space-x-2 flex-shrink-0 ml-2">
+                                        <span class="px-2 py-0.5 rounded text-xs"
+                                              :class="{
+                                                  'bg-yellow-500/30 text-yellow-400': job.status === 'pending',
+                                                  'bg-blue-500/30 text-blue-400': job.status === 'processing',
+                                                  'bg-green-500/30 text-green-400': job.status === 'completed',
+                                                  'bg-red-500/30 text-red-400': job.status === 'failed'
+                                              }"
+                                              x-text="job.status">
+                                        </span>
+                                        <button
+                                            @click.stop="deleteJob(job.id)"
+                                            class="p-1 text-gray-500 hover:text-red-400 transition-colors"
+                                            title="Delete job"
+                                        >
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div x-show="job.drive_folder_url && job.status === 'completed'" class="mt-2 text-xs text-pink-400">
+                                    Click to open in Google Drive
+                                </div>
+                                <div x-show="job.error_message" class="mt-2 text-xs text-red-400 break-words" x-text="job.error_message"></div>
+                            </div>
+                        </template>
+                        <div x-show="jobs.length === 0" class="text-center text-gray-500 py-8">
+                            No slideshow jobs found
+                        </div>
+                    </div>
+
+                    <!-- Video Jobs List -->
+                    <div x-show="queueTab === 'video'" class="space-y-2 mb-4">
+                        <template x-for="job in videoJobs" :key="job.id">
+                            <div
+                                class="bg-gray-700/50 rounded p-3 text-sm transition-colors"
+                                :class="{ 'hover:bg-gray-600/50 cursor-pointer': job.drive_url }"
+                                @click="job.drive_url && window.open(job.drive_url, '_blank')"
+                            >
+                                <div class="flex justify-between items-start">
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-center space-x-2">
+                                            <span class="font-mono text-xs text-gray-400" x-text="job.id.substring(0, 8)"></span>
+                                            <span class="px-1.5 py-0.5 bg-purple-500/30 text-purple-300 rounded text-xs" x-text="job.job_type"></span>
+                                            <span class="truncate" x-text="job.folder_name || 'Unnamed'"></span>
+                                        </div>
+                                        <div class="text-xs text-gray-500 mt-1" x-text="formatDate(job.created_at)"></div>
+                                    </div>
+                                    <div class="flex items-center space-x-2 flex-shrink-0 ml-2">
+                                        <span class="px-2 py-0.5 rounded text-xs"
+                                              :class="{
+                                                  'bg-yellow-500/30 text-yellow-400': job.status === 'pending',
+                                                  'bg-blue-500/30 text-blue-400': job.status === 'processing',
+                                                  'bg-green-500/30 text-green-400': job.status === 'completed',
+                                                  'bg-red-500/30 text-red-400': job.status === 'failed'
+                                              }"
+                                              x-text="job.status">
+                                        </span>
+                                    </div>
+                                </div>
+                                <div x-show="job.drive_url && job.status === 'completed'" class="mt-2 text-xs text-purple-400">
+                                    Click to open in Google Drive
+                                </div>
+                                <div x-show="job.error_message" class="mt-2 text-xs text-red-400 break-words" x-text="job.error_message"></div>
+                            </div>
+                        </template>
+                        <div x-show="videoJobs.length === 0" class="text-center text-gray-500 py-8">
+                            No video jobs found
+                        </div>
+                    </div>
+
+                    <!-- Slideshow Pagination -->
+                    <div x-show="queueTab === 'slideshow' && totalJobs > perPage" class="flex items-center justify-between pt-4 border-t border-gray-700">
+                        <div class="text-sm text-gray-400">
+                            Showing <span x-text="((page - 1) * perPage) + 1"></span>-<span x-text="Math.min(page * perPage, totalJobs)"></span> of <span x-text="totalJobs"></span>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button
+                                @click="prevPage"
+                                :disabled="page === 1"
+                                class="px-3 py-1 bg-gray-700 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-600"
+                            >
+                                Previous
+                            </button>
+                            <button
+                                @click="nextPage"
+                                :disabled="page * perPage >= totalJobs"
+                                class="px-3 py-1 bg-gray-700 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-600"
+                            >
+                                Next
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Video Pagination -->
+                    <div x-show="queueTab === 'video' && totalVideoJobs > perPage" class="flex items-center justify-between pt-4 border-t border-gray-700">
+                        <div class="text-sm text-gray-400">
+                            Showing <span x-text="((videoPage - 1) * perPage) + 1"></span>-<span x-text="Math.min(videoPage * perPage, totalVideoJobs)"></span> of <span x-text="totalVideoJobs"></span>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button
+                                @click="videoPrevPage"
+                                :disabled="videoPage === 1"
+                                class="px-3 py-1 bg-gray-700 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-600"
+                            >
+                                Previous
+                            </button>
+                            <button
+                                @click="videoNextPage"
+                                :disabled="videoPage * perPage >= totalVideoJobs"
+                                class="px-3 py-1 bg-gray-700 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-600"
+                            >
+                                Next
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Back to App Link -->
+            <div class="mt-6 text-center">
+                <a href="/" class="text-pink-400 hover:text-pink-300 text-sm">
+                    &larr; Back to Generator
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+            ? 'http://localhost:5001'
+            : '';
+
+        function adminApp() {
+            return {
+                // Page state
+                currentPage: window.location.pathname.includes('/queue') ? 'queue' : 'keys',
+
+                // Auth state
+                isAuthenticated: false,
+                password: '',
+                token: '',
+                loginError: '',
+                loading: false,
+
+                // Keys state
+                keys: {},
+                newKeys: {
+                    GEMINI_API_KEY: '',
+                    RAPIDAPI_KEY: ''
+                },
+                saving: false,
+                message: '',
+                messageType: 'success',
+
+                // Job queue state
+                jobs: [],
+                queueStats: { pending: 0, processing: 0, completed: 0, failed: 0 },
+                page: 1,
+                perPage: 10,
+                totalJobs: 0,
+
+                // Video jobs state
+                queueTab: 'slideshow', // 'slideshow' or 'video'
+                videoJobs: [],
+                videoQueueStats: { pending: 0, processing: 0, completed: 0, failed: 0 },
+                videoPage: 1,
+                totalVideoJobs: 0,
+
+                init() {
+                    const storedToken = localStorage.getItem('adminToken');
+                    if (storedToken) {
+                        this.token = storedToken;
+                        this.verifyToken();
+                    }
+                },
+
+                async verifyToken() {
+                    try {
+                        const res = await fetch(`${API_BASE}/api/admin/verify`, {
+                            headers: { 'X-Admin-Token': this.token }
+                        });
+                        if (res.ok) {
+                            this.isAuthenticated = true;
+                            this.fetchKeys();
+                            this.refreshJobs();
+                            this.fetchQueueStats();
+                            this.fetchVideoJobs();
+                        } else {
+                            this.clearToken();
+                        }
+                    } catch (e) {
+                        this.clearToken();
+                    }
+                },
+
+                clearToken() {
+                    this.token = '';
+                    this.isAuthenticated = false;
+                    localStorage.removeItem('adminToken');
+                },
+
+                async login() {
+                    this.loading = true;
+                    this.loginError = '';
+
+                    try {
+                        const res = await fetch(`${API_BASE}/api/admin/login`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ password: this.password })
+                        });
+
+                        const data = await res.json();
+
+                        if (res.ok) {
+                            this.token = data.token;
+                            this.isAuthenticated = true;
+                            localStorage.setItem('adminToken', data.token);
+                            this.password = '';
+                            this.fetchKeys();
+                            this.refreshJobs();
+                            this.fetchQueueStats();
+                            this.fetchVideoJobs();
+                        } else {
+                            this.loginError = data.error || 'Login failed';
+                        }
+                    } catch (e) {
+                        this.loginError = 'Connection error. Is the server running?';
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                async logout() {
+                    try {
+                        await fetch(`${API_BASE}/api/admin/logout`, {
+                            method: 'POST',
+                            headers: { 'X-Admin-Token': this.token }
+                        });
+                    } catch (e) {}
+                    this.clearToken();
+                    this.keys = {};
+                    this.newKeys = { GEMINI_API_KEY: '', RAPIDAPI_KEY: '' };
+                },
+
+                async fetchKeys() {
+                    try {
+                        const res = await fetch(`${API_BASE}/api/admin/keys`, {
+                            headers: { 'X-Admin-Token': this.token }
+                        });
+
+                        if (res.ok) {
+                            const data = await res.json();
+                            this.keys = data.keys;
+                        } else if (res.status === 401) {
+                            this.clearToken();
+                        }
+                    } catch (e) {
+                        console.error('Failed to fetch keys:', e);
+                    }
+                },
+
+                async saveKeys() {
+                    this.saving = true;
+                    this.message = '';
+
+                    const payload = {};
+                    if (this.newKeys.GEMINI_API_KEY.trim()) {
+                        payload.GEMINI_API_KEY = this.newKeys.GEMINI_API_KEY.trim();
+                    }
+                    if (this.newKeys.RAPIDAPI_KEY.trim()) {
+                        payload.RAPIDAPI_KEY = this.newKeys.RAPIDAPI_KEY.trim();
+                    }
+
+                    try {
+                        const res = await fetch(`${API_BASE}/api/admin/keys`, {
+                            method: 'PUT',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-Admin-Token': this.token
+                            },
+                            body: JSON.stringify(payload)
+                        });
+
+                        const data = await res.json();
+
+                        if (res.ok) {
+                            this.messageType = 'success';
+                            this.message = data.message || 'Keys updated successfully';
+                            this.newKeys = { GEMINI_API_KEY: '', RAPIDAPI_KEY: '' };
+                            this.fetchKeys();
+                        } else if (res.status === 401) {
+                            this.clearToken();
+                        } else {
+                            this.messageType = 'error';
+                            this.message = data.error || data.message || 'Update failed';
+                        }
+                    } catch (e) {
+                        this.messageType = 'error';
+                        this.message = 'Connection error';
+                    } finally {
+                        this.saving = false;
+                        setTimeout(() => { this.message = ''; }, 5000);
+                    }
+                },
+
+                async fetchQueueStats() {
+                    try {
+                        const res = await fetch(`${API_BASE}/api/jobs?limit=1000`);
+                        if (res.ok) {
+                            const data = await res.json();
+                            const allJobs = data.jobs || [];
+                            this.queueStats = {
+                                pending: allJobs.filter(j => j.status === 'pending').length,
+                                processing: allJobs.filter(j => j.status === 'processing').length,
+                                completed: allJobs.filter(j => j.status === 'completed').length,
+                                failed: allJobs.filter(j => j.status === 'failed').length
+                            };
+                        }
+                    } catch (e) {
+                        console.error('Failed to fetch queue stats:', e);
+                    }
+                },
+
+                async refreshJobs() {
+                    try {
+                        const offset = (this.page - 1) * this.perPage;
+                        const res = await fetch(`${API_BASE}/api/jobs?limit=${this.perPage}&offset=${offset}`);
+                        if (res.ok) {
+                            const data = await res.json();
+                            this.jobs = data.jobs || [];
+                            this.totalJobs = data.total || 0;
+                        }
+                    } catch (e) {
+                        console.error('Failed to fetch jobs:', e);
+                    }
+                    this.fetchQueueStats();
+                },
+
+                async deleteJob(jobId) {
+                    if (!confirm('Delete this job?')) return;
+                    try {
+                        const res = await fetch(`${API_BASE}/api/jobs/${jobId}`, { method: 'DELETE' });
+                        if (res.ok) {
+                            this.refreshJobs();
+                        } else {
+                            const data = await res.json();
+                            alert('Failed to delete: ' + (data.error || 'Unknown error'));
+                        }
+                    } catch (e) {
+                        console.error('Delete failed:', e);
+                        alert('Failed to delete job');
+                    }
+                },
+
+                prevPage() {
+                    if (this.page > 1) {
+                        this.page--;
+                        this.refreshJobs();
+                    }
+                },
+
+                nextPage() {
+                    if (this.page * this.perPage < this.totalJobs) {
+                        this.page++;
+                        this.refreshJobs();
+                    }
+                },
+
+                formatDate(dateStr) {
+                    if (!dateStr) return '';
+                    const date = new Date(dateStr);
+                    return date.toLocaleString();
+                },
+
+                // Video Jobs methods
+                async fetchVideoJobs() {
+                    try {
+                        const offset = (this.videoPage - 1) * this.perPage;
+                        const res = await fetch(`${API_BASE}/api/admin/video-jobs?limit=${this.perPage}&offset=${offset}`, {
+                            headers: { 'X-Admin-Token': this.token }
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            this.videoJobs = data.jobs || [];
+                            this.totalVideoJobs = data.total || 0;
+                        }
+                    } catch (e) {
+                        console.error('Failed to fetch video jobs:', e);
+                    }
+                    this.fetchVideoQueueStats();
+                },
+
+                async fetchVideoQueueStats() {
+                    try {
+                        const res = await fetch(`${API_BASE}/api/admin/video-jobs?limit=1000`, {
+                            headers: { 'X-Admin-Token': this.token }
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            const allJobs = data.jobs || [];
+                            this.videoQueueStats = {
+                                pending: allJobs.filter(j => j.status === 'pending').length,
+                                processing: allJobs.filter(j => j.status === 'processing').length,
+                                completed: allJobs.filter(j => j.status === 'completed').length,
+                                failed: allJobs.filter(j => j.status === 'failed').length
+                            };
+                        }
+                    } catch (e) {
+                        console.error('Failed to fetch video queue stats:', e);
+                    }
+                },
+
+                videoPrevPage() {
+                    if (this.videoPage > 1) {
+                        this.videoPage--;
+                        this.fetchVideoJobs();
+                    }
+                },
+
+                videoNextPage() {
+                    if (this.videoPage * this.perPage < this.totalVideoJobs) {
+                        this.videoPage++;
+                        this.fetchVideoJobs();
+                    }
+                }
+            };
+        }
+    </script>
+</body>
+</html>
