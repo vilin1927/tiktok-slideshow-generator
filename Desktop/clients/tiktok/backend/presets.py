@@ -152,17 +152,17 @@ def get_font_size(text_length: int, image_height: int) -> int:
     Returns:
         Font size in pixels
     """
-    # TikTok-style large text - doubled from previous values
-    # Short text (<20 chars): 12% of height (~130px on 1080p)
-    # Medium text (20-50 chars): 9% of height (~97px on 1080p)
-    # Long text (>50 chars): 6% of height (~65px on 1080p)
+    # TikTok-style text sizing
+    # Short text (<20 chars): 6% of height (~65px on 1080p)
+    # Medium text (20-50 chars): 4.5% of height (~49px on 1080p)
+    # Long text (>50 chars): 3% of height (~32px on 1080p)
 
     if text_length < 20:
-        percent = 0.12
-    elif text_length <= 50:
-        percent = 0.09
-    else:
         percent = 0.06
+    elif text_length <= 50:
+        percent = 0.045
+    else:
+        percent = 0.03
 
     return int(image_height * percent)
 
