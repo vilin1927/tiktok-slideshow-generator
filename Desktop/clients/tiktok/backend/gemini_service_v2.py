@@ -1347,11 +1347,76 @@ def generate_all_images(
                 }
                 all_tasks.append(task)
 
-    total = len(all_tasks)
+    # In clean_image_mode, product slides should use original image (no Gemini generation)
+    # Just copy the user's product image and let PIL add text overlay later
+    copy_only_tasks = []
+    generate_tasks = []
+
+    if clean_image_mode:
+        for task in all_tasks:
+            if task['slide_type'] == 'product' and task['product_image_path']:
+                copy_only_tasks.append(task)
+            else:
+                generate_tasks.append(task)
+        log.info(f"Clean image mode: {len(copy_only_tasks)} product slides will use original images")
+    else:
+        generate_tasks = all_tasks
+
+    # Process copy-only tasks (product slides in clean_image_mode)
+    # Track results from copy-only tasks for final output
+    copy_only_results = {}
+    import shutil
+    from PIL import Image as PILImage
+    for task in copy_only_tasks:
+        try:
+            # Copy and convert to PNG at proper resolution
+            src_path = task['product_image_path']
+            dst_path = task['output_path']
+
+            # Open, resize if needed (maintain 3:4 aspect ratio), and save as PNG
+            with PILImage.open(src_path) as img:
+                # Target: 3:4 aspect ratio, minimum 1080x1440
+                target_w, target_h = 1080, 1440
+
+                # Resize to fit while maintaining aspect ratio
+                img_ratio = img.width / img.height
+                target_ratio = target_w / target_h
+
+                if img_ratio > target_ratio:
+                    # Image is wider - fit to height, crop width
+                    new_h = target_h
+                    new_w = int(new_h * img_ratio)
+                else:
+                    # Image is taller - fit to width, crop height
+                    new_w = target_w
+                    new_h = int(new_w / img_ratio)
+
+                # Resize
+                img_resized = img.resize((new_w, new_h), PILImage.Resampling.LANCZOS)
+
+                # Center crop to target dimensions
+                left = (new_w - target_w) // 2
+                top = (new_h - target_h) // 2
+                img_cropped = img_resized.crop((left, top, left + target_w, top + target_h))
+
+                # Convert to RGB if necessary and save
+                if img_cropped.mode in ('RGBA', 'P'):
+                    img_cropped = img_cropped.convert('RGB')
+                img_cropped.save(dst_path, 'PNG')
+
+            copy_only_results[task['task_id']] = dst_path
+            log.debug(f"Copied product image: {os.path.basename(src_path)} -> {os.path.basename(dst_path)}")
+        except Exception as e:
+            log.error(f"Failed to copy product image {task['task_id']}: {e}")
+            # Fallback: just copy the file as-is
+            shutil.copy2(task['product_image_path'], task['output_path'])
+            copy_only_results[task['task_id']] = task['output_path']
+
+    total = len(generate_tasks)
 
     # Separate persona tasks from non-persona tasks
-    persona_tasks = [t for t in all_tasks if t['has_persona']]
-    non_persona_tasks = [t for t in all_tasks if not t['has_persona']]
+    persona_tasks = [t for t in generate_tasks if t['has_persona']]
+    non_persona_tasks = [t for t in generate_tasks if not t['has_persona']]
 
     log.info(f"Generation tasks: {total} total ({len(persona_tasks)} persona, {len(non_persona_tasks)} non-persona)")
 
@@ -1448,6 +1513,9 @@ def generate_all_images(
             log.error(f"  {task_id}: {err}")
         error_msgs = [f"{task_id}: {err}" for task_id, err in errors]
         raise GeminiServiceError(f"Image generation failed:\n" + "\n".join(error_msgs))
+
+    # Merge copy_only_results into results
+    results.update(copy_only_results)
 
     # Build variations structure with actual paths
     for task in all_tasks:

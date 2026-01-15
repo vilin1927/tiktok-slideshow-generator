@@ -343,16 +343,18 @@ def _calculate_zone_confidence(
     edge_result: Dict,
     color_result: Dict
 ) -> float:
-    """Calculate confidence score for a safe zone."""
-    # Factors:
-    # 1. Size (larger = better)
-    # 2. Low edge density
-    # 3. Low color variance
-    # 4. Position (corners/edges often better for text)
+    """Calculate confidence score for a safe zone.
 
+    CRITICAL: Avoid center of image where products/subjects are.
+    Prefer top or bottom edges for TikTok-style text placement.
+    """
     bounds = zone['bounds']
     cell_w, cell_h = edge_result['cell_size']
     grid_size = edge_result['density_map'].shape[0]
+
+    # Get image dimensions from grid
+    img_h = grid_size * cell_h
+    img_w = grid_size * cell_w
 
     # Get cells in this zone
     start_col = bounds['x'] // cell_w
@@ -381,8 +383,37 @@ def _calculate_zone_confidence(
     # Variance factor (lower variance = higher score)
     variance_factor = 1.0 - avg_variance
 
-    # Combined confidence
-    confidence = (size_factor * 0.3 + edge_factor * 0.35 + variance_factor * 0.35)
+    # POSITION FACTOR - Critical for avoiding product/subject
+    # Zone center position
+    zone_center_y = bounds['y'] + bounds['h'] / 2
+    zone_center_x = bounds['x'] + bounds['w'] / 2
+
+    # Calculate vertical position score (0 = center, 1 = top/bottom edge)
+    # Center 40% of image gets heavily penalized
+    y_ratio = zone_center_y / img_h
+    if 0.30 <= y_ratio <= 0.70:
+        # Zone is in center 40% - heavy penalty
+        position_factor = 0.1
+    elif y_ratio < 0.25 or y_ratio > 0.75:
+        # Zone is in top/bottom 25% - big boost
+        position_factor = 1.0
+    else:
+        # Transition zones
+        position_factor = 0.5
+
+    # Also penalize horizontal center (products often centered)
+    x_ratio = zone_center_x / img_w
+    if 0.25 <= x_ratio <= 0.75:
+        # Zone is horizontally centered - slight penalty
+        position_factor *= 0.8
+
+    # Combined confidence with position heavily weighted
+    confidence = (
+        size_factor * 0.15 +
+        edge_factor * 0.20 +
+        variance_factor * 0.20 +
+        position_factor * 0.45  # Position is most important
+    )
 
     return round(confidence, 3)
 

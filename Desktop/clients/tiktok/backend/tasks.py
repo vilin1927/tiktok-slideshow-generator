@@ -217,20 +217,50 @@ def process_link(self, batch_link_id: str, parent_drive_folder_id: str):
                     if audio_path and os.path.exists(audio_path):
                         logger.info(f"[Link {batch_link_id[:8]}] Creating video with {len(generated_images)} images")
 
-                        # Sort images for video: hook, body_1, body_2, ..., product
-                        def slide_sort_key(path):
-                            filename = os.path.basename(path).lower()
-                            if filename.startswith('hook'):
-                                return (0, 0)
-                            elif filename.startswith('body'):
-                                match = re.search(r'body_(\d+)', filename)
-                                num = int(match.group(1)) if match else 0
-                                return (1, num)
-                            elif filename.startswith('product'):
-                                return (2, 0)
-                            return (3, 0)
+                        # Sort images: hook → body slides (except last) → product → last body
+                        def sort_slides_for_batch_video(images):
+                            hooks = []
+                            bodies = {}  # {num: path}
+                            products = []
+                            others = []
 
-                        sorted_images = sorted(generated_images, key=slide_sort_key)
+                            for img_path in images:
+                                filename = os.path.basename(img_path).lower()
+                                if filename.startswith('hook'):
+                                    hooks.append(img_path)
+                                elif filename.startswith('body'):
+                                    match = re.search(r'body_(\d+)', filename)
+                                    num = int(match.group(1)) if match else 0
+                                    bodies[num] = img_path
+                                elif filename.startswith('product'):
+                                    products.append(img_path)
+                                else:
+                                    others.append(img_path)
+
+                            result = []
+                            result.extend(sorted(hooks))  # Hooks first
+
+                            if bodies:
+                                sorted_body_nums = sorted(bodies.keys())
+                                if len(sorted_body_nums) > 1:
+                                    # Add all body slides except the last
+                                    for num in sorted_body_nums[:-1]:
+                                        result.append(bodies[num])
+                                    # Add products before last body
+                                    result.extend(sorted(products))
+                                    # Add last body slide
+                                    result.append(bodies[sorted_body_nums[-1]])
+                                else:
+                                    # Only one body slide - product goes after it
+                                    result.append(bodies[sorted_body_nums[0]])
+                                    result.extend(sorted(products))
+                            else:
+                                result.extend(sorted(products))
+
+                            result.extend(sorted(others))
+                            return result
+
+                        sorted_images = sort_slides_for_batch_video(generated_images)
 
                         # Create video output path
                         video_output_path = os.path.join(output_dir, f'slideshow_link_{link_index + 1}.mp4')

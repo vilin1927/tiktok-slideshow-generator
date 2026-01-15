@@ -892,6 +892,19 @@ def render_text(
     # Get effect config
     effect = preset.effect
 
+    # Determine text color based on zone brightness suggestion
+    # For shadow/outline: use zone's suggestion (adapts to background)
+    # For box: always use preset color (text on white box = black)
+    text_color = effect.text_color  # Default from preset
+
+    if effect.type in ('shadow', 'outline'):
+        # Use the zone's text color suggestion based on background brightness
+        text_color_suggestion = zone.get('text_color_suggestion', 'white')
+        if text_color_suggestion == 'black':
+            text_color = '#000000'  # Dark text for light backgrounds
+        else:
+            text_color = '#FFFFFF'  # Light text for dark backgrounds
+
     # For box style, each line gets its own box (Figma design)
     if effect.type == 'box':
         result = render_multiline_box_text(
@@ -915,7 +928,7 @@ def render_text(
             if effect.type == 'shadow':
                 result = render_shadow_text(
                     result, line, (x, y), font,
-                    effect.text_color,
+                    text_color,  # Use dynamic text color based on background
                     effect.shadow_color,
                     effect.shadow_opacity,
                     effect.shadow_offset,
@@ -926,7 +939,7 @@ def render_text(
             elif effect.type == 'outline':
                 result = render_outline_text(
                     result, line, (x, y), font,
-                    effect.text_color,
+                    text_color,  # Use dynamic text color based on background
                     effect.outline_color,
                     effect.outline_width,
                     emoji_font,
