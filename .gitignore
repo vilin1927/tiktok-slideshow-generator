@@ -1,0 +1,62 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.venv/
+ENV/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Database
+*.db
+*.sqlite3
+
+# Logs
+logs/
+*.log
+
+# Temp files
+temp/
+tmp/
+
+# Static/generated files
+static/previews/
+static/generated/
+
+# Test files
+test_fonts/
+test_images/
+test_scripts/
+
+# Node
+node_modules/
+package-lock.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Credentials (keep example only)
+credentials/
+*.pickle
+*.json.credentials
+
+# Claude
+.claude/
+
+# Other
+new-pics/
+font_detection_results.json
