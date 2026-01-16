@@ -272,28 +272,63 @@ def create_videos_for_variations(
         # Fallback: create single video from all images
         variation_groups['default'] = generated_images
     else:
-        # Fill in missing product images for variation sets
-        # Product may only have p1 variations while hook/body have p1, p2, etc.
+        # Collect all slide types by variation for fallback logic
+        hooks_by_var = {}  # var_key -> [hook paths]
+        bodies_by_var = {}  # var_key -> {body_num: path}
+
+        for var_key, images in variation_groups.items():
+            hooks_by_var[var_key] = []
+            bodies_by_var[var_key] = {}
+            for img_path in images:
+                filename = os.path.basename(img_path).lower()
+                if filename.startswith('hook'):
+                    hooks_by_var[var_key].append(img_path)
+                elif filename.startswith('body'):
+                    body_match = re.search(r'body_(\d+)', filename)
+                    if body_match:
+                        bodies_by_var[var_key][int(body_match.group(1))] = img_path
+
+        # Find the base variation (p1_t1) which should have all slides
+        base_var = 'p1_t1'
+        base_hooks = hooks_by_var.get(base_var, [])
+        base_bodies = bodies_by_var.get(base_var, {})
+
+        # Fill in missing slides for each variation
         for var_key in list(variation_groups.keys()):
+            if var_key == base_var:
+                continue
+
+            current_hooks = hooks_by_var.get(var_key, [])
+            current_bodies = bodies_by_var.get(var_key, {})
+
+            # Fill in missing hooks from base variation
+            if not current_hooks and base_hooks:
+                for hook_path in base_hooks:
+                    variation_groups[var_key].append(hook_path)
+                    logger.debug(f"{log_prefix}Added fallback hook from {base_var} to {var_key}")
+
+            # Fill in missing bodies from base variation
+            if not current_bodies and base_bodies:
+                for body_num, body_path in base_bodies.items():
+                    variation_groups[var_key].append(body_path)
+                    logger.debug(f"{log_prefix}Added fallback body_{body_num} from {base_var} to {var_key}")
+
+            # Fill in missing product from base or p1_tX variation
             has_product = any('product' in os.path.basename(p).lower() for p in variation_groups[var_key])
             if not has_product and product_images:
-                # Extract text variation from key (e.g., p2_t1 -> t1)
                 match = re.match(r'p(\d+)_t(\d+)', var_key)
                 if match:
                     text_var = match.group(2)
-                    # Look for product with same text variation, any photo variation
                     fallback_key = f"p1_t{text_var}"
                     if fallback_key in product_images:
                         variation_groups[var_key].append(product_images[fallback_key])
-                        logger.debug(f"{log_prefix}Added fallback product {fallback_key} to variation {var_key}")
-                    else:
-                        # Use any available product image as last resort
+                        logger.debug(f"{log_prefix}Added fallback product {fallback_key} to {var_key}")
+                    elif product_images:
                         first_product = next(iter(product_images.values()))
                         variation_groups[var_key].append(first_product)
-                        logger.debug(f"{log_prefix}Added fallback product to variation {var_key}")
+                        logger.debug(f"{log_prefix}Added fallback product to {var_key}")
 
         # Filter out incomplete variation sets (need at least hook + 1 body + product = 3 slides)
-        # This handles cases like p1_t2 which only has product (text_var=2 only for product)
         MIN_SLIDES_FOR_VIDEO = 3
         incomplete_keys = []
         for var_key, images in variation_groups.items():
