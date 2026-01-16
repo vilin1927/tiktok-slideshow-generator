@@ -1,6 +1,8 @@
 """
 Database Module for Batch Processing
 SQLite database for tracking batches, links, and variations
+
+Security: All dynamic SQL uses whitelisted column names to prevent SQL injection.
 """
 import sqlite3
 import os
@@ -8,6 +10,43 @@ import uuid
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from contextlib import contextmanager
+
+# Whitelisted columns for each table to prevent SQL injection
+ALLOWED_COLUMNS = {
+    'jobs': {
+        'status', 'started_at', 'completed_at', 'error_message',
+        'drive_folder_url', 'celery_task_id', 'completed_links', 'failed_links'
+    },
+    'batches': {
+        'status', 'started_at', 'completed_at', 'error_message', 'drive_folder_url'
+    },
+    'batch_links': {
+        'status', 'started_at', 'completed_at', 'error_message',
+        'drive_folder_url', 'celery_task_id'
+    },
+    'batch_variations': {
+        'status', 'started_at', 'completed_at', 'error_message',
+        'output_path', 'drive_url', 'celery_task_id'
+    },
+    'video_jobs': {
+        'status', 'started_at', 'completed_at', 'error_message',
+        'output_path', 'drive_url'
+    }
+}
+
+
+def _validate_columns(table: str, columns: List[str]) -> List[str]:
+    """
+    Validate that all column names are in the whitelist.
+    Raises ValueError if any column is not allowed.
+    """
+    allowed = ALLOWED_COLUMNS.get(table, set())
+    for col in columns:
+        # Extract column name (remove ' = ?' suffix if present)
+        col_name = col.split(' ')[0] if ' ' in col else col
+        if col_name not in allowed:
+            raise ValueError(f"Column '{col_name}' is not allowed for table '{table}'")
+    return columns
 
 # Database file path
 DB_PATH = os.path.join(os.path.dirname(__file__), 'batch_processing.db')
@@ -199,7 +238,7 @@ def update_job_status(
     completed_links: int = None,
     failed_links: int = None
 ):
-    """Update job status."""
+    """Update job status with validated column names."""
     with get_db() as conn:
         cursor = conn.cursor()
         updates = ['status = ?']
@@ -232,10 +271,14 @@ def update_job_status(
             updates.append('failed_links = ?')
             params.append(failed_links)
 
+        # Validate all column names against whitelist
+        _validate_columns('jobs', [u.split(' = ')[0] for u in updates])
+
         params.append(job_id)
-        cursor.execute(f'''
-            UPDATE jobs SET {', '.join(updates)} WHERE id = ?
-        ''', params)
+        cursor.execute(
+            'UPDATE jobs SET ' + ', '.join(updates) + ' WHERE id = ?',
+            params
+        )
 
 
 def list_jobs(
@@ -341,7 +384,7 @@ def update_batch_status(
     completed_links: int = None,
     failed_links: int = None
 ):
-    """Update batch status and sync to jobs table."""
+    """Update batch status and sync to jobs table with validated column names."""
     with get_db() as conn:
         cursor = conn.cursor()
         updates = ['status = ?']
@@ -362,10 +405,14 @@ def update_batch_status(
             updates.append('drive_folder_url = ?')
             params.append(drive_folder_url)
 
+        # Validate column names against whitelist
+        _validate_columns('batches', [u.split(' = ')[0] for u in updates])
+
         params.append(batch_id)
-        cursor.execute(f'''
-            UPDATE batches SET {', '.join(updates)} WHERE id = ?
-        ''', params)
+        cursor.execute(
+            'UPDATE batches SET ' + ', '.join(updates) + ' WHERE id = ?',
+            params
+        )
 
         # Also sync status to jobs table if job_id exists
         cursor.execute('SELECT job_id, drive_folder_url FROM batches WHERE id = ?', (batch_id,))
@@ -399,10 +446,14 @@ def update_batch_status(
                 job_updates.append('failed_links = ?')
                 job_params.append(failed_links)
 
+            # Validate job column names
+            _validate_columns('jobs', [u.split(' = ')[0] for u in job_updates])
+
             job_params.append(batch['job_id'])
-            cursor.execute(f'''
-                UPDATE jobs SET {', '.join(job_updates)} WHERE id = ?
-            ''', job_params)
+            cursor.execute(
+                'UPDATE jobs SET ' + ', '.join(job_updates) + ' WHERE id = ?',
+                job_params
+            )
 
 
 def get_batch_status(batch_id: str) -> Dict[str, Any]:
@@ -519,7 +570,7 @@ def update_batch_link_status(
     drive_folder_url: str = None,
     celery_task_id: str = None
 ):
-    """Update batch link status."""
+    """Update batch link status with validated column names."""
     with get_db() as conn:
         cursor = conn.cursor()
         updates = ['status = ?']
@@ -544,10 +595,14 @@ def update_batch_link_status(
             updates.append('celery_task_id = ?')
             params.append(celery_task_id)
 
+        # Validate column names against whitelist
+        _validate_columns('batch_links', [u.split(' = ')[0] for u in updates])
+
         params.append(link_id)
-        cursor.execute(f'''
-            UPDATE batch_links SET {', '.join(updates)} WHERE id = ?
-        ''', params)
+        cursor.execute(
+            'UPDATE batch_links SET ' + ', '.join(updates) + ' WHERE id = ?',
+            params
+        )
 
 
 # ============ Variation Operations ============
@@ -593,7 +648,7 @@ def update_variation_status(
     drive_url: str = None,
     celery_task_id: str = None
 ):
-    """Update variation status."""
+    """Update variation status with validated column names."""
     with get_db() as conn:
         cursor = conn.cursor()
         updates = ['status = ?']
@@ -622,10 +677,14 @@ def update_variation_status(
             updates.append('celery_task_id = ?')
             params.append(celery_task_id)
 
+        # Validate column names against whitelist
+        _validate_columns('batch_variations', [u.split(' = ')[0] for u in updates])
+
         params.append(variation_id)
-        cursor.execute(f'''
-            UPDATE batch_variations SET {', '.join(updates)} WHERE id = ?
-        ''', params)
+        cursor.execute(
+            'UPDATE batch_variations SET ' + ', '.join(updates) + ' WHERE id = ?',
+            params
+        )
 
 
 # ============ Utility Functions ============
@@ -728,7 +787,7 @@ def update_video_job_status(
     output_path: str = None,
     drive_url: str = None
 ):
-    """Update video job status."""
+    """Update video job status with validated column names."""
     with get_db() as conn:
         cursor = conn.cursor()
         updates = ['status = ?']
@@ -753,10 +812,14 @@ def update_video_job_status(
             updates.append('drive_url = ?')
             params.append(drive_url)
 
+        # Validate column names against whitelist
+        _validate_columns('video_jobs', [u.split(' = ')[0] for u in updates])
+
         params.append(job_id)
-        cursor.execute(f'''
-            UPDATE video_jobs SET {', '.join(updates)} WHERE id = ?
-        ''', params)
+        cursor.execute(
+            'UPDATE video_jobs SET ' + ', '.join(updates) + ' WHERE id = ?',
+            params
+        )
 
 
 def get_next_pending_video_job() -> Optional[Dict[str, Any]]:

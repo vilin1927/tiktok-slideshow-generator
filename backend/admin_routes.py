@@ -1,6 +1,11 @@
 """
 Admin API Routes
 Endpoints for managing API keys with password protection
+
+Security:
+- Constant-time password comparison to prevent timing attacks
+- Rate limiting on login attempts to prevent brute force
+- Session tokens with expiration
 """
 import os
 import re
@@ -21,6 +26,65 @@ admin_bp = Blueprint('admin', __name__, url_prefix='/api/admin')
 # Format: {token: {'expires': timestamp}}
 active_sessions = {}
 SESSION_DURATION = 3600  # 1 hour
+
+# Rate limiting for login attempts
+# Format: {ip_address: {'attempts': count, 'lockout_until': timestamp}}
+login_attempts = {}
+MAX_LOGIN_ATTEMPTS = 5
+LOCKOUT_DURATION = 300  # 5 minutes
+
+
+def _get_client_ip():
+    """Get client IP address, handling proxies."""
+    # Check X-Forwarded-For header for proxied requests
+    forwarded = request.headers.get('X-Forwarded-For')
+    if forwarded:
+        return forwarded.split(',')[0].strip()
+    return request.remote_addr or 'unknown'
+
+
+def _check_rate_limit(ip: str) -> tuple[bool, int]:
+    """
+    Check if IP is rate limited.
+    Returns (is_allowed, seconds_until_unlock)
+    """
+    now = time.time()
+
+    if ip not in login_attempts:
+        return True, 0
+
+    record = login_attempts[ip]
+
+    # Check if still in lockout period
+    if record.get('lockout_until', 0) > now:
+        seconds_left = int(record['lockout_until'] - now)
+        return False, seconds_left
+
+    # Reset if lockout has expired
+    if record.get('lockout_until', 0) <= now and record.get('lockout_until', 0) > 0:
+        login_attempts[ip] = {'attempts': 0, 'lockout_until': 0}
+
+    return True, 0
+
+
+def _record_login_attempt(ip: str, success: bool):
+    """Record a login attempt and apply lockout if needed."""
+    now = time.time()
+
+    if ip not in login_attempts:
+        login_attempts[ip] = {'attempts': 0, 'lockout_until': 0}
+
+    if success:
+        # Reset on successful login
+        login_attempts[ip] = {'attempts': 0, 'lockout_until': 0}
+    else:
+        # Increment failed attempts
+        login_attempts[ip]['attempts'] += 1
+
+        # Apply lockout if max attempts exceeded
+        if login_attempts[ip]['attempts'] >= MAX_LOGIN_ATTEMPTS:
+            login_attempts[ip]['lockout_until'] = now + LOCKOUT_DURATION
+            logger.warning(f"IP {ip} locked out for {LOCKOUT_DURATION}s after {MAX_LOGIN_ATTEMPTS} failed attempts")
 
 
 def cleanup_expired_sessions():
@@ -61,18 +125,11 @@ def mask_key(key: str) -> str:
 def update_env_file(key: str, value: str) -> bool:
     """Update a key in the .env file"""
     try:
-        # Find the .env file
+        # Find the .env file - only use relative path from current file
         dotenv_path = find_dotenv()
         if not dotenv_path:
-            # Try common locations
-            possible_paths = [
-                os.path.join(os.path.dirname(__file__), '.env'),
-                '/root/tiktok-slideshow-generator/Desktop/tiktok/backend/.env'
-            ]
-            for path in possible_paths:
-                if os.path.exists(path):
-                    dotenv_path = path
-                    break
+            # Fall back to .env in same directory as this file
+            dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
 
         if not dotenv_path or not os.path.exists(dotenv_path):
             logger.error("Could not find .env file")
@@ -100,6 +157,10 @@ def admin_login():
     """
     Authenticate with admin password.
 
+    Security:
+    - Rate limited: 5 attempts per 5 minutes
+    - Constant-time password comparison to prevent timing attacks
+
     Expected JSON:
     - password: Admin password
 
@@ -107,6 +168,17 @@ def admin_login():
     - token: Session token (valid for 1 hour)
     """
     try:
+        # Check rate limit first
+        client_ip = _get_client_ip()
+        is_allowed, seconds_left = _check_rate_limit(client_ip)
+
+        if not is_allowed:
+            logger.warning(f"Rate limited login attempt from {client_ip}")
+            return jsonify({
+                'error': 'Too many login attempts. Please try again later.',
+                'retry_after': seconds_left
+            }), 429
+
         data = request.get_json() or {}
         password = data.get('password', '')
 
@@ -116,9 +188,18 @@ def admin_login():
             logger.error("ADMIN_PASSWORD not configured")
             return jsonify({'error': 'Admin not configured'}), 500
 
-        if password != admin_password:
-            logger.warning("Failed admin login attempt")
+        # Use constant-time comparison to prevent timing attacks
+        # Both values must be strings of equal length for proper comparison
+        password_bytes = password.encode('utf-8')
+        admin_password_bytes = admin_password.encode('utf-8')
+
+        if not secrets.compare_digest(password_bytes, admin_password_bytes):
+            _record_login_attempt(client_ip, success=False)
+            logger.warning(f"Failed admin login attempt from {client_ip}")
             return jsonify({'error': 'Invalid password'}), 401
+
+        # Successful login - reset rate limit counter
+        _record_login_attempt(client_ip, success=True)
 
         # Generate session token
         token = secrets.token_urlsafe(32)
@@ -126,7 +207,7 @@ def admin_login():
             'expires': time.time() + SESSION_DURATION
         }
 
-        logger.info("Admin login successful")
+        logger.info(f"Admin login successful from {client_ip}")
 
         return jsonify({
             'status': 'authenticated',
