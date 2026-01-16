@@ -34,55 +34,11 @@ ANALYSIS_MODEL = 'gemini-3-pro-preview'
 IMAGE_MODEL = 'gemini-3-pro-image-preview'
 
 # Rate limiting config (Gemini strict quota: 20 RPM)
-MAX_CONCURRENT = 5    # Max 5 concurrent requests across all jobs
-RPM_LIMIT = 20        # 20 requests per minute (Gemini strict quota)
-RATE_WINDOW = 65.0    # Safety margin: 65s instead of 60s
 MAX_RETRIES = 5       # More retries for rate limit recovery
 REQUEST_TIMEOUT = 120 # 120 sec timeout per API call
 
-# Rate limiter using semaphore + delay
-class RateLimiter:
-    """
-    Semaphore-based rate limiter that enforces RPM limits.
-    Ensures delay BEFORE each request, not after.
-    """
-    def __init__(self, rpm: int = RPM_LIMIT, max_concurrent: int = MAX_CONCURRENT):
-        self.semaphore = threading.Semaphore(max_concurrent)
-        self.min_interval = RATE_WINDOW / rpm  # seconds between requests (65s/20 = 3.25s)
-        self.last_request_time = 0.0
-        self.lock = threading.Lock()
-        logger.debug(f"RateLimiter initialized: rpm={rpm}, max_concurrent={max_concurrent}")
-
-    def acquire(self):
-        """Acquire permission to make a request. Blocks if rate limit exceeded."""
-        self.semaphore.acquire()
-        with self.lock:
-            now = time.time()
-            elapsed = now - self.last_request_time
-            if elapsed < self.min_interval:
-                wait_time = self.min_interval - elapsed
-                logger.debug(f"Rate limiter: waiting {wait_time:.2f}s")
-                time.sleep(wait_time)
-            self.last_request_time = time.time()
-
-    def release(self):
-        """Release the semaphore after request completes."""
-        self.semaphore.release()
-
-
-# Global singleton rate limiter - shared across ALL jobs
-_global_rate_limiter = None
-_rate_limiter_lock = threading.Lock()
-
-
-def get_rate_limiter():
-    """Get or create the global rate limiter (singleton)."""
-    global _global_rate_limiter
-    with _rate_limiter_lock:
-        if _global_rate_limiter is None:
-            _global_rate_limiter = RateLimiter(rpm=RPM_LIMIT, max_concurrent=MAX_CONCURRENT)
-            logger.info(f"Created global RateLimiter: rpm={RPM_LIMIT}, concurrent={MAX_CONCURRENT}")
-        return _global_rate_limiter
+# Import Redis-based rate limiter (shared across all processes)
+from redis_rate_limiter import get_rate_limiter
 
 
 class GeminiServiceError(Exception):
