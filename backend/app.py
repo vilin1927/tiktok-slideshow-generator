@@ -113,14 +113,17 @@ def update_progress(session_id, step, message, progress, details=None):
 
 def run_generation(session_id, job_id, tiktok_url, folder_name, product_context,
                    saved_product_images, session_scraped, session_generated,
-                   photo_var=1, text_var=1, generate_video=False, preset_id='gemini'):
-    """Background task for generation using v2 pipeline with unified photo × text variations"""
+                   hook_photo_var=1, hook_text_var=1,
+                   body_photo_var=1, body_text_var=1,
+                   product_text_var=1, generate_video=False, preset_id='gemini'):
+    """Background task for generation using v2 pipeline with photo × text variations"""
     log = get_request_logger('app', session_id)
     start_time = time.time()
 
     log.info(f"Starting generation pipeline - URL: {tiktok_url[:60]}...")
     log.debug(f"Params: folder={folder_name}, products={len(saved_product_images)}")
-    log.debug(f"Variations: photo={photo_var}, text={text_var}")
+    log.debug(f"Photo vars: hook={hook_photo_var}, body={body_photo_var}")
+    log.debug(f"Text vars: hook={hook_text_var}, body={body_text_var}, product={product_text_var}")
     log.debug(f"Generate video: {generate_video}, preset: {preset_id}")
 
     # Update job status to processing
@@ -162,8 +165,11 @@ def run_generation(session_id, job_id, tiktok_url, folder_name, product_context,
                 product_description=product_context,
                 output_dir=session_generated,
                 progress_callback=progress_callback,
-                photo_var=photo_var,
-                text_var=text_var,
+                hook_photo_var=hook_photo_var,
+                hook_text_var=hook_text_var,
+                body_photo_var=body_photo_var,
+                body_text_var=body_text_var,
+                product_text_var=product_text_var,
                 request_id=session_id,
                 preset_id=preset_id
             )
@@ -270,9 +276,12 @@ def generate_slideshow():
         folder_name = request.form.get('folder_name')
         product_context = request.form.get('product_context', 'Product')
 
-        # Unified variation params (default to 1 if not provided)
-        photo_var = int(request.form.get('photo_var', 1))
-        text_var = int(request.form.get('text_var', 1))
+        # Photo × Text variation params (default to 1 if not provided)
+        hook_photo_var = int(request.form.get('hook_photo_var', 1))
+        hook_text_var = int(request.form.get('hook_text_var', 1))
+        body_photo_var = int(request.form.get('body_photo_var', 1))
+        body_text_var = int(request.form.get('body_text_var', 1))
+        product_text_var = int(request.form.get('product_text_var', 1))
 
         # Video generation option (default false)
         generate_video = request.form.get('generate_video', 'false').lower() == 'true'
@@ -281,11 +290,15 @@ def generate_slideshow():
         preset_id = request.form.get('preset_id', 'gemini')
 
         # Clamp to valid range (1-5)
-        photo_var = max(1, min(5, photo_var))
-        text_var = max(1, min(5, text_var))
+        hook_photo_var = max(1, min(5, hook_photo_var))
+        hook_text_var = max(1, min(5, hook_text_var))
+        body_photo_var = max(1, min(5, body_photo_var))
+        body_text_var = max(1, min(5, body_text_var))
+        product_text_var = max(1, min(5, product_text_var))
 
         log.info(f"New request: url={tiktok_url[:50]}... folder={folder_name}")
-        log.debug(f"Variations: photo={photo_var}, text={text_var}")
+        log.debug(f"Photo vars: hook={hook_photo_var}, body={body_photo_var}")
+        log.debug(f"Text vars: hook={hook_text_var}, body={body_text_var}, product={product_text_var}")
         log.debug(f"Generate video: {generate_video}")
 
         if not tiktok_url:
@@ -326,8 +339,11 @@ def generate_slideshow():
             product_description=product_context,
             folder_name=folder_name,
             variations_config=json.dumps({
-                'photo_var': photo_var,
-                'text_var': text_var,
+                'hook_photo_var': hook_photo_var,
+                'hook_text_var': hook_text_var,
+                'body_photo_var': body_photo_var,
+                'body_text_var': body_text_var,
+                'product_text_var': product_text_var,
                 'generate_video': generate_video,
                 'preset_id': preset_id,
                 'product_image_paths': saved_product_images
@@ -338,11 +354,13 @@ def generate_slideshow():
         # Initialize progress
         update_progress(session_id, 'starting', 'Starting generation...', 5)
 
-        # Start background generation thread (v2 pipeline with unified photo × text variations)
+        # Start background generation thread (v2 pipeline with photo × text variations)
         thread = threading.Thread(target=run_generation, args=(
             session_id, job_id, tiktok_url, folder_name, product_context,
             saved_product_images, session_scraped, session_generated,
-            photo_var, text_var, generate_video, preset_id
+            hook_photo_var, hook_text_var,
+            body_photo_var, body_text_var,
+            product_text_var, generate_video, preset_id
         ))
         thread.start()
         log.info("Background thread started")
