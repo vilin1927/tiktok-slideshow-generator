@@ -30,9 +30,10 @@ from presets import get_preset, get_font_path, get_font_size, TextPreset
 ROUNDED_TEXT_BOX_SCRIPT = os.path.join(os.path.dirname(__file__), 'rounded_text_box.js')
 
 
-# Emoji font paths
-APPLE_EMOJI_FONT = "/System/Library/Fonts/Apple Color Emoji.ttc"  # macOS
-NOTO_EMOJI_FONT = "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf"  # Linux
+# Emoji font paths (in order of preference)
+APPLE_EMOJI_FONT = "/System/Library/Fonts/Apple Color Emoji.ttc"  # macOS - best for iOS look
+TWEMOJI_FONT = "/usr/share/fonts/truetype/Twemoji.ttf"  # Linux - Twitter style, close to iOS
+NOTO_EMOJI_FONT = "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf"  # Linux - Android style
 
 # Regex pattern to detect emoji characters
 # This covers most common emojis including skin tones and modifiers
@@ -171,9 +172,10 @@ def load_emoji_font(size: int = 160) -> Optional[ImageFont.FreeTypeFont]:
     """
     Load color emoji font for emoji rendering.
 
-    Supports:
-    - Apple Color Emoji (macOS) - bitmap font, only works at size 160
-    - Noto Color Emoji (Linux) - bitmap font, only works at size 109
+    Supports (in order of preference):
+    - Apple Color Emoji (macOS) - bitmap font, size 160, best iOS look
+    - Twemoji (Linux) - bitmap font, size 61, Twitter style (close to iOS)
+    - Noto Color Emoji (Linux) - bitmap font, size 109, Android style
 
     Sets global EMOJI_NATIVE_SIZE based on which font is loaded.
 
@@ -191,7 +193,16 @@ def load_emoji_font(size: int = 160) -> Optional[ImageFont.FreeTypeFont]:
         except Exception:
             pass
 
-    # Try Noto Color Emoji (Linux)
+    # Try Twemoji (Linux) - Twitter style, closer to iOS
+    if os.path.exists(TWEMOJI_FONT):
+        try:
+            # Twemoji only works at size 61 (bitmap font)
+            EMOJI_NATIVE_SIZE = 61
+            return ImageFont.truetype(TWEMOJI_FONT, 61)
+        except Exception:
+            pass
+
+    # Fallback to Noto Color Emoji (Linux) - Android style
     if os.path.exists(NOTO_EMOJI_FONT):
         try:
             # Noto Color Emoji only works at size 109 (bitmap font)
