@@ -1235,7 +1235,10 @@ def generate_all_images(
     output_dir: str,
     progress_callback: Optional[ImageProgressCallback] = None,
     hook_photo_var: int = 1,
+    hook_text_var: int = 1,
     body_photo_var: int = 1,
+    body_text_var: int = 1,
+    product_text_var: int = 1,
     request_id: str = None,
     clean_image_mode: bool = False
 ) -> dict:
@@ -1675,7 +1678,10 @@ def run_pipeline(
         output_dir,
         progress_callback=image_progress,
         hook_photo_var=hook_photo_var,
+        hook_text_var=hook_text_var,
         body_photo_var=body_photo_var,
+        body_text_var=body_text_var,
+        product_text_var=product_text_var,
         request_id=request_id,
         clean_image_mode=clean_image_mode
     )
