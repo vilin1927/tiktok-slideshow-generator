@@ -12,8 +12,9 @@ from logging_config import get_logger, get_request_logger
 from database import (
     create_batch, get_batch, get_batch_status, get_batch_links,
     create_batch_link, update_batch_status, cancel_pending_tasks,
-    create_job, update_job_status
+    create_job, update_job_status, get_batch_celery_task_ids
 )
+from celery_app import celery_app
 from tasks import process_batch, retry_failed_links
 import json
 
@@ -259,6 +260,9 @@ def create_batch_job():
         task = process_batch.delay(batch_id)
         log.info(f"Dispatched batch task: {task.id}")
 
+        # Store the celery task ID for later revocation
+        update_batch_status(batch_id, 'pending', celery_task_id=task.id)
+
         return jsonify({
             'status': 'created',
             'batch_id': batch_id,
@@ -430,8 +434,7 @@ def get_batch_links_list(batch_id: str):
 @batch_bp.route('/<batch_id>/cancel', methods=['POST'])
 def cancel_batch_job(batch_id: str):
     """
-    Cancel a batch job. Marks pending tasks as cancelled.
-    In-progress tasks will complete.
+    Cancel a batch job. Revokes running Celery tasks and marks pending as cancelled.
     """
     try:
         batch = get_batch(batch_id)
@@ -442,6 +445,19 @@ def cancel_batch_job(batch_id: str):
             return jsonify({
                 'error': f'Cannot cancel batch with status: {batch["status"]}'
             }), 400
+
+        # Get all Celery task IDs and revoke them
+        task_ids = get_batch_celery_task_ids(batch_id)
+        revoked_count = 0
+        for task_id in task_ids:
+            try:
+                celery_app.control.revoke(task_id, terminate=True, signal='SIGTERM')
+                revoked_count += 1
+                logger.debug(f"Revoked Celery task: {task_id}")
+            except Exception as e:
+                logger.warning(f"Failed to revoke task {task_id}: {e}")
+
+        logger.info(f"Revoked {revoked_count}/{len(task_ids)} Celery tasks for batch {batch_id[:8]}")
 
         # Cancel pending tasks in database
         cancel_pending_tasks(batch_id)
@@ -454,7 +470,8 @@ def cancel_batch_job(batch_id: str):
         return jsonify({
             'status': 'cancelled',
             'batch_id': batch_id,
-            'message': 'Batch cancelled. Pending tasks will not be processed.'
+            'revoked_tasks': revoked_count,
+            'message': f'Batch cancelled. {revoked_count} running tasks terminated.'
         })
 
     except Exception as e:

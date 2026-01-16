@@ -382,7 +382,8 @@ def update_batch_status(
     error_message: str = None,
     drive_folder_url: str = None,
     completed_links: int = None,
-    failed_links: int = None
+    failed_links: int = None,
+    celery_task_id: str = None
 ):
     """Update batch status and sync to jobs table with validated column names."""
     with get_db() as conn:
@@ -404,6 +405,10 @@ def update_batch_status(
         if drive_folder_url:
             updates.append('drive_folder_url = ?')
             params.append(drive_folder_url)
+
+        if celery_task_id:
+            updates.append('celery_task_id = ?')
+            params.append(celery_task_id)
 
         # Validate column names against whitelist
         _validate_columns('batches', [u.split(' = ')[0] for u in updates])
@@ -737,6 +742,52 @@ def cancel_pending_tasks(batch_id: str):
                 SELECT id FROM batch_links WHERE batch_id = ?
             ) AND status = 'pending'
         ''', (batch_id,))
+
+
+def get_batch_celery_task_ids(batch_id: str) -> List[str]:
+    """Get all Celery task IDs associated with a batch for revocation."""
+    task_ids = []
+    with get_db() as conn:
+        cursor = conn.cursor()
+
+        # Get main batch task ID
+        cursor.execute('SELECT celery_task_id FROM batches WHERE id = ?', (batch_id,))
+        row = cursor.fetchone()
+        if row and row['celery_task_id']:
+            task_ids.append(row['celery_task_id'])
+
+        # Get batch link task IDs (processing links)
+        cursor.execute('''
+            SELECT celery_task_id FROM batch_links
+            WHERE batch_id = ? AND celery_task_id IS NOT NULL
+        ''', (batch_id,))
+        for row in cursor.fetchall():
+            if row['celery_task_id']:
+                task_ids.append(row['celery_task_id'])
+
+        # Get variation task IDs
+        cursor.execute('''
+            SELECT bv.celery_task_id FROM batch_variations bv
+            JOIN batch_links bl ON bv.batch_link_id = bl.id
+            WHERE bl.batch_id = ? AND bv.celery_task_id IS NOT NULL
+        ''', (batch_id,))
+        for row in cursor.fetchall():
+            if row['celery_task_id']:
+                task_ids.append(row['celery_task_id'])
+
+    return task_ids
+
+
+def get_job_celery_task_ids(job_id: str) -> List[str]:
+    """Get all Celery task IDs associated with a job (via batch)."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        # Find batch_id from job
+        cursor.execute('SELECT id FROM batches WHERE job_id = ?', (job_id,))
+        row = cursor.fetchone()
+        if row:
+            return get_batch_celery_task_ids(row['id'])
+    return []
 
 
 # ============ Video Job Operations ============
