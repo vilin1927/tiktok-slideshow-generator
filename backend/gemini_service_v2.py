@@ -1298,18 +1298,24 @@ def generate_all_images(
             text_content = slide.get('text_content', '')
             text_variations = [text_content] if text_content else ['']
 
-        # Determine photo variations and slide key
+        # Determine photo variations, text variation limit, and slide key
         if slide_type == 'hook':
             photo_vars = hook_photo_var
+            text_var_limit = hook_text_var
             slide_key = 'hook'
         elif slide_type == 'product':
             # Product photo variations = number of uploaded product images
             photo_vars = len(product_image_paths)
+            text_var_limit = product_text_var
             slide_key = 'product'
         else:  # body
             photo_vars = body_photo_var
+            text_var_limit = body_text_var
             body_num = sum(1 for s in new_slides[:idx] if s['slide_type'] == 'body') + 1
             slide_key = f'body_{body_num}'
+
+        # Enforce text variation limit - Gemini may return more than requested
+        text_variations = text_variations[:text_var_limit]
 
         # Initialize variations list for this slide
         if slide_key not in variations_structure:
@@ -1682,6 +1688,7 @@ def run_pipeline(
         log.info(f"Step 3: Rendering text on {len(generation_result['images'])} images with preset '{preset_id}'")
 
         # Build a mapping of task_id to text_content from analysis
+        # Enforce variation limits - Gemini may return more than requested
         text_mapping = {}
         for slide in analysis.get('new_slides', []):
             idx = slide['slide_index']
@@ -1690,13 +1697,19 @@ def run_pipeline(
 
             if slide_type == 'hook':
                 slide_key = 'hook'
+                # Enforce hook_text_var limit
+                text_variations = text_variations[:hook_text_var]
             elif slide_type == 'product':
                 slide_key = 'product'
+                # Enforce product_text_var limit
+                text_variations = text_variations[:product_text_var]
             elif slide_type == 'cta':
                 continue  # Skip CTA slides
             else:
                 body_num = sum(1 for s in analysis['new_slides'][:idx] if s['slide_type'] == 'body') + 1
                 slide_key = f'body_{body_num}'
+                # Enforce body_text_var limit
+                text_variations = text_variations[:body_text_var]
 
             text_mapping[slide_key] = text_variations
 
