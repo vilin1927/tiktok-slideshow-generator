@@ -7,7 +7,7 @@ import shutil
 import threading
 import time
 import json
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, send_file
 from flask_cors import CORS
 from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
@@ -413,6 +413,53 @@ def test_scrape():
     except Exception as e:
         log.error(f"Test scrape error: {str(e)}", exc_info=True)
         return jsonify({'error': f'Server error: {str(e)}'}), 500
+
+
+@app.route('/api/test-text-render', methods=['POST'])
+def test_text_render():
+    """Test endpoint to render text with a preset on a blank background"""
+    import io
+    from PIL import Image
+    from text_renderer import render_text
+    from presets import get_preset
+
+    try:
+        data = request.json
+        text = data.get('text', 'Sample text')
+        preset_id = data.get('preset_id', 'classic_shadow')
+        bg_color = data.get('background_color', '#1a1a1a')
+
+        # Create a blank TikTok-sized image
+        width, height = 828, 1472
+        img = Image.new('RGB', (width, height), bg_color)
+
+        # Save temp image
+        temp_path = f'/tmp/test_bg_{uuid.uuid4().hex[:8]}.png'
+        img.save(temp_path)
+
+        # Create safe zone (center of image)
+        zone = {
+            'bounds': {
+                'x': 50,
+                'y': height // 3,
+                'w': width - 100,
+                'h': height // 3
+            },
+            'text_color_suggestion': 'white'
+        }
+
+        # Render text
+        output_path = f'/tmp/test_render_{uuid.uuid4().hex[:8]}.png'
+        result = render_text(temp_path, text, zone, preset_id, output_path)
+
+        # Clean up temp bg
+        os.remove(temp_path)
+
+        # Return image
+        return send_file(output_path, mimetype='image/png')
+
+    except Exception as e:
+        return jsonify({'error': f'Render failed: {str(e)}'}), 500
 
 
 @app.route('/api/jobs/<job_id>', methods=['GET'])
