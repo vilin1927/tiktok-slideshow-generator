@@ -443,6 +443,85 @@ def delete_job_endpoint(job_id):
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/test-text-render', methods=['POST'])
+def test_text_render():
+    """
+    Simple text rendering test endpoint - no TikTok download needed.
+
+    Accepts either:
+    1. JSON body: { "text": "your text", "preset_id": "classic_box" }
+    2. Form data: text, preset_id, image (optional background image)
+
+    Returns the rendered image as PNG.
+    """
+    from flask import send_file
+    from text_renderer import render_text
+    from presets import get_preset
+    from PIL import Image
+    import io
+
+    session_id = str(uuid.uuid4())[:8]
+    log = get_request_logger('app', session_id)
+
+    try:
+        # Get parameters from JSON or form
+        if request.is_json:
+            data = request.get_json()
+            text = data.get('text', 'Sample Text\nLine Two')
+            preset_id = data.get('preset_id', 'classic_box')
+            bg_color = data.get('bg_color', '#1a1a1a')
+        else:
+            text = request.form.get('text', 'Sample Text\nLine Two')
+            preset_id = request.form.get('preset_id', 'classic_box')
+            bg_color = request.form.get('bg_color', '#1a1a1a')
+
+        log.info(f"Test text render: preset={preset_id}, text='{text[:30]}...'")
+
+        # Get preset config
+        preset = get_preset(preset_id)
+        if not preset:
+            return jsonify({'error': f'Unknown preset: {preset_id}'}), 400
+
+        # Check if background image was uploaded
+        bg_image = None
+        if 'image' in request.files:
+            img_file = request.files['image']
+            if img_file and img_file.filename:
+                bg_image = Image.open(img_file).convert('RGB')
+                log.debug(f"Using uploaded background: {bg_image.size}")
+
+        # Create background if not provided
+        if bg_image is None:
+            # Default 1080x1920 background
+            bg_image = Image.new('RGB', (1080, 1920), bg_color)
+
+        # Render text on image
+        result_image = render_text(
+            bg_image,
+            text,
+            preset,
+            request_id=session_id
+        )
+
+        # Return as PNG
+        img_buffer = io.BytesIO()
+        result_image.save(img_buffer, format='PNG')
+        img_buffer.seek(0)
+
+        log.info(f"Text render complete: {result_image.size}")
+
+        return send_file(
+            img_buffer,
+            mimetype='image/png',
+            as_attachment=False,
+            download_name=f'text_render_{session_id}.png'
+        )
+
+    except Exception as e:
+        log.error(f"Text render failed: {str(e)}", exc_info=True)
+        return jsonify({'error': f'Render failed: {str(e)}'}), 500
+
+
 @app.route('/api/jobs', methods=['GET'])
 def list_all_jobs():
     """List all jobs with optional filtering for admin dashboard"""
