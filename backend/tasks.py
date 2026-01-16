@@ -392,7 +392,10 @@ def finalize_batch(self, link_results: list, batch_id: str):
 
 @celery_app.task(bind=True, rate_limit='10/m', max_retries=3, default_retry_delay=60)
 def generate_variation(self, variation_id: str, slide_paths: list, product_image_path: str,
-                       product_description: str, output_dir: str, variation_num: int):
+                       product_description: str, output_dir: str, variation_num: int,
+                       hook_photo_var: int = 1, hook_text_var: int = 1,
+                       body_photo_var: int = 1, body_text_var: int = 1,
+                       product_text_var: int = 1, preset_id: str = 'classic_shadow'):
     """
     Generate a single variation. Used for fine-grained rate limiting.
 
@@ -405,6 +408,12 @@ def generate_variation(self, variation_id: str, slide_paths: list, product_image
         product_description: Product description text
         output_dir: Directory for output
         variation_num: Variation number (1-based)
+        hook_photo_var: Number of photo variations for hook
+        hook_text_var: Number of text variations for hook
+        body_photo_var: Number of photo variations for body
+        body_text_var: Number of text variations for body
+        product_text_var: Number of text variations for product
+        preset_id: Text preset ID
     """
     logger.info(f"[Variation {variation_id[:8]}] Generating variation #{variation_num}")
 
@@ -414,12 +423,16 @@ def generate_variation(self, variation_id: str, slide_paths: list, product_image
         # Run pipeline for single variation
         result = run_pipeline(
             slide_paths=slide_paths,
-            product_image_path=product_image_path,
+            product_image_paths=[product_image_path],  # List format
             product_description=product_description,
             output_dir=output_dir,
-            hook_variations=1,
-            body_variations=1,
-            request_id=f"var_{variation_id[:8]}"
+            hook_photo_var=hook_photo_var,
+            hook_text_var=hook_text_var,
+            body_photo_var=body_photo_var,
+            body_text_var=body_text_var,
+            product_text_var=product_text_var,
+            request_id=f"var_{variation_id[:8]}",
+            preset_id=preset_id
         )
 
         generated_images = result.get('generated_images', [])
