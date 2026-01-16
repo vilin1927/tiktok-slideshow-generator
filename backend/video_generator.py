@@ -246,14 +246,15 @@ def create_videos_for_variations(
     # Naming convention: {slide_type}_p{photo}_t{text}.png
     # e.g., hook_p1_t1.png, body_1_p1_t1.png, product_p1_t1.png
 
+    import re
     variation_groups = {}
+    product_images = {}  # Track all product images by their variation key
 
     for img_path in generated_images:
         filename = os.path.basename(img_path)
 
         # Extract variation key (e.g., "p1_t1")
         # Look for pattern like _p1_t1 or _p2_t2 at end of filename
-        import re
         match = re.search(r'_p(\d+)_t(\d+)\.png$', filename, re.IGNORECASE)
 
         if match:
@@ -262,10 +263,45 @@ def create_videos_for_variations(
                 variation_groups[var_key] = []
             variation_groups[var_key].append(img_path)
 
+            # Track product images separately for fallback logic
+            if filename.lower().startswith('product'):
+                product_images[var_key] = img_path
+
     if not variation_groups:
         logger.warning(f"{log_prefix}No variation patterns found in images")
         # Fallback: create single video from all images
         variation_groups['default'] = generated_images
+    else:
+        # Fill in missing product images for variation sets
+        # Product may only have p1 variations while hook/body have p1, p2, etc.
+        for var_key in list(variation_groups.keys()):
+            has_product = any('product' in os.path.basename(p).lower() for p in variation_groups[var_key])
+            if not has_product and product_images:
+                # Extract text variation from key (e.g., p2_t1 -> t1)
+                match = re.match(r'p(\d+)_t(\d+)', var_key)
+                if match:
+                    text_var = match.group(2)
+                    # Look for product with same text variation, any photo variation
+                    fallback_key = f"p1_t{text_var}"
+                    if fallback_key in product_images:
+                        variation_groups[var_key].append(product_images[fallback_key])
+                        logger.debug(f"{log_prefix}Added fallback product {fallback_key} to variation {var_key}")
+                    else:
+                        # Use any available product image as last resort
+                        first_product = next(iter(product_images.values()))
+                        variation_groups[var_key].append(first_product)
+                        logger.debug(f"{log_prefix}Added fallback product to variation {var_key}")
+
+        # Filter out incomplete variation sets (need at least hook + 1 body + product = 3 slides)
+        # This handles cases like p1_t2 which only has product (text_var=2 only for product)
+        MIN_SLIDES_FOR_VIDEO = 3
+        incomplete_keys = []
+        for var_key, images in variation_groups.items():
+            if len(images) < MIN_SLIDES_FOR_VIDEO:
+                incomplete_keys.append(var_key)
+                logger.warning(f"{log_prefix}Skipping incomplete variation {var_key} with only {len(images)} slides")
+        for key in incomplete_keys:
+            del variation_groups[key]
 
     logger.info(f"{log_prefix}Found {len(variation_groups)} variation sets")
 
