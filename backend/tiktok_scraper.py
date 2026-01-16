@@ -45,6 +45,32 @@ def _validate_image(file_path: str) -> bool:
         return False
 
 
+def _validate_media(file_path: str) -> bool:
+    """
+    Validate that a downloaded media file is valid.
+    For images, checks if it's a valid image.
+    For audio files, just checks file size.
+
+    Args:
+        file_path: Path to the media file
+
+    Returns:
+        True if valid, False otherwise
+    """
+    # Audio files: just check that we have meaningful content (> 10KB for audio)
+    audio_extensions = {'.mp3', '.m4a', '.wav', '.aac', '.ogg'}
+    ext = os.path.splitext(file_path)[1].lower()
+    if ext in audio_extensions:
+        try:
+            size = os.path.getsize(file_path)
+            return size > 10000  # Audio should be > 10KB
+        except Exception:
+            return False
+
+    # Images: use PIL validation
+    return _validate_image(file_path)
+
+
 def _get_headers() -> dict:
     """Get RapidAPI headers"""
     api_key = os.getenv('RAPIDAPI_KEY')  # Read dynamically for hot-reload support
@@ -189,14 +215,14 @@ def download_media(url: str, save_path: str, use_proxy: bool = True, request_id:
         with open(save_path, 'wb') as f:
             for chunk in response.iter_content(chunk_size=8192):
                 f.write(chunk)
-        # Validate the downloaded image is complete
-        if _validate_image(save_path):
+        # Validate the downloaded media is complete
+        if _validate_media(save_path):
             log.debug(f"Direct download success: {filename}")
             return save_path
         else:
             log.debug(f"Direct download incomplete/corrupt: {filename}")
             os.remove(save_path)  # Remove partial file
-            raise requests.exceptions.RequestException("Image validation failed")
+            raise requests.exceptions.RequestException("Media validation failed")
     except requests.exceptions.RequestException:
         # Clean up partial file if exists
         if os.path.exists(save_path):
@@ -220,12 +246,12 @@ def download_media(url: str, save_path: str, use_proxy: bool = True, request_id:
             if response.status_code == 200 and len(response.content) > 1000:
                 with open(save_path, 'wb') as f:
                     f.write(response.content)
-                # Validate the downloaded image is complete
-                if _validate_image(save_path):
+                # Validate the downloaded media is complete
+                if _validate_media(save_path):
                     log.debug(f"Proxy {i+1} success: {filename}")
                     return save_path
                 else:
-                    log.debug(f"Proxy {i+1} returned incomplete image: {filename}")
+                    log.debug(f"Proxy {i+1} returned incomplete media: {filename}")
                     os.remove(save_path)  # Remove invalid file, try next proxy
         except requests.exceptions.RequestException:
             # Clean up partial file if exists

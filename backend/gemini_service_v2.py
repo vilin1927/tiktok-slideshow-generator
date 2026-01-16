@@ -1234,16 +1234,13 @@ def generate_all_images(
     product_image_paths: list[str],
     output_dir: str,
     progress_callback: Optional[ImageProgressCallback] = None,
-    hook_photo_var: int = 1,
-    hook_text_var: int = 1,
-    body_photo_var: int = 1,
-    body_text_var: int = 1,
-    product_text_var: int = 1,
+    photo_var: int = 1,
+    text_var: int = 1,
     request_id: str = None,
     clean_image_mode: bool = False
 ) -> dict:
     """
-    Generate all images with persona consistency and photo × text variations.
+    Generate all images with persona consistency and unified photo × text variations.
 
     Strategy:
     1. Generate first persona variation FIRST (creates the persona)
@@ -1253,18 +1250,18 @@ def generate_all_images(
     Args:
         analysis: Output from analyze_and_plan() - includes text_variations per slide
         slide_paths: List of original slide image paths
-        product_image_paths: List of user's product images (each = one photo variation)
+        product_image_paths: List of user's product images
         output_dir: Directory to save generated images
         progress_callback: Optional callback with signature (current, total, message)
-        hook_photo_var: Number of photo variations for hook slide (default 1)
-        body_photo_var: Number of photo variations per body slide (default 1)
+        photo_var: Number of photo variations for ALL slides (unified)
+        text_var: Number of text variations for ALL slides (unified)
         request_id: Optional request ID for logging
         clean_image_mode: If True, generate images WITHOUT text (for PIL rendering)
 
-    Photo × Text Matrix:
-        - Hook: hook_photo_var × len(text_variations) images
-        - Body: body_photo_var × len(text_variations) images per body slide
-        - Product: len(product_image_paths) × len(text_variations) images
+    Photo × Text Matrix (unified across all slides):
+        - Hook: photo_var × text_var images
+        - Body: photo_var × text_var images per body slide
+        - Product: photo_var × text_var images (product image reused for all photo variations)
 
     Returns:
         dict with:
@@ -1301,21 +1298,19 @@ def generate_all_images(
             text_content = slide.get('text_content', '')
             text_variations = [text_content] if text_content else ['']
 
-        # Determine photo variations, text variation limit, and slide key
+        # Determine slide key and use unified photo/text variations for ALL slides
         if slide_type == 'hook':
-            photo_vars = hook_photo_var
-            text_var_limit = hook_text_var
             slide_key = 'hook'
         elif slide_type == 'product':
-            # Product photo variations = number of uploaded product images
-            photo_vars = len(product_image_paths)
-            text_var_limit = product_text_var
             slide_key = 'product'
         else:  # body
-            photo_vars = body_photo_var
-            text_var_limit = body_text_var
             body_num = sum(1 for s in new_slides[:idx] if s['slide_type'] == 'body') + 1
             slide_key = f'body_{body_num}'
+
+        # Use unified photo_var and text_var for ALL slide types
+        # This ensures complete variation sets (p1_t1, p1_t2, p2_t1, p2_t2, etc.)
+        photo_vars = photo_var
+        text_var_limit = text_var
 
         # Enforce text variation limit - Gemini may return more than requested
         text_variations = text_variations[:text_var_limit]
@@ -1333,10 +1328,11 @@ def generate_all_images(
                 # Determine output filename with photo and text version
                 output_path = os.path.join(output_dir, f'{slide_key}_p{photo_ver}_t{text_ver}.png')
 
-                # For product slides, use the p_idx-th uploaded image
+                # For product slides, always use the first product image
+                # (photo_var creates style variations, not different product images)
                 product_img = None
                 if slide_type == 'product' and product_image_paths:
-                    product_img = product_image_paths[p_idx] if p_idx < len(product_image_paths) else product_image_paths[0]
+                    product_img = product_image_paths[0]
 
                 task = {
                     'task_id': f'{slide_key}_p{photo_ver}_t{text_ver}',
@@ -1551,38 +1547,31 @@ def run_pipeline(
     product_description: str,
     output_dir: str,
     progress_callback: Optional[PipelineProgressCallback] = None,
-    hook_photo_var: int = 1,
-    hook_text_var: int = 1,
-    body_photo_var: int = 1,
-    body_text_var: int = 1,
-    product_text_var: int = 1,
+    photo_var: int = 1,
+    text_var: int = 1,
     request_id: str = None,
     preset_id: str = 'gemini'
 ) -> dict:
     """
-    Run the complete generation pipeline with photo × text variations.
+    Run the complete generation pipeline with unified photo × text variations.
 
     Args:
         slide_paths: List of paths to scraped TikTok slide images
-        product_image_paths: List of user's product images (multiple for photo variations)
+        product_image_paths: List of user's product images
         product_description: Text description of the product
         output_dir: Directory to save analysis and generated images
         progress_callback: Optional callback with signature (status, message, percent)
             - status: Current phase ('analyzing' | 'generating')
             - message: Human-readable progress message
             - percent: Progress percentage (0-100)
-        hook_photo_var: Number of photo variations for hook slide
-        hook_text_var: Number of text variations for hook slide
-        body_photo_var: Number of photo variations per body slide
-        body_text_var: Number of text variations per body slide
-        product_text_var: Number of text variations for product slide
+        photo_var: Number of photo style variations (unified for all slides)
+        text_var: Number of text variations (unified for all slides)
         request_id: Optional request ID for logging
         preset_id: Text preset ID ('gemini' for AI text, or preset like 'classic_shadow')
 
-    Photo × Text Matrix:
-        - Hook: hook_photo_var × hook_text_var images
-        - Body: body_photo_var × body_text_var images per slide
-        - Product: len(product_image_paths) × product_text_var images
+    Photo × Text Matrix (unified):
+        - Total videos: photo_var × text_var
+        - Each video: 1 hook + N body slides + 1 product = complete slideshow
 
     Returns:
         dict with keys:
@@ -1593,21 +1582,19 @@ def run_pipeline(
 
     Steps:
         1. Analyze slideshow with text variations generation
-        2. Generate all images with photo × text matrix
+        2. Generate all images with unified photo × text matrix
     """
     log = get_request_logger('gemini', request_id) if request_id else logger
     start_time = time.time()
 
-    # Estimate total images (photo × text for each slide type)
-    hook_total = hook_photo_var * hook_text_var
+    # Estimate total images with unified variations
+    # Each slide type gets photo_var × text_var images
     body_count = max(1, len(slide_paths) - 2)  # Estimate body slides
-    body_total = body_count * body_photo_var * body_text_var
-    product_total = len(product_image_paths) * product_text_var
-    total_estimate = hook_total + body_total + product_total
+    slides_count = 1 + body_count + 1  # hook + body + product
+    total_estimate = slides_count * photo_var * text_var
 
     log.info(f"Starting pipeline: {len(slide_paths)} slides, ~{total_estimate} total images, preset={preset_id}")
-    log.debug(f"Photo vars: hook={hook_photo_var}, body={body_photo_var}, product={len(product_image_paths)}")
-    log.debug(f"Text vars: hook={hook_text_var}, body={body_text_var}, product={product_text_var}")
+    log.debug(f"Unified variations: photo={photo_var}, text={text_var}")
 
     # Determine if we need clean images (no text) for manual preset
     clean_image_mode = preset_id != 'gemini'
@@ -1621,16 +1608,16 @@ def run_pipeline(
     pre_extraction = _extract_brand_from_description(product_description)
     log.debug(f"Pre-extracted brand candidates: {pre_extraction}")
 
-    # Step 1: Analyze and plan (with text variation counts)
+    # Step 1: Analyze and plan (with unified text variation count)
     log.info("Step 1/2: Analyzing slideshow")
     analysis = analyze_and_plan(
         slide_paths,
         product_image_paths,
         product_description,
         output_dir,
-        hook_text_var=hook_text_var,
-        body_text_var=body_text_var,
-        product_text_var=product_text_var,
+        hook_text_var=text_var,
+        body_text_var=text_var,
+        product_text_var=text_var,
         request_id=request_id
     )
 
@@ -1677,11 +1664,8 @@ def run_pipeline(
         product_image_paths,
         output_dir,
         progress_callback=image_progress,
-        hook_photo_var=hook_photo_var,
-        hook_text_var=hook_text_var,
-        body_photo_var=body_photo_var,
-        body_text_var=body_text_var,
-        product_text_var=product_text_var,
+        photo_var=photo_var,
+        text_var=text_var,
         request_id=request_id,
         clean_image_mode=clean_image_mode
     )
@@ -1694,7 +1678,7 @@ def run_pipeline(
         log.info(f"Step 3: Rendering text on {len(generation_result['images'])} images with preset '{preset_id}'")
 
         # Build a mapping of task_id to text_content from analysis
-        # Enforce variation limits - Gemini may return more than requested
+        # Enforce unified text_var limit for all slide types
         text_mapping = {}
         for slide in analysis.get('new_slides', []):
             idx = slide['slide_index']
@@ -1703,20 +1687,16 @@ def run_pipeline(
 
             if slide_type == 'hook':
                 slide_key = 'hook'
-                # Enforce hook_text_var limit
-                text_variations = text_variations[:hook_text_var]
             elif slide_type == 'product':
                 slide_key = 'product'
-                # Enforce product_text_var limit
-                text_variations = text_variations[:product_text_var]
             elif slide_type == 'cta':
                 continue  # Skip CTA slides
             else:
                 body_num = sum(1 for s in analysis['new_slides'][:idx] if s['slide_type'] == 'body') + 1
                 slide_key = f'body_{body_num}'
-                # Enforce body_text_var limit
-                text_variations = text_variations[:body_text_var]
 
+            # Enforce unified text_var limit for ALL slide types
+            text_variations = text_variations[:text_var]
             text_mapping[slide_key] = text_variations
 
         # Process each generated image

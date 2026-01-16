@@ -120,24 +120,17 @@ def create_batch_job():
                 'invalid_links': invalid_links
             }), 400
 
-        # Get variation settings - detailed Photo × Text per slide type
-        # Support both old format (photo_variations/text_variations) and new detailed format
-        hook_photo_var = int(request.form.get('hook_photo_var', request.form.get('photo_variations', 1)))
-        hook_text_var = int(request.form.get('hook_text_var', request.form.get('text_variations', 1)))
-        body_photo_var = int(request.form.get('body_photo_var', request.form.get('photo_variations', 1)))
-        body_text_var = int(request.form.get('body_text_var', request.form.get('text_variations', 1)))
-        product_text_var = int(request.form.get('product_text_var', request.form.get('text_variations', 1)))
+        # Get unified variation settings
+        photo_var = int(request.form.get('photo_var', 1))
+        text_var = int(request.form.get('text_var', 1))
 
         # Clamp to valid range (1-5)
-        hook_photo_var = max(1, min(5, hook_photo_var))
-        hook_text_var = max(1, min(5, hook_text_var))
-        body_photo_var = max(1, min(5, body_photo_var))
-        body_text_var = max(1, min(5, body_text_var))
-        product_text_var = max(1, min(5, product_text_var))
+        photo_var = max(1, min(5, photo_var))
+        text_var = max(1, min(5, text_var))
 
         # Legacy support: keep photo_variations/text_variations for existing batch table
-        photo_variations = max(hook_photo_var, body_photo_var)
-        text_variations = max(hook_text_var, body_text_var, product_text_var)
+        photo_variations = photo_var
+        text_variations = text_var
 
         # Get video generation flag
         generate_video = request.form.get('generate_video', 'false').lower() in ('true', '1', 'yes')
@@ -147,16 +140,13 @@ def create_batch_job():
 
         # Build variations config
         variations_config = {
-            'hook_photo_var': hook_photo_var,
-            'hook_text_var': hook_text_var,
-            'body_photo_var': body_photo_var,
-            'body_text_var': body_text_var,
-            'product_text_var': product_text_var,
+            'photo_var': photo_var,
+            'text_var': text_var,
             'generate_video': generate_video,
             'preset_id': preset_id
         }
 
-        log.debug(f"Variations: hook={hook_photo_var}x{hook_text_var}, body={body_photo_var}x{body_text_var}, product=x{product_text_var}, video={generate_video}, preset={preset_id}")
+        log.debug(f"Variations: photo={photo_var}, text={text_var}, video={generate_video}, preset={preset_id}")
 
         # Create job entry in unified jobs table first (for Job History)
         job_id = create_job(
@@ -266,11 +256,8 @@ def create_batch_job():
             'total_links': len(created_links),
             'invalid_links': invalid_links if invalid_links else None,
             'variations': {
-                'hook_photo_var': hook_photo_var,
-                'hook_text_var': hook_text_var,
-                'body_photo_var': body_photo_var,
-                'body_text_var': body_text_var,
-                'product_text_var': product_text_var
+                'photo_var': photo_var,
+                'text_var': text_var
             },
             'generate_video': generate_video,
             'message': f'Batch created with {len(created_links)} links. Processing started.'

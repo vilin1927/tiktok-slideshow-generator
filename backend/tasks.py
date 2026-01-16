@@ -164,27 +164,21 @@ def process_link(self, batch_link_id: str, parent_drive_folder_id: str):
                 except (json.JSONDecodeError, TypeError):
                     pass
 
-            # Extract individual variation settings (default to 1)
-            hook_photo_var = variations_config.get('hook_photo_var', 1)
-            hook_text_var = variations_config.get('hook_text_var', 1)
-            body_photo_var = variations_config.get('body_photo_var', 1)
-            body_text_var = variations_config.get('body_text_var', 1)
-            product_text_var = variations_config.get('product_text_var', 1)
+            # Extract unified variation settings (default to 1)
+            photo_var = variations_config.get('photo_var', 1)
+            text_var = variations_config.get('text_var', 1)
             generate_video = variations_config.get('generate_video', False)
             preset_id = variations_config.get('preset_id', 'gemini')
 
             # Step 3: Run generation pipeline
-            logger.info(f"[Link {batch_link_id[:8]}] Running pipeline with hook={hook_photo_var}x{hook_text_var}, body={body_photo_var}x{body_text_var}, preset={preset_id}")
+            logger.info(f"[Link {batch_link_id[:8]}] Running pipeline with photo_var={photo_var}, text_var={text_var}, preset={preset_id}")
             pipeline_result = run_pipeline(
                 slide_paths=slide_paths,
                 product_image_paths=[product_photo_path],  # List of product images
                 product_description=product_description,
                 output_dir=output_dir,
-                hook_photo_var=hook_photo_var,
-                hook_text_var=hook_text_var,
-                body_photo_var=body_photo_var,
-                body_text_var=body_text_var,
-                product_text_var=product_text_var,
+                photo_var=photo_var,
+                text_var=text_var,
                 request_id=batch_link_id[:8],
                 preset_id=preset_id
             )
@@ -393,9 +387,7 @@ def finalize_batch(self, link_results: list, batch_id: str):
 @celery_app.task(bind=True, rate_limit='10/m', max_retries=3, default_retry_delay=60)
 def generate_variation(self, variation_id: str, slide_paths: list, product_image_path: str,
                        product_description: str, output_dir: str, variation_num: int,
-                       hook_photo_var: int = 1, hook_text_var: int = 1,
-                       body_photo_var: int = 1, body_text_var: int = 1,
-                       product_text_var: int = 1, preset_id: str = 'classic_shadow'):
+                       photo_var: int = 1, text_var: int = 1, preset_id: str = 'gemini'):
     """
     Generate a single variation. Used for fine-grained rate limiting.
 
@@ -408,11 +400,8 @@ def generate_variation(self, variation_id: str, slide_paths: list, product_image
         product_description: Product description text
         output_dir: Directory for output
         variation_num: Variation number (1-based)
-        hook_photo_var: Number of photo variations for hook
-        hook_text_var: Number of text variations for hook
-        body_photo_var: Number of photo variations for body
-        body_text_var: Number of text variations for body
-        product_text_var: Number of text variations for product
+        photo_var: Number of photo variations (applies to all slide types)
+        text_var: Number of text variations (applies to all slide types)
         preset_id: Text preset ID
     """
     logger.info(f"[Variation {variation_id[:8]}] Generating variation #{variation_num}")
@@ -426,11 +415,8 @@ def generate_variation(self, variation_id: str, slide_paths: list, product_image
             product_image_paths=[product_image_path],  # List format
             product_description=product_description,
             output_dir=output_dir,
-            hook_photo_var=hook_photo_var,
-            hook_text_var=hook_text_var,
-            body_photo_var=body_photo_var,
-            body_text_var=body_text_var,
-            product_text_var=product_text_var,
+            photo_var=photo_var,
+            text_var=text_var,
             request_id=f"var_{variation_id[:8]}",
             preset_id=preset_id
         )

@@ -158,93 +158,36 @@
                         Variations (Photo × Text)
                     </label>
 
-                    <!-- Hook variations -->
-                    <div class="mb-4 pb-3 border-b border-gray-600">
-                        <p class="text-gray-400 text-xs mb-2 font-medium">Hook Slide</p>
-                        <div class="grid grid-cols-2 gap-3">
-                            <div>
-                                <label class="block text-gray-500 text-xs mb-1">Photo</label>
-                                <input
-                                    type="number"
-                                    x-model.number="formData.hook_photo_var"
-                                    min="1"
-                                    max="5"
-                                    class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-center text-sm focus:outline-none focus:border-purple-500"
-                                >
-                            </div>
-                            <div>
-                                <label class="block text-gray-500 text-xs mb-1">Text</label>
-                                <input
-                                    type="number"
-                                    x-model.number="formData.hook_text_var"
-                                    min="1"
-                                    max="5"
-                                    class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-center text-sm focus:outline-none focus:border-purple-500"
-                                >
-                            </div>
+                    <!-- Unified Variations -->
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-gray-400 text-xs mb-2 font-medium">Photo Variations</label>
+                            <input
+                                type="number"
+                                x-model.number="formData.photo_var"
+                                min="1"
+                                max="5"
+                                class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-center text-sm focus:outline-none focus:border-purple-500"
+                            >
+                            <p class="text-gray-500 text-xs mt-1">Different image styles</p>
+                        </div>
+                        <div>
+                            <label class="block text-gray-400 text-xs mb-2 font-medium">Text Variations</label>
+                            <input
+                                type="number"
+                                x-model.number="formData.text_var"
+                                min="1"
+                                max="5"
+                                class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-center text-sm focus:outline-none focus:border-purple-500"
+                            >
+                            <p class="text-gray-500 text-xs mt-1">Different text options</p>
                         </div>
                     </div>
 
-                    <!-- Body variations -->
-                    <div class="mb-4 pb-3 border-b border-gray-600">
-                        <p class="text-gray-400 text-xs mb-2 font-medium">Body Slides (each)</p>
-                        <div class="grid grid-cols-2 gap-3">
-                            <div>
-                                <label class="block text-gray-500 text-xs mb-1">Photo</label>
-                                <input
-                                    type="number"
-                                    x-model.number="formData.body_photo_var"
-                                    min="1"
-                                    max="5"
-                                    class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-center text-sm focus:outline-none focus:border-purple-500"
-                                >
-                            </div>
-                            <div>
-                                <label class="block text-gray-500 text-xs mb-1">Text</label>
-                                <input
-                                    type="number"
-                                    x-model.number="formData.body_text_var"
-                                    min="1"
-                                    max="5"
-                                    class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-center text-sm focus:outline-none focus:border-purple-500"
-                                >
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Product variations -->
-                    <div class="mb-3">
-                        <p class="text-gray-400 text-xs mb-2 font-medium">Product Slide</p>
-                        <div class="grid grid-cols-2 gap-3">
-                            <div>
-                                <label class="block text-gray-500 text-xs mb-1">Photos</label>
-                                <p class="px-3 py-2 bg-gray-600/50 border border-gray-600 rounded-lg text-center text-sm"
-                                   :class="productFiles.length > 0 ? 'text-purple-400' : 'text-gray-500'">
-                                    <span x-show="productFiles.length > 0" x-text="productFiles.length + ' uploaded'"></span>
-                                    <span x-show="productFiles.length === 0">0 uploaded</span>
-                                </p>
-                            </div>
-                            <div>
-                                <label class="block text-gray-500 text-xs mb-1">Text</label>
-                                <input
-                                    type="number"
-                                    x-model.number="formData.product_text_var"
-                                    min="1"
-                                    max="5"
-                                    class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-center text-sm focus:outline-none focus:border-purple-500"
-                                >
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Total calculation with formula -->
-                    <div class="mt-3 pt-3 border-t border-gray-600 text-center">
-                        <p class="text-gray-500 text-xs mb-1">Total images (assuming ~5 body slides):</p>
-                        <p class="text-sm">
-                            <span class="text-gray-400" x-text="getFormula()"></span>
-                            <span class="text-gray-500"> = </span>
-                            <span class="text-purple-400 font-bold" x-text="calculateTotal()"></span>
-                        </p>
+                    <!-- Total calculation -->
+                    <div class="pt-3 border-t border-gray-600 text-center">
+                        <p class="text-gray-500 text-xs mb-1">Total videos: <span class="text-purple-400 font-bold" x-text="formData.photo_var * formData.text_var"></span></p>
+                        <p class="text-gray-500 text-xs">Each video = full slideshow with ~6 slides</p>
                     </div>
                 </div>
 
@@ -364,91 +307,36 @@ https://vm.tiktok.com/abc..."
                             Variations (Photo × Text)
                         </label>
 
-                        <!-- Hook variations -->
-                        <div class="mb-4 pb-3 border-b border-gray-600">
-                            <p class="text-gray-400 text-xs mb-2 font-medium">Hook Slide</p>
-                            <div class="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label class="block text-gray-500 text-xs mb-1">Photo</label>
-                                    <input
-                                        type="number"
-                                        x-model.number="batchData.hook_photo_var"
-                                        min="1"
-                                        max="5"
-                                        class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-center text-sm focus:outline-none focus:border-purple-500"
-                                    >
-                                </div>
-                                <div>
-                                    <label class="block text-gray-500 text-xs mb-1">Text</label>
-                                    <input
-                                        type="number"
-                                        x-model.number="batchData.hook_text_var"
-                                        min="1"
-                                        max="5"
-                                        class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-center text-sm focus:outline-none focus:border-purple-500"
-                                    >
-                                </div>
+                        <!-- Unified Variations -->
+                        <div class="grid grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label class="block text-gray-400 text-xs mb-2 font-medium">Photo Variations</label>
+                                <input
+                                    type="number"
+                                    x-model.number="batchData.photo_var"
+                                    min="1"
+                                    max="5"
+                                    class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-center text-sm focus:outline-none focus:border-purple-500"
+                                >
+                                <p class="text-gray-500 text-xs mt-1">Different image styles</p>
                             </div>
-                        </div>
-
-                        <!-- Body variations -->
-                        <div class="mb-4 pb-3 border-b border-gray-600">
-                            <p class="text-gray-400 text-xs mb-2 font-medium">Body Slides (each)</p>
-                            <div class="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label class="block text-gray-500 text-xs mb-1">Photo</label>
-                                    <input
-                                        type="number"
-                                        x-model.number="batchData.body_photo_var"
-                                        min="1"
-                                        max="5"
-                                        class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-center text-sm focus:outline-none focus:border-purple-500"
-                                    >
-                                </div>
-                                <div>
-                                    <label class="block text-gray-500 text-xs mb-1">Text</label>
-                                    <input
-                                        type="number"
-                                        x-model.number="batchData.body_text_var"
-                                        min="1"
-                                        max="5"
-                                        class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-center text-sm focus:outline-none focus:border-purple-500"
-                                    >
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Product variations -->
-                        <div class="mb-3">
-                            <p class="text-gray-400 text-xs mb-2 font-medium">Product Slide</p>
-                            <div class="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label class="block text-gray-500 text-xs mb-1">Photo</label>
-                                    <p class="px-3 py-2 bg-gray-600/50 border border-gray-600 rounded-lg text-gray-500 text-center text-sm">
-                                        1 per link
-                                    </p>
-                                </div>
-                                <div>
-                                    <label class="block text-gray-500 text-xs mb-1">Text</label>
-                                    <input
-                                        type="number"
-                                        x-model.number="batchData.product_text_var"
-                                        min="1"
-                                        max="5"
-                                        class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-center text-sm focus:outline-none focus:border-purple-500"
-                                    >
-                                </div>
+                            <div>
+                                <label class="block text-gray-400 text-xs mb-2 font-medium">Text Variations</label>
+                                <input
+                                    type="number"
+                                    x-model.number="batchData.text_var"
+                                    min="1"
+                                    max="5"
+                                    class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-center text-sm focus:outline-none focus:border-purple-500"
+                                >
+                                <p class="text-gray-500 text-xs mt-1">Different text options</p>
                             </div>
                         </div>
 
                         <!-- Total calculation -->
-                        <div class="mt-3 pt-3 border-t border-gray-600 text-center">
-                            <p class="text-gray-500 text-xs mb-1">Total images per link (assuming ~5 body slides):</p>
-                            <p class="text-sm">
-                                <span class="text-gray-400" x-text="getBatchFormula()"></span>
-                                <span class="text-gray-500"> = </span>
-                                <span class="text-purple-400 font-bold" x-text="calculateBatchTotal()"></span>
-                            </p>
+                        <div class="pt-3 border-t border-gray-600 text-center">
+                            <p class="text-gray-500 text-xs mb-1">Total videos per link: <span class="text-purple-400 font-bold" x-text="batchData.photo_var * batchData.text_var"></span></p>
+                            <p class="text-gray-500 text-xs">Each video = full slideshow with ~6 slides</p>
                         </div>
                     </div>
 
@@ -1010,11 +898,8 @@ https://vm.tiktok.com/abc..."
                     tiktok_url: '',
                     folder_name: '',
                     product_context: '',
-                    hook_photo_var: 1,
-                    hook_text_var: 1,
-                    body_photo_var: 1,
-                    body_text_var: 1,
-                    product_text_var: 1,
+                    photo_var: 1,
+                    text_var: 1,
                     generate_video: false,
                     preset_id: 'gemini'
                 },
@@ -1063,11 +948,8 @@ INSPIRED BY JAPANESE SKIN CARE: Delivers a lifted, contoured look without silico
                 batchStep: 1,
                 batchData: {
                     linksText: '',
-                    hook_photo_var: 1,
-                    hook_text_var: 1,
-                    body_photo_var: 1,
-                    body_text_var: 1,
-                    product_text_var: 1,
+                    photo_var: 1,
+                    text_var: 1,
                     preset_id: 'gemini',
                     applyToAll: true,
                     generateVideo: false,
@@ -1148,68 +1030,6 @@ INSPIRED BY JAPANESE SKIN CARE: Delivers a lifted, contoured look without silico
                     this.previewImages = [];
                 },
 
-                calculateTotal() {
-                    const hookTotal = this.formData.hook_photo_var * this.formData.hook_text_var;
-                    const bodyCount = 5; // Estimate ~5 body slides
-                    const bodyTotal = bodyCount * this.formData.body_photo_var * this.formData.body_text_var;
-                    const productPhotos = this.productFiles.length || 1;
-                    const productTotal = productPhotos * this.formData.product_text_var;
-                    return hookTotal + bodyTotal + productTotal;
-                },
-
-                getFormula() {
-                    const hp = this.formData.hook_photo_var;
-                    const ht = this.formData.hook_text_var;
-                    const bp = this.formData.body_photo_var;
-                    const bt = this.formData.body_text_var;
-                    const pp = this.productFiles.length || 1;
-                    const pt = this.formData.product_text_var;
-
-                    // Hook part
-                    const hookPart = hp === 1 && ht === 1 ? '1' : `${hp}×${ht}`;
-
-                    // Body part (5 slides estimate)
-                    let bodyPart;
-                    if (bp === 1 && bt === 1) {
-                        bodyPart = '5×1';
-                    } else {
-                        bodyPart = `5×${bp}×${bt}`;
-                    }
-
-                    // Product part
-                    const productPart = pp === 1 && pt === 1 ? '1' : `${pp}×${pt}`;
-
-                    return `${hookPart} + ${bodyPart} + ${productPart}`;
-                },
-
-                // Batch mode formula and calculation
-                calculateBatchTotal() {
-                    const hookTotal = this.batchData.hook_photo_var * this.batchData.hook_text_var;
-                    const bodyCount = 5; // Estimate ~5 body slides
-                    const bodyTotal = bodyCount * this.batchData.body_photo_var * this.batchData.body_text_var;
-                    const productTotal = this.batchData.product_text_var; // 1 photo per link
-                    return hookTotal + bodyTotal + productTotal;
-                },
-
-                getBatchFormula() {
-                    const hp = this.batchData.hook_photo_var;
-                    const ht = this.batchData.hook_text_var;
-                    const bp = this.batchData.body_photo_var;
-                    const bt = this.batchData.body_text_var;
-                    const pt = this.batchData.product_text_var;
-
-                    const hookPart = hp === 1 && ht === 1 ? '1' : `${hp}×${ht}`;
-                    let bodyPart;
-                    if (bp === 1 && bt === 1) {
-                        bodyPart = '5×1';
-                    } else {
-                        bodyPart = `5×${bp}×${bt}`;
-                    }
-                    const productPart = pt === 1 ? '1' : `1×${pt}`;
-
-                    return `${hookPart} + ${bodyPart} + ${productPart}`;
-                },
-
                 startPolling(sessionId) {
                     this.sessionId = sessionId;
                     this.pollInterval = setInterval(async () => {
@@ -1279,12 +1099,9 @@ INSPIRED BY JAPANESE SKIN CARE: Delivers a lifted, contoured look without silico
                         formData.append('product_images', file);
                     });
 
-                    // Photo × Text variation params
-                    formData.append('hook_photo_var', this.formData.hook_photo_var);
-                    formData.append('hook_text_var', this.formData.hook_text_var);
-                    formData.append('body_photo_var', this.formData.body_photo_var);
-                    formData.append('body_text_var', this.formData.body_text_var);
-                    formData.append('product_text_var', this.formData.product_text_var);
+                    // Unified variation params
+                    formData.append('photo_var', this.formData.photo_var);
+                    formData.append('text_var', this.formData.text_var);
 
                     // Video generation option
                     formData.append('generate_video', this.formData.generate_video);
@@ -1395,12 +1212,9 @@ INSPIRED BY JAPANESE SKIN CARE: Delivers a lifted, contoured look without silico
                     const validUrls = this.batchValidation.validLinks.map(l => l.url).join('\n');
                     formData.append('links', validUrls);
 
-                    // Add variations (Photo × Text per slide type)
-                    formData.append('hook_photo_var', this.batchData.hook_photo_var);
-                    formData.append('hook_text_var', this.batchData.hook_text_var);
-                    formData.append('body_photo_var', this.batchData.body_photo_var);
-                    formData.append('body_text_var', this.batchData.body_text_var);
-                    formData.append('product_text_var', this.batchData.product_text_var);
+                    // Unified variation params
+                    formData.append('photo_var', this.batchData.photo_var);
+                    formData.append('text_var', this.batchData.text_var);
 
                     // Add video generation flag
                     formData.append('generate_video', this.batchData.generateVideo);
@@ -1529,11 +1343,9 @@ INSPIRED BY JAPANESE SKIN CARE: Delivers a lifted, contoured look without silico
                     this.batchStep = 1;
                     this.batchData = {
                         linksText: '',
-                        hook_photo_var: 1,
-                        hook_text_var: 1,
-                        body_photo_var: 1,
-                        body_text_var: 1,
-                        product_text_var: 1,
+                        photo_var: 1,
+                        text_var: 1,
+                        preset_id: 'gemini',
                         applyToAll: true,
                         generateVideo: false,
                         products: [{ file: null, preview: null, description: '' }]
