@@ -459,6 +459,7 @@ def test_text_render():
     from presets import get_preset
     from PIL import Image
     import io
+    import tempfile
 
     session_id = str(uuid.uuid4())[:8]
     log = get_request_logger('app', session_id)
@@ -495,27 +496,48 @@ def test_text_render():
             # Default 1080x1920 background
             bg_image = Image.new('RGB', (1080, 1920), bg_color)
 
-        # Render text on image
-        result_image = render_text(
-            bg_image,
-            text,
-            preset,
-            request_id=session_id
-        )
+        # Save background to temp file (render_text expects path)
+        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
+            bg_image.save(tmp.name, format='PNG')
+            tmp_path = tmp.name
 
-        # Return as PNG
-        img_buffer = io.BytesIO()
-        result_image.save(img_buffer, format='PNG')
-        img_buffer.seek(0)
+        try:
+            # Create zone for full image (center of image)
+            img_width, img_height = bg_image.size
+            zone = {
+                'bounds': {
+                    'x': int(img_width * 0.1),
+                    'y': int(img_height * 0.3),
+                    'w': int(img_width * 0.8),
+                    'h': int(img_height * 0.4)
+                },
+                'text_color_suggestion': 'white'
+            }
 
-        log.info(f"Text render complete: {result_image.size}")
+            # Render text on image
+            result_image = render_text(
+                tmp_path,
+                text,
+                zone,
+                preset_id
+            )
 
-        return send_file(
-            img_buffer,
-            mimetype='image/png',
-            as_attachment=False,
-            download_name=f'text_render_{session_id}.png'
-        )
+            # Return as PNG
+            img_buffer = io.BytesIO()
+            result_image.save(img_buffer, format='PNG')
+            img_buffer.seek(0)
+
+            log.info(f"Text render complete: {result_image.size}")
+
+            return send_file(
+                img_buffer,
+                mimetype='image/png',
+                as_attachment=False,
+                download_name=f'text_render_{session_id}.png'
+            )
+        finally:
+            # Clean up temp file
+            os.unlink(tmp_path)
 
     except Exception as e:
         log.error(f"Text render failed: {str(e)}", exc_info=True)
