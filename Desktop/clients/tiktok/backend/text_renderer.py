@@ -30,8 +30,9 @@ from presets import get_preset, get_font_path, get_font_size, TextPreset
 ROUNDED_TEXT_BOX_SCRIPT = os.path.join(os.path.dirname(__file__), 'rounded_text_box.js')
 
 
-# Apple Color Emoji font path (macOS)
-APPLE_EMOJI_FONT = "/System/Library/Fonts/Apple Color Emoji.ttc"
+# Emoji font paths
+APPLE_EMOJI_FONT = "/System/Library/Fonts/Apple Color Emoji.ttc"  # macOS
+NOTO_EMOJI_FONT = "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf"  # Linux
 
 # Regex pattern to detect emoji characters
 # This covers most common emojis including skin tones and modifiers
@@ -164,24 +165,36 @@ def normalize_punctuation(text: str) -> str:
 
 def load_emoji_font(size: int = 160) -> Optional[ImageFont.FreeTypeFont]:
     """
-    Load Apple Color Emoji font for iPhone-style emoji rendering.
+    Load color emoji font for emoji rendering.
 
-    Note: Apple Color Emoji is a bitmap font that only works at size 160.
-    The emoji will be scaled to match the desired text size.
+    Supports:
+    - Apple Color Emoji (macOS) - bitmap font, only works at size 160
+    - Noto Color Emoji (Linux) - works at any size
 
     Returns:
         PIL ImageFont or None if not available
     """
+    # Try Apple Color Emoji first (macOS)
     if os.path.exists(APPLE_EMOJI_FONT):
         try:
             # Apple Color Emoji only works at size 160 (bitmap font)
             return ImageFont.truetype(APPLE_EMOJI_FONT, 160)
         except Exception:
             pass
+
+    # Try Noto Color Emoji (Linux)
+    if os.path.exists(NOTO_EMOJI_FONT):
+        try:
+            # Noto Color Emoji works at any size
+            return ImageFont.truetype(NOTO_EMOJI_FONT, size)
+        except Exception:
+            pass
+
     return None
 
 
 # Native emoji font size (Apple Color Emoji bitmap size)
+# Note: Noto Color Emoji doesn't have this limitation
 EMOJI_NATIVE_SIZE = 160
 
 
