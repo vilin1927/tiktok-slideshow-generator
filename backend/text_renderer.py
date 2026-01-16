@@ -156,8 +156,10 @@ def normalize_punctuation(text: str) -> str:
             break
         text = text[:-1].rstrip()
 
-    # Clean up any double spaces
-    text = ' '.join(text.split())
+    # Clean up any double spaces (but preserve newlines)
+    lines = text.split('\n')
+    lines = [' '.join(line.split()) for line in lines]
+    text = '\n'.join(lines)
 
     return text
 
@@ -265,7 +267,7 @@ def wrap_text(
     emoji_font: Optional[ImageFont.FreeTypeFont] = None
 ) -> list:
     """
-    Wrap text to fit within max_width.
+    Wrap text to fit within max_width, preserving explicit newlines.
 
     Args:
         text: Text to wrap
@@ -276,29 +278,38 @@ def wrap_text(
     Returns:
         List of text lines
     """
-    words = text.split()
-    lines = []
-    current_line = []
+    # First split by explicit newlines
+    paragraphs = text.split('\n')
+    all_lines = []
 
     # Create temporary draw for measurement
     temp_img = Image.new('RGB', (1, 1))
     draw = ImageDraw.Draw(temp_img)
 
-    for word in words:
-        current_line.append(word)
-        test_line = ' '.join(current_line)
-        line_width = get_text_width_with_emojis(test_line, font, emoji_font, draw)
+    for paragraph in paragraphs:
+        words = paragraph.split()
+        if not words:
+            # Empty line from double newline
+            all_lines.append('')
+            continue
 
-        if line_width > max_width and len(current_line) > 1:
-            # Remove last word and add line
-            current_line.pop()
-            lines.append(' '.join(current_line))
-            current_line = [word]
+        current_line = []
 
-    if current_line:
-        lines.append(' '.join(current_line))
+        for word in words:
+            current_line.append(word)
+            test_line = ' '.join(current_line)
+            line_width = get_text_width_with_emojis(test_line, font, emoji_font, draw)
 
-    return lines
+            if line_width > max_width and len(current_line) > 1:
+                # Remove last word and add line
+                current_line.pop()
+                all_lines.append(' '.join(current_line))
+                current_line = [word]
+
+        if current_line:
+            all_lines.append(' '.join(current_line))
+
+    return all_lines
 
 
 def render_emoji_scaled(
@@ -892,10 +903,18 @@ def render_text(
     # Get effect config
     effect = preset.effect
 
-    # Use preset text color directly
-    # Shadow/outline effects: white text + black shadow/outline works on any background
-    # Box effect: black text on white box (defined in preset)
-    text_color = effect.text_color
+    # Determine text color based on zone brightness suggestion
+    # For shadow/outline: use zone's suggestion (adapts to background)
+    # For box: always use preset color (text on white box = black)
+    text_color = effect.text_color  # Default from preset
+
+    if effect.type in ('shadow', 'outline'):
+        # Use the zone's text color suggestion based on background brightness
+        text_color_suggestion = zone.get('text_color_suggestion', 'white')
+        if text_color_suggestion == 'black':
+            text_color = '#000000'  # Dark text for light backgrounds
+        else:
+            text_color = '#FFFFFF'  # Light text for dark backgrounds
 
     # For box style, each line gets its own box (Figma design)
     if effect.type == 'box':
