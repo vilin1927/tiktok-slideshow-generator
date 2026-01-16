@@ -33,9 +33,9 @@ from google.genai import types
 ANALYSIS_MODEL = 'gemini-3-pro-preview'
 IMAGE_MODEL = 'gemini-3-pro-image-preview'
 
-# Rate limiting config (user quota: 25 RPM)
-MAX_CONCURRENT = 10   # Up to 10 concurrent requests across all jobs
-RPM_LIMIT = 25        # 25 requests per minute (Gemini quota)
+# Rate limiting config (Gemini strict quota: 20 RPM)
+MAX_CONCURRENT = 5    # Max 5 concurrent requests across all jobs
+RPM_LIMIT = 20        # 20 requests per minute (Gemini strict quota)
 RATE_WINDOW = 65.0    # Safety margin: 65s instead of 60s
 MAX_RETRIES = 5       # More retries for rate limit recovery
 REQUEST_TIMEOUT = 120 # 120 sec timeout per API call
@@ -48,7 +48,7 @@ class RateLimiter:
     """
     def __init__(self, rpm: int = RPM_LIMIT, max_concurrent: int = MAX_CONCURRENT):
         self.semaphore = threading.Semaphore(max_concurrent)
-        self.min_interval = RATE_WINDOW / rpm  # seconds between requests (65s/25 = 2.6s)
+        self.min_interval = RATE_WINDOW / rpm  # seconds between requests (65s/20 = 3.25s)
         self.last_request_time = 0.0
         self.lock = threading.Lock()
         logger.debug(f"RateLimiter initialized: rpm={rpm}, max_concurrent={max_concurrent}")

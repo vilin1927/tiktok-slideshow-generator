@@ -135,15 +135,19 @@ def create_video(
     work_dir = tempfile.mkdtemp(prefix='video_gen_')
 
     try:
-        # Fixed 3 seconds per slide (audio will be trimmed to match video length)
+        # Fixed N seconds per slide - video duration = num_images * slide_duration
         if audio_path and os.path.exists(audio_path):
-            logger.info(f"{log_prefix}Using fixed {slide_duration}s per slide (audio will be trimmed)")
+            total_duration = len(image_paths) * slide_duration
+            logger.info(f"{log_prefix}Using fixed {slide_duration}s per slide, total duration: {total_duration}s")
         else:
             logger.info(f"{log_prefix}No audio provided, using {slide_duration}s per slide")
             audio_path = None
 
         # Create concat file
         concat_path = create_concat_file(image_paths, slide_duration, work_dir)
+
+        # Calculate total video duration (exact slide count * duration)
+        total_video_duration = len(image_paths) * slide_duration
 
         # Build FFmpeg command
         # Video filter: scale to 3:4, pad to 9:16 with black bars centered
@@ -160,6 +164,9 @@ def create_video(
         # Add audio input if available
         if audio_path:
             cmd.extend(['-i', audio_path])
+
+        # Limit output duration to exactly the slide duration (don't extend for longer audio)
+        cmd.extend(['-t', str(total_video_duration)])
 
         # Video encoding settings
         cmd.extend([
