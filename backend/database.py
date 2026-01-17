@@ -18,7 +18,7 @@ ALLOWED_COLUMNS = {
         'drive_folder_url', 'celery_task_id', 'completed_links', 'failed_links'
     },
     'batches': {
-        'status', 'started_at', 'completed_at', 'error_message', 'drive_folder_url'
+        'status', 'started_at', 'completed_at', 'error_message', 'drive_folder_url', 'celery_task_id'
     },
     'batch_links': {
         'status', 'started_at', 'completed_at', 'error_message',
