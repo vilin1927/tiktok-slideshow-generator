@@ -87,21 +87,21 @@ class TestBatchLinksEndpoint:
 
 
 class TestBatchListEndpoint:
-    """Tests for GET /api/batches endpoint."""
+    """Tests for GET /api/batch/list endpoint."""
 
     def test_list_batches_returns_200(self, client):
-        """GET /api/batches should return 200 OK."""
-        response = client.get('/api/batches')
+        """GET /api/batch/list should return 200 OK."""
+        response = client.get('/api/batch/list')
         assert response.status_code == 200
 
     def test_list_batches_returns_json(self, client):
-        """GET /api/batches should return JSON response."""
-        response = client.get('/api/batches')
+        """GET /api/batch/list should return JSON response."""
+        response = client.get('/api/batch/list')
         assert response.content_type == 'application/json'
 
     def test_list_batches_structure(self, client):
-        """GET /api/batches should return batches list structure."""
-        response = client.get('/api/batches')
+        """GET /api/batch/list should return batches list structure."""
+        response = client.get('/api/batch/list')
         data = response.get_json()
         assert 'batches' in data or isinstance(data, list)
 
@@ -113,7 +113,7 @@ class TestValidateLinksEndpoint:
         """POST /api/batch/validate with empty links."""
         response = client.post('/api/batch/validate', json={'links': ''})
         data = response.get_json()
-        assert 'valid' in data or response.status_code == 400
+        assert 'valid_count' in data or response.status_code == 400
 
     def test_validate_valid_links(self, client, valid_tiktok_urls):
         """POST /api/batch/validate with valid TikTok links."""
@@ -121,7 +121,7 @@ class TestValidateLinksEndpoint:
         response = client.post('/api/batch/validate', json={'links': links_text})
         if response.status_code == 200:
             data = response.get_json()
-            assert 'valid' in data
+            assert 'valid_count' in data
 
     def test_validate_mixed_links(self, client, valid_tiktok_urls, invalid_tiktok_urls):
         """POST /api/batch/validate with mixed valid and invalid links."""
@@ -130,5 +130,5 @@ class TestValidateLinksEndpoint:
         response = client.post('/api/batch/validate', json={'links': links_text})
         if response.status_code == 200:
             data = response.get_json()
-            assert 'valid' in data
-            assert 'invalid' in data
+            assert 'valid_count' in data
+            assert 'invalid_count' in data

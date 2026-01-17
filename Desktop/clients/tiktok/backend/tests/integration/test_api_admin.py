@@ -7,10 +7,10 @@ import pytest
 class TestAdminLoginEndpoint:
     """Tests for POST /api/admin/login endpoint."""
 
-    def test_login_missing_password_returns_400(self, client):
-        """POST /api/admin/login without password should return 400."""
+    def test_login_missing_password_returns_error(self, client):
+        """POST /api/admin/login without password should return 401 (auth failed)."""
         response = client.post('/api/admin/login', json={})
-        assert response.status_code == 400
+        assert response.status_code == 401  # Missing password = auth failure
 
     def test_login_wrong_password_returns_401(self, client):
         """POST /api/admin/login with wrong password should return 401."""

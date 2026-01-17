@@ -105,7 +105,8 @@ class TestListAllPresets:
     def test_list_all_presets_contains_all_ids(self, preset_ids):
         """list_all_presets() should contain all preset IDs."""
         presets = list_all_presets()
-        returned_ids = [p.id for p in presets]
+        # list_all_presets returns dicts with 'id' key, not objects with .id attribute
+        returned_ids = [p['id'] for p in presets]
         for preset_id in preset_ids:
             assert preset_id in returned_ids
 
@@ -169,7 +170,8 @@ class TestGetGeminiOption:
         assert 'id' in option
         assert option['id'] == 'gemini'
 
-    def test_get_gemini_option_has_name(self):
-        """get_gemini_option() should have name field."""
+    def test_get_gemini_option_has_display_name(self):
+        """get_gemini_option() should have display_name field."""
         option = get_gemini_option()
-        assert 'name' in option
+        # API uses 'display_name' not 'name'
+        assert 'display_name' in option

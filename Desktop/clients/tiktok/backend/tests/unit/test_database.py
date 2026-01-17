@@ -104,8 +104,8 @@ class TestBatchOperations:
         from database import create_batch
         batch_id = create_batch(
             total_links=5,
-            preset_id='classic_shadow',
-            drive_folder_id='test_folder_123'
+            photo_variations=1,
+            text_variations=1
         )
         assert batch_id is not None
         assert isinstance(batch_id, str)
@@ -115,8 +115,8 @@ class TestBatchOperations:
         from database import create_batch, get_batch
         batch_id = create_batch(
             total_links=5,
-            preset_id='classic_shadow',
-            drive_folder_id='test_folder_123'
+            photo_variations=1,
+            text_variations=1
         )
         batch = get_batch(batch_id)
         assert batch is not None
@@ -133,8 +133,8 @@ class TestBatchOperations:
         from database import create_batch, get_batch, update_batch_status
         batch_id = create_batch(
             total_links=5,
-            preset_id='classic_shadow',
-            drive_folder_id='test_folder_123'
+            photo_variations=1,
+            text_variations=1
         )
         update_batch_status(batch_id, 'completed')
         batch = get_batch(batch_id)
@@ -147,10 +147,11 @@ class TestBatchLinkOperations:
     def test_create_batch_link(self, test_db):
         """create_batch_link() should return a link ID."""
         from database import create_batch, create_batch_link
-        batch_id = create_batch(5, 'classic_shadow', 'folder_123')
+        batch_id = create_batch(total_links=5)
         link_id = create_batch_link(
             batch_id=batch_id,
-            tiktok_url='https://www.tiktok.com/@test/photo/123',
+            link_index=0,
+            link_url='https://www.tiktok.com/@test/photo/123',
             product_description='Test product'
         )
         assert link_id is not None
@@ -159,10 +160,11 @@ class TestBatchLinkOperations:
     def test_get_batch_link(self, test_db):
         """get_batch_link() should return link data."""
         from database import create_batch, create_batch_link, get_batch_link
-        batch_id = create_batch(5, 'classic_shadow', 'folder_123')
+        batch_id = create_batch(total_links=5)
         link_id = create_batch_link(
             batch_id=batch_id,
-            tiktok_url='https://www.tiktok.com/@test/photo/123',
+            link_index=0,
+            link_url='https://www.tiktok.com/@test/photo/123',
             product_description='Test product'
         )
         link = get_batch_link(link_id)
@@ -172,10 +174,10 @@ class TestBatchLinkOperations:
     def test_get_batch_links(self, test_db):
         """get_batch_links() should return all links for a batch."""
         from database import create_batch, create_batch_link, get_batch_links
-        batch_id = create_batch(3, 'classic_shadow', 'folder_123')
-        create_batch_link(batch_id, 'https://tiktok.com/1', 'Product 1')
-        create_batch_link(batch_id, 'https://tiktok.com/2', 'Product 2')
-        create_batch_link(batch_id, 'https://tiktok.com/3', 'Product 3')
+        batch_id = create_batch(total_links=3)
+        create_batch_link(batch_id, 0, 'https://tiktok.com/1', product_description='Product 1')
+        create_batch_link(batch_id, 1, 'https://tiktok.com/2', product_description='Product 2')
+        create_batch_link(batch_id, 2, 'https://tiktok.com/3', product_description='Product 3')
 
         links = get_batch_links(batch_id)
         assert len(links) == 3

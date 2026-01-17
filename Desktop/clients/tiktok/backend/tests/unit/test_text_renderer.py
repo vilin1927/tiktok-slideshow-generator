@@ -48,16 +48,16 @@ class TestSplitTextAndEmojis:
         """split_text_and_emojis() with text only."""
         segments = split_text_and_emojis("Hello World")
         assert len(segments) >= 1
-        # Should have text segment
-        text_segments = [s for s in segments if s[0] == 'text']
+        # Should have text segment - format is (segment_str, is_emoji_bool)
+        text_segments = [s for s in segments if not s[1]]  # is_emoji = False
         assert len(text_segments) >= 1
 
     def test_split_emoji_only(self):
         """split_text_and_emojis() with emoji only."""
         segments = split_text_and_emojis("😀🎉🔥")
         assert len(segments) >= 1
-        # Should have emoji segments
-        emoji_segments = [s for s in segments if s[0] == 'emoji']
+        # Should have emoji segments - format is (segment_str, is_emoji_bool)
+        emoji_segments = [s for s in segments if s[1]]  # is_emoji = True
         assert len(emoji_segments) >= 1
 
     def test_split_mixed(self):
@@ -149,12 +149,15 @@ class TestRenderText:
     def test_render_text_creates_image(self, sample_image_file, temp_output_dir):
         """render_text() should create output image."""
         output_path = os.path.join(temp_output_dir, "output.png")
-        safe_zone = {'x': 100, 'y': 100, 'width': 800, 'height': 200}
+        zone = {
+            'bounds': {'x': 100, 'y': 100, 'w': 800, 'h': 200},
+            'text_color_suggestion': 'white'
+        }
 
         result = render_text(
             image_path=sample_image_file,
             text="Test Text",
-            safe_zone=safe_zone,
+            zone=zone,
             preset_id='classic_shadow',
             output_path=output_path
         )
@@ -164,7 +167,10 @@ class TestRenderText:
 
     def test_render_text_all_presets(self, sample_image_file, temp_output_dir, preset_ids):
         """render_text() should work with all 9 presets."""
-        safe_zone = {'x': 100, 'y': 100, 'width': 800, 'height': 200}
+        zone = {
+            'bounds': {'x': 100, 'y': 100, 'w': 800, 'h': 200},
+            'text_color_suggestion': 'white'
+        }
 
         for preset_id in preset_ids:
             output_path = os.path.join(temp_output_dir, f"output_{preset_id}.png")
@@ -172,7 +178,7 @@ class TestRenderText:
                 result = render_text(
                     image_path=sample_image_file,
                     text="Test",
-                    safe_zone=safe_zone,
+                    zone=zone,
                     preset_id=preset_id,
                     output_path=output_path
                 )
@@ -184,13 +190,16 @@ class TestRenderText:
     def test_render_text_with_emoji(self, sample_image_file, temp_output_dir):
         """render_text() should handle text with emoji."""
         output_path = os.path.join(temp_output_dir, "emoji_output.png")
-        safe_zone = {'x': 100, 'y': 100, 'width': 800, 'height': 200}
+        zone = {
+            'bounds': {'x': 100, 'y': 100, 'w': 800, 'h': 200},
+            'text_color_suggestion': 'white'
+        }
 
         try:
             result = render_text(
                 image_path=sample_image_file,
                 text="Hello 😀 World",
-                safe_zone=safe_zone,
+                zone=zone,
                 preset_id='classic_shadow',
                 output_path=output_path
             )
@@ -203,13 +212,16 @@ class TestRenderText:
     def test_render_text_multiline(self, sample_image_file, temp_output_dir):
         """render_text() should handle multiline text."""
         output_path = os.path.join(temp_output_dir, "multiline_output.png")
-        safe_zone = {'x': 100, 'y': 100, 'width': 300, 'height': 400}
+        zone = {
+            'bounds': {'x': 100, 'y': 100, 'w': 300, 'h': 400},
+            'text_color_suggestion': 'white'
+        }
 
         try:
             result = render_text(
                 image_path=sample_image_file,
                 text="This is a long text that should wrap to multiple lines",
-                safe_zone=safe_zone,
+                zone=zone,
                 preset_id='classic_shadow',
                 output_path=output_path
             )

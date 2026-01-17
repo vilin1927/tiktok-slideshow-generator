@@ -40,13 +40,14 @@ class TestPresetsListEndpoint:
             assert preset_id in returned_ids, f"Missing preset: {preset_id}"
 
     def test_preset_has_required_fields(self, client):
-        """Each preset should have id, name, font, and effect fields."""
+        """Each preset should have id, display_name, font_name, and effect_name fields."""
         response = client.get('/api/presets')
         data = response.get_json()
         for preset in data['presets']:
-            if preset.get('id') != 'gemini':
-                assert 'id' in preset
-                assert 'name' in preset
+            assert 'id' in preset
+            assert 'display_name' in preset
+            assert 'font_name' in preset
+            assert 'effect_name' in preset
 
 
 class TestPresetDetailEndpoint:
