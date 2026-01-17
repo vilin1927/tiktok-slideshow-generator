@@ -40,6 +40,8 @@ class EffectConfig:
     box_padding: int = 40  # Horizontal padding (left/right)
     box_padding_v: int = 20  # Vertical padding (top/bottom)
     box_radius: int = 20
+    line_gap: int = 0  # Extra gap between lines (separate from padding)
+    box_padding_top: int = 0  # Extra padding at top only (for emojis)
     # Text color
     text_color: str = '#FFFFFF'  # Default white, can be black for box
 
@@ -94,9 +96,11 @@ EFFECTS = {
         name='Box',
         type='box',
         box_color='#FFFFFF',
-        box_padding=40,      # Horizontal padding (increased)
-        box_padding_v=25,    # Vertical padding
-        box_radius=20,       # Corner radius from Remotion
+        box_padding=40,      # Horizontal padding (left/right)
+        box_padding_v=20,    # Vertical padding (top/bottom inside box)
+        box_radius=15,       # Corner radius
+        line_gap=0,          # Gap between lines
+        box_padding_top=15,  # Extra top padding (for emojis)
         text_color='#000000'  # Black text on white box
     )
 }

@@ -270,10 +270,18 @@ def get_text_width_with_emojis(
     text: str,
     font: ImageFont.FreeTypeFont,
     emoji_font: Optional[ImageFont.FreeTypeFont],
-    draw: ImageDraw.ImageDraw
+    draw: ImageDraw.ImageDraw,
+    target_emoji_size: int = 0
 ) -> int:
     """
     Calculate text width accounting for different emoji font sizing.
+
+    Args:
+        text: Text to measure
+        font: Regular text font
+        emoji_font: Emoji font (at native size)
+        draw: ImageDraw for measurement
+        target_emoji_size: Target emoji size (if 0, uses font size estimate)
 
     Returns:
         Total width in pixels
@@ -285,12 +293,18 @@ def get_text_width_with_emojis(
     total_width = 0
     segments = split_text_and_emojis(text)
 
+    # Calculate scale factor for emojis
+    # Emojis are rendered at target_emoji_size but measured at EMOJI_NATIVE_SIZE
+    scale = target_emoji_size / EMOJI_NATIVE_SIZE if target_emoji_size > 0 else 1.0
+
     for segment, is_emoji in segments:
         if is_emoji and emoji_font:
             bbox = draw.textbbox((0, 0), segment, font=emoji_font)
+            # Scale emoji width to match rendered size
+            total_width += int((bbox[2] - bbox[0]) * scale)
         else:
             bbox = draw.textbbox((0, 0), segment, font=font)
-        total_width += bbox[2] - bbox[0]
+            total_width += bbox[2] - bbox[0]
 
     return total_width
 
@@ -299,41 +313,53 @@ def wrap_text(
     text: str,
     font: ImageFont.FreeTypeFont,
     max_width: int,
-    emoji_font: Optional[ImageFont.FreeTypeFont] = None
+    emoji_font: Optional[ImageFont.FreeTypeFont] = None,
+    font_size: int = 0
 ) -> list:
     """
-    Wrap text to fit within max_width.
+    Wrap text to fit within max_width, respecting explicit newlines.
 
     Args:
         text: Text to wrap
         font: Font to use for measurement
         max_width: Maximum width in pixels
         emoji_font: Optional emoji font for proper emoji sizing
+        font_size: Font size for accurate emoji width calculation
 
     Returns:
         List of text lines
     """
-    words = text.split()
-    lines = []
-    current_line = []
-
     # Create temporary draw for measurement
     temp_img = Image.new('RGB', (1, 1))
     draw = ImageDraw.Draw(temp_img)
 
-    for word in words:
-        current_line.append(word)
-        test_line = ' '.join(current_line)
-        line_width = get_text_width_with_emojis(test_line, font, emoji_font, draw)
+    lines = []
 
-        if line_width > max_width and len(current_line) > 1:
-            # Remove last word and add line
-            current_line.pop()
+    # First split by explicit newlines to respect user's line breaks
+    paragraphs = text.split('\n')
+
+    for paragraph in paragraphs:
+        if not paragraph.strip():
+            # Empty line - keep it as empty
+            lines.append('')
+            continue
+
+        words = paragraph.split()
+        current_line = []
+
+        for word in words:
+            current_line.append(word)
+            test_line = ' '.join(current_line)
+            line_width = get_text_width_with_emojis(test_line, font, emoji_font, draw, font_size)
+
+            if line_width > max_width and len(current_line) > 1:
+                # Remove last word and add line
+                current_line.pop()
+                lines.append(' '.join(current_line))
+                current_line = [word]
+
+        if current_line:
             lines.append(' '.join(current_line))
-            current_line = [word]
-
-    if current_line:
-        lines.append(' '.join(current_line))
 
     return lines
 
@@ -356,10 +382,14 @@ def render_emoji_scaled(
     Returns:
         RGBA Image with the emoji
     """
-    # Render at native size (160px)
-    temp = Image.new('RGBA', (EMOJI_NATIVE_SIZE * 2, EMOJI_NATIVE_SIZE * 2), (0, 0, 0, 0))
+    # Render at native size with padding to avoid cutoff
+    # Use 3x size canvas and draw in center to capture full emoji
+    canvas_size = EMOJI_NATIVE_SIZE * 3
+    temp = Image.new('RGBA', (canvas_size, canvas_size), (0, 0, 0, 0))
     temp_draw = ImageDraw.Draw(temp)
-    temp_draw.text((0, 0), emoji, font=emoji_font, embedded_color=True)
+    # Draw with offset to ensure emoji isn't cut off at edges
+    offset = EMOJI_NATIVE_SIZE // 2
+    temp_draw.text((offset, offset), emoji, font=emoji_font, embedded_color=True)
 
     # Get actual bounding box
     bbox = temp.getbbox()
@@ -427,8 +457,8 @@ def render_text_with_emojis(
         if is_emoji and emoji_font and target_image:
             # Render emoji as color image and composite
             emoji_img = render_emoji_scaled(segment, emoji_font, target_emoji_size)
-            # Center emoji vertically with text
-            emoji_y = y + (target_emoji_size - emoji_img.height) // 2
+            # Position emoji - ensure it doesn't go above y (stays within box)
+            emoji_y = y + max(0, (target_emoji_size - emoji_img.height) // 2)
             target_image.paste(emoji_img, (int(x), int(emoji_y)), emoji_img)
             x += emoji_img.width
         elif is_emoji and emoji_font:
@@ -606,7 +636,7 @@ def render_box_text(
     text_height = bbox[3] - bbox[1]
 
     # Account for emojis in width calculation
-    emoji_width = get_text_width_with_emojis(text, font, emoji_font, draw)
+    emoji_width = get_text_width_with_emojis(text, font, emoji_font, draw, font_size)
     if emoji_width > text_width:
         text_width = emoji_width
 
@@ -751,7 +781,9 @@ def render_multiline_box_text(
     box_color: str,
     box_padding_h: int,
     box_padding_v: int,
-    box_radius: int
+    box_radius: int,
+    line_gap: int = 0,
+    box_padding_top: int = 0
 ) -> Image.Image:
     """
     Render multiple lines of text using Remotion's rounded-text-box algorithm.
@@ -764,6 +796,7 @@ def render_multiline_box_text(
     Args:
         box_padding_h: Horizontal padding (left/right) - from Figma
         box_padding_v: Vertical padding (top/bottom) - from Figma
+        line_gap: Extra gap between lines (added to line height)
     """
     result = image.copy().convert('RGBA')
 
@@ -774,18 +807,20 @@ def render_multiline_box_text(
     bbox = temp_draw.textbbox((0, 0), "Hg", font=font)
     text_height = bbox[3] - bbox[1]
 
-    # Line height including padding
-    line_box_height = text_height + 2 * box_padding_v
+    # Line height including padding and gap
+    line_box_height = text_height + 2 * box_padding_v + line_gap
 
     # Measure each line
     line_measurements = []
     line_widths = []
-    for line in lines:
-        line_width = get_text_width_with_emojis(line, font, emoji_font, temp_draw)
+    for i, line in enumerate(lines):
+        line_width = get_text_width_with_emojis(line, font, emoji_font, temp_draw, font_size)
         line_widths.append(line_width)
+        # Add extra top padding to first line only
+        height = line_box_height + (box_padding_top if i == 0 else 0)
         line_measurements.append({
             'width': line_width,
-            'height': line_box_height
+            'height': height
         })
 
     # Get the Remotion rounded box path
@@ -833,19 +868,19 @@ def render_multiline_box_text(
 
     # Draw text on top of the box
     draw = ImageDraw.Draw(result)
-    max_line_width = max(line_widths)
 
     # Get font metrics for proper vertical centering
     # textbbox returns (left, top, right, bottom) relative to origin
     sample_bbox = temp_draw.textbbox((0, 0), "Hg", font=font)
     text_top_offset = sample_bbox[1]  # How far below origin the text starts
 
-    current_y = box_y + box_padding_v - text_top_offset  # Adjust for font metrics
+    # Start with extra top padding for first line
+    current_y = box_y + box_padding_v + box_padding_top - text_top_offset
 
     for i, line in enumerate(lines):
         line_width = line_widths[i]
-        # Center text horizontally based on max line width
-        text_x = box_x + box_padding_h + (max_line_width - line_width) // 2
+        # Center each line within the total box width
+        text_x = box_x + (box_width - line_width) // 2
         text_y = current_y
 
         render_text_with_emojis(
@@ -853,6 +888,7 @@ def render_multiline_box_text(
             text_rgb + (255,), target_image=result, target_emoji_size=font_size
         )
 
+        # Move to next line (first line had extra top padding already added)
         current_y += line_box_height
 
     return result.convert('RGB')
@@ -913,13 +949,13 @@ def render_text(
     zone_h = bounds['h']
 
     # Wrap text to fit zone (with emoji-aware width calculation)
-    max_text_width = zone_w - 40  # Padding
-    lines = wrap_text(text, font, max_text_width, emoji_font)
+    max_text_width = zone_w - 20  # Reduced padding for more text space
+    lines = wrap_text(text, font, max_text_width, emoji_font, font_size)
 
     # Calculate total text height
     temp_img = Image.new('RGB', (1, 1))
     temp_draw = ImageDraw.Draw(temp_img)
-    line_height = font_size * 1.3  # 1.3x line spacing
+    line_height = font_size * 1.1  # Tighter line spacing
     total_height = len(lines) * line_height
 
     # Calculate starting position (center in zone)
@@ -948,9 +984,11 @@ def render_text(
             image, lines, zone_x, zone_w, start_y, line_height,
             font, emoji_font, font_size, temp_draw,
             effect.text_color, effect.box_color,
-            effect.box_padding,      # Horizontal padding (40px from Figma)
-            effect.box_padding_v,    # Vertical padding (20px from Figma)
-            effect.box_radius
+            effect.box_padding,      # Horizontal padding (left/right)
+            effect.box_padding_v,    # Vertical padding (top/bottom inside box)
+            effect.box_radius,
+            getattr(effect, 'line_gap', 0),        # Gap between lines
+            getattr(effect, 'box_padding_top', 0)  # Extra top padding
         )
     else:
         # Render each line separately for shadow/outline styles
@@ -959,7 +997,7 @@ def render_text(
             y = int(start_y + i * line_height)
 
             # Center line horizontally (with emoji-aware width calculation)
-            line_width = get_text_width_with_emojis(line, font, emoji_font, temp_draw)
+            line_width = get_text_width_with_emojis(line, font, emoji_font, temp_draw, font_size)
             x = int(zone_x + (zone_w - line_width) // 2)
 
             if effect.type == 'shadow':
