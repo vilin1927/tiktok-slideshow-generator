@@ -302,7 +302,7 @@
             <div>
                 <!-- Step 1: Enter Links -->
                 <div x-show="batchStep === 1" class="bg-gray-800 rounded-xl p-6 shadow-xl">
-                    <h2 class="text-xl font-semibold text-white mb-4">Step 1: Enter TikTok Links</h2>
+                    <h2 class="text-xl font-semibold text-white mb-4">Batch Processing</h2>
 
                     <!-- Links Textarea -->
                     <div class="mb-4">
@@ -356,6 +356,72 @@ https://vm.tiktok.com/abc..."
                                 </li>
                             </template>
                         </ul>
+                    </div>
+
+                    <!-- Product Photo (used for all links) -->
+                    <div class="mb-4">
+                        <label class="block text-gray-300 text-sm font-medium mb-2">
+                            Product Photo <span class="text-gray-500 font-normal">(used for all links)</span>
+                        </label>
+                        <div
+                            @click="$refs.batchProductInput.click()"
+                            @dragover.prevent="batchDragOver = true"
+                            @dragleave.prevent="batchDragOver = false"
+                            @drop.prevent="batchDragOver = false; handleBatchProductDrop($event)"
+                            class="border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors"
+                            :class="batchDragOver ? 'border-purple-500 bg-purple-500/10' : 'border-gray-600 hover:border-gray-500'"
+                        >
+                            <input
+                                type="file"
+                                x-ref="batchProductInput"
+                                @change="handleBatchProductSelect($event)"
+                                accept="image/*"
+                                class="hidden"
+                            >
+                            <template x-if="!batchData.productPreview">
+                                <div class="text-gray-400">
+                                    <svg class="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                    </svg>
+                                    <p class="text-sm">Click to upload product photo</p>
+                                    <p class="text-xs text-gray-500 mt-1">Same product image will be used for all links</p>
+                                </div>
+                            </template>
+                            <template x-if="batchData.productPreview">
+                                <div class="relative">
+                                    <img :src="batchData.productPreview" class="max-h-32 mx-auto rounded-lg">
+                                    <button
+                                        @click.stop="clearBatchProduct()"
+                                        class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-600"
+                                    >
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- Product Description (used for all links) -->
+                    <div class="mb-4">
+                        <label class="block text-gray-300 text-sm font-medium mb-2">
+                            Product Description <span class="text-gray-500 font-normal">(used for all links)</span>
+                        </label>
+                        <textarea
+                            x-model="batchData.product_description"
+                            placeholder="Describe your product (e.g., 'Luxury skincare serum for anti-aging, reduces wrinkles in 2 weeks')"
+                            rows="3"
+                            class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                        ></textarea>
+                        <!-- Quick-fill button -->
+                        <button
+                            type="button"
+                            @click="batchData.product_description = sampleProduct.description"
+                            class="mt-2 px-3 py-1 text-xs bg-gray-600 hover:bg-gray-500 text-gray-300 rounded transition-colors"
+                        >
+                            Face Tape
+                        </button>
                     </div>
 
                     <!-- Variations Section (Photo × Text) - Same as single mode -->
@@ -466,140 +532,17 @@ https://vm.tiktok.com/abc..."
                         <p class="text-gray-500 text-xs mt-2" x-text="textPresets.find(p => p.id === batchData.preset_id)?.desc || ''"></p>
                     </div>
 
-                    <!-- Next Button -->
-                    <button
-                        @click="goToStep2()"
-                        :disabled="batchValidation.valid === 0"
-                        class="w-full py-4 px-6 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        Continue with <span x-text="batchValidation.valid"></span> Links
-                    </button>
-                </div>
-
-                <!-- Step 2: Product Mapping -->
-                <div x-show="batchStep === 2" class="bg-gray-800 rounded-xl p-6 shadow-xl">
-                    <div class="flex items-center justify-between mb-4">
-                        <h2 class="text-xl font-semibold text-white">Step 2: Add Products</h2>
-                        <button @click="batchStep = 1" class="text-purple-400 hover:text-purple-300 text-sm">
-                            &larr; Back to links
-                        </button>
-                    </div>
-
-                    <!-- Apply to All Toggle -->
-                    <div class="mb-4 p-3 bg-gray-700/50 rounded-lg flex items-center justify-between">
-                        <div>
-                            <p class="text-gray-300 font-medium">Same product for all links?</p>
-                            <p class="text-gray-500 text-sm">Use the same photo and description for every link</p>
-                        </div>
-                        <button
-                            @click="batchData.applyToAll = !batchData.applyToAll"
-                            :class="batchData.applyToAll ? 'bg-purple-600' : 'bg-gray-600'"
-                            class="relative w-12 h-6 rounded-full transition-colors"
+                    <!-- Output Folder Name -->
+                    <div class="mb-4">
+                        <label class="block text-gray-300 text-sm font-medium mb-2">
+                            Output Folder Name
+                        </label>
+                        <input
+                            type="text"
+                            x-model="batchData.folder_name"
+                            placeholder="my-batch-slideshow"
+                            class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
                         >
-                            <span
-                                :class="batchData.applyToAll ? 'translate-x-6' : 'translate-x-1'"
-                                class="absolute top-1 left-0 w-4 h-4 bg-white rounded-full transition-transform"
-                            ></span>
-                        </button>
-                    </div>
-
-                    <!-- Product Mapping Table -->
-                    <div class="space-y-4 mb-6 max-h-96 overflow-y-auto">
-                        <!-- If Apply to All -->
-                        <template x-if="batchData.applyToAll">
-                            <div class="p-4 bg-gray-700/50 rounded-lg">
-                                <p class="text-gray-300 font-medium mb-3">Product for all <span x-text="batchValidation.valid"></span> links:</p>
-                                <div class="grid grid-cols-2 gap-4">
-                                    <!-- Photo Upload -->
-                                    <div>
-                                        <label class="block text-gray-400 text-xs mb-1">Product Photo</label>
-                                        <div
-                                            class="border-2 border-dashed border-gray-600 rounded-lg p-4 text-center hover:border-purple-500 cursor-pointer"
-                                            @click="$refs.batchFileAll.click()"
-                                        >
-                                            <input
-                                                type="file"
-                                                x-ref="batchFileAll"
-                                                @change="handleBatchFileSelect($event, 0)"
-                                                accept="image/*"
-                                                class="hidden"
-                                            >
-                                            <template x-if="!batchData.products[0]?.preview">
-                                                <div class="text-gray-400 text-sm">
-                                                    <svg class="mx-auto h-8 w-8 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                                                    </svg>
-                                                    Click to upload
-                                                </div>
-                                            </template>
-                                            <template x-if="batchData.products[0]?.preview">
-                                                <img :src="batchData.products[0].preview" class="max-h-20 mx-auto rounded">
-                                            </template>
-                                        </div>
-                                    </div>
-                                    <!-- Description -->
-                                    <div>
-                                        <label class="block text-gray-400 text-xs mb-1">Description</label>
-                                        <textarea
-                                            x-model="batchData.products[0].description"
-                                            placeholder="Product description..."
-                                            rows="3"
-                                            class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm placeholder-gray-400 focus:outline-none focus:border-purple-500 resize-none"
-                                        ></textarea>
-                                    </div>
-                                </div>
-                            </div>
-                        </template>
-
-                        <!-- Individual Products -->
-                        <template x-if="!batchData.applyToAll">
-                            <div class="space-y-3">
-                                <template x-for="(link, index) in batchValidation.validLinks" :key="index">
-                                    <div class="p-4 bg-gray-700/50 rounded-lg">
-                                        <p class="text-gray-400 text-xs mb-2 truncate">
-                                            Link <span x-text="index + 1"></span>: <a :href="link.url" target="_blank" x-text="link.url" class="text-purple-400 hover:text-purple-300 hover:underline"></a>
-                                        </p>
-                                        <div class="grid grid-cols-2 gap-3">
-                                            <!-- Photo Upload -->
-                                            <div>
-                                                <div
-                                                    class="border-2 border-dashed border-gray-600 rounded-lg p-3 text-center hover:border-purple-500 cursor-pointer"
-                                                    @click="$refs['batchFile' + index][0].click()"
-                                                >
-                                                    <input
-                                                        type="file"
-                                                        :x-ref="'batchFile' + index"
-                                                        @change="handleBatchFileSelect($event, index)"
-                                                        accept="image/*"
-                                                        class="hidden"
-                                                    >
-                                                    <template x-if="!batchData.products[index]?.preview">
-                                                        <div class="text-gray-400 text-xs">
-                                                            <svg class="mx-auto h-6 w-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                                                            </svg>
-                                                            Photo
-                                                        </div>
-                                                    </template>
-                                                    <template x-if="batchData.products[index]?.preview">
-                                                        <img :src="batchData.products[index].preview" class="max-h-16 mx-auto rounded">
-                                                    </template>
-                                                </div>
-                                            </div>
-                                            <!-- Description -->
-                                            <div>
-                                                <textarea
-                                                    x-model="batchData.products[index].description"
-                                                    placeholder="Description..."
-                                                    rows="2"
-                                                    class="w-full px-2 py-1 bg-gray-700 border border-gray-600 rounded-lg text-white text-xs placeholder-gray-400 focus:outline-none focus:border-purple-500 resize-none"
-                                                ></textarea>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </template>
-                            </div>
-                        </template>
                     </div>
 
                     <!-- Video Generation Option -->
@@ -617,13 +560,13 @@ https://vm.tiktok.com/abc..."
                         </p>
                     </div>
 
-                    <!-- Submit Batch Button -->
+                    <!-- Submit Button -->
                     <button
                         @click="submitBatch()"
-                        :disabled="!canSubmitBatch()"
+                        :disabled="batchValidation.valid === 0 || !canSubmitBatch()"
                         class="w-full py-4 px-6 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        Start Batch Processing
+                        Start Batch Processing (<span x-text="batchValidation.valid"></span> Links)
                     </button>
                 </div>
 
@@ -1061,6 +1004,7 @@ INSPIRED BY JAPANESE SKIN CARE: Delivers a lifted, contoured look without silico
 
                 // Batch mode data
                 batchStep: 1,
+                batchDragOver: false,
                 batchData: {
                     linksText: '',
                     hook_photo_var: 1,
@@ -1069,9 +1013,11 @@ INSPIRED BY JAPANESE SKIN CARE: Delivers a lifted, contoured look without silico
                     body_text_var: 1,
                     product_text_var: 1,
                     preset_id: 'gemini',
-                    applyToAll: true,
                     generateVideo: false,
-                    products: [{ file: null, preview: null, description: '' }]
+                    folder_name: '',
+                    productFile: null,
+                    productPreview: null,
+                    product_description: ''
                 },
                 batchValidation: {
                     valid: 0,
@@ -1358,34 +1304,38 @@ INSPIRED BY JAPANESE SKIN CARE: Delivers a lifted, contoured look without silico
                     };
                 },
 
-                goToStep2() {
-                    // Initialize products array
-                    const count = this.batchValidation.valid;
-                    this.batchData.products = [];
-                    for (let i = 0; i < count; i++) {
-                        this.batchData.products.push({ file: null, preview: null, description: '' });
-                    }
-                    this.batchStep = 2;
-                },
-
-                handleBatchFileSelect(event, index) {
+                handleBatchProductSelect(event) {
                     const file = event.target.files[0];
                     if (file && file.type.startsWith('image/')) {
-                        this.batchData.products[index].file = file;
+                        this.batchData.productFile = file;
                         const reader = new FileReader();
                         reader.onload = (e) => {
-                            this.batchData.products[index].preview = e.target.result;
+                            this.batchData.productPreview = e.target.result;
                         };
                         reader.readAsDataURL(file);
                     }
                 },
 
-                canSubmitBatch() {
-                    if (this.batchData.applyToAll) {
-                        return this.batchData.products[0]?.file && this.batchData.products[0]?.description;
+                handleBatchProductDrop(event) {
+                    const file = event.dataTransfer.files[0];
+                    if (file && file.type.startsWith('image/')) {
+                        this.batchData.productFile = file;
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            this.batchData.productPreview = e.target.result;
+                        };
+                        reader.readAsDataURL(file);
                     }
-                    // Check all products have file and description
-                    return this.batchData.products.every(p => p.file && p.description);
+                },
+
+                clearBatchProduct() {
+                    this.batchData.productFile = null;
+                    this.batchData.productPreview = null;
+                },
+
+                canSubmitBatch() {
+                    // Check for product file and description (used for all links)
+                    return this.batchData.productFile && this.batchData.product_description;
                 },
 
                 async submitBatch() {
@@ -1408,20 +1358,16 @@ INSPIRED BY JAPANESE SKIN CARE: Delivers a lifted, contoured look without silico
                     // Add text preset
                     formData.append('preset_id', this.batchData.preset_id);
 
-                    // Add products
-                    if (this.batchData.applyToAll) {
-                        // Same product for all
-                        for (let i = 0; i < this.batchValidation.valid; i++) {
-                            formData.append(`product_photo_${i}`, this.batchData.products[0].file);
-                            formData.append(`product_description_${i}`, this.batchData.products[0].description);
-                        }
-                    } else {
-                        // Individual products
-                        this.batchData.products.forEach((product, i) => {
-                            formData.append(`product_photo_${i}`, product.file);
-                            formData.append(`product_description_${i}`, product.description);
-                        });
+                    // Add folder name
+                    if (this.batchData.folder_name) {
+                        formData.append('folder_name', this.batchData.folder_name);
                     }
+
+                    // Add single product photo and description (used for all links)
+                    if (this.batchData.productFile) {
+                        formData.append('product_photo', this.batchData.productFile);
+                    }
+                    formData.append('product_description', this.batchData.product_description);
 
                     try {
                         const response = await fetch(`${API_BASE_URL}/api/batch`, {
