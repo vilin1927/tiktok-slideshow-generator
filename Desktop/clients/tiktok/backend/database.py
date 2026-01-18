@@ -831,5 +831,65 @@ def get_video_jobs_count(status: str = None) -> int:
         return cursor.fetchone()['count']
 
 
+# ============ Celery Task ID Operations ============
+
+def get_job_task_ids(job_id: str) -> List[str]:
+    """Get Celery task ID for a job."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute('SELECT celery_task_id FROM jobs WHERE id = ?', (job_id,))
+        row = cursor.fetchone()
+        return [row['celery_task_id']] if row and row['celery_task_id'] else []
+
+
+def get_batch_task_ids(batch_id: str) -> List[str]:
+    """Get all Celery task IDs for a batch (links + variations)."""
+    task_ids = []
+    with get_db() as conn:
+        cursor = conn.cursor()
+        # Get batch links tasks
+        cursor.execute('SELECT celery_task_id FROM batch_links WHERE batch_id = ?', (batch_id,))
+        for row in cursor.fetchall():
+            if row['celery_task_id']:
+                task_ids.append(row['celery_task_id'])
+        # Get variations tasks
+        cursor.execute('''
+            SELECT bv.celery_task_id FROM batch_variations bv
+            JOIN batch_links bl ON bv.batch_link_id = bl.id
+            WHERE bl.batch_id = ?
+        ''', (batch_id,))
+        for row in cursor.fetchall():
+            if row['celery_task_id']:
+                task_ids.append(row['celery_task_id'])
+    return task_ids
+
+
+def delete_batch_cascade(batch_id: str) -> Dict[str, int]:
+    """Delete a batch and all related data. Returns counts of deleted items."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+
+        # Delete variations first
+        cursor.execute('''
+            DELETE FROM batch_variations
+            WHERE batch_link_id IN (SELECT id FROM batch_links WHERE batch_id = ?)
+        ''', (batch_id,))
+        variations_deleted = cursor.rowcount
+
+        # Delete links
+        cursor.execute('DELETE FROM batch_links WHERE batch_id = ?', (batch_id,))
+        links_deleted = cursor.rowcount
+
+        # Delete batch
+        cursor.execute('DELETE FROM batches WHERE id = ?', (batch_id,))
+        batch_deleted = cursor.rowcount > 0
+
+        return {
+            'batch_deleted': batch_deleted,
+            'links_deleted': links_deleted,
+            'variations_deleted': variations_deleted
+        }
+
+
 # Initialize database on import
 init_db()

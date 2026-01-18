@@ -524,3 +524,45 @@ def list_batches():
     except Exception as e:
         logger.error(f"Failed to list batches: {e}", exc_info=True)
         return jsonify({'error': f'Server error: {e}'}), 500
+
+
+@batch_bp.route('/<batch_id>', methods=['DELETE'])
+def delete_batch_endpoint(batch_id: str):
+    """
+    Delete a batch and all related data, revoking Celery tasks.
+
+    Performs cascade delete: variations → links → batch
+    Also revokes any running Celery tasks.
+    """
+    try:
+        from database import get_batch_task_ids, delete_batch_cascade
+        from celery_utils import revoke_tasks
+
+        batch = get_batch(batch_id)
+        if not batch:
+            return jsonify({'error': 'Batch not found'}), 404
+
+        # Get all task IDs before deleting
+        task_ids = get_batch_task_ids(batch_id)
+
+        # Cascade delete from database
+        deleted = delete_batch_cascade(batch_id)
+
+        if deleted['batch_deleted']:
+            # Revoke Celery tasks
+            revoked = revoke_tasks(task_ids)
+            logger.info(f"Deleted batch {batch_id[:8]}: {deleted['links_deleted']} links, {deleted['variations_deleted']} variations, revoked {revoked} tasks")
+
+            return jsonify({
+                'status': 'deleted',
+                'batch_id': batch_id,
+                'links_deleted': deleted['links_deleted'],
+                'variations_deleted': deleted['variations_deleted'],
+                'tasks_revoked': revoked
+            })
+
+        return jsonify({'error': 'Batch not found'}), 404
+
+    except Exception as e:
+        logger.error(f"Failed to delete batch: {e}", exc_info=True)
+        return jsonify({'error': f'Server error: {e}'}), 500

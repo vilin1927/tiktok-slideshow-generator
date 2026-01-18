@@ -478,12 +478,20 @@ def get_job_details(job_id):
 
 @app.route('/api/jobs/<job_id>', methods=['DELETE'])
 def delete_job_endpoint(job_id):
-    """Delete a job from the queue"""
+    """Delete a job from the queue and revoke its Celery tasks"""
     try:
-        from database import delete_job
+        from database import delete_job, get_job_task_ids
+        from celery_utils import revoke_tasks
+
+        # Get task IDs before deleting from database
+        task_ids = get_job_task_ids(job_id)
+
+        # Delete from database
         if delete_job(job_id):
-            logger.info(f"Deleted job {job_id}")
-            return jsonify({'status': 'deleted', 'job_id': job_id})
+            # Revoke Celery tasks
+            revoked = revoke_tasks(task_ids)
+            logger.info(f"Deleted job {job_id}, revoked {revoked} Celery tasks")
+            return jsonify({'status': 'deleted', 'job_id': job_id, 'tasks_revoked': revoked})
         return jsonify({'error': 'Job not found'}), 404
     except Exception as e:
         logger.error(f"Failed to delete job {job_id}: {e}")
