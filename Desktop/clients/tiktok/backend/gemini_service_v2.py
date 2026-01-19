@@ -227,10 +227,25 @@ def _inject_missing_keywords(analysis: dict) -> dict:
     location = keywords.get('purchase_location', '') or 'amazon'  # Default to amazon
 
     def process_text(text: str) -> str:
-        """Process a single text: inject keywords and remove redundancy."""
+        """Process a single text: inject keywords, clean up, and remove redundancy."""
         if not text:
             return text
         original_text = text
+
+        # Clean up common Gemini output issues
+        # Remove "Header:" prefix if present (Gemini sometimes adds this)
+        if text.lower().startswith('header:'):
+            text = text[7:].lstrip()  # Remove "Header:" and any leading whitespace
+
+        # Remove "grab" and replace with natural alternatives
+        text = re.sub(r'\bgrab\s+(them|yours|it)\s+(on|from)\s+', 'get yours on ', text, flags=re.IGNORECASE)
+        text = re.sub(r'\bgrab\s+(on|from)\s+', 'find them on ', text, flags=re.IGNORECASE)
+
+        # Fix "(amazon)" at end to be more natural
+        if text.rstrip().endswith('(amazon)'):
+            text = text.rstrip()[:-8].rstrip() + ' i got mine from amazon!'
+        elif text.rstrip().endswith('(amazon find)'):
+            text = text.rstrip()[:-13].rstrip() + ' i got mine from amazon!'
 
         # Check and inject brand
         if brand and brand.lower() not in text.lower():
@@ -639,10 +654,24 @@ They should flow naturally in conversational text, not feel forced.
   - NEVER end sentences with "."
   - Use "!" only if it fits the vibe, otherwise no punctuation
   - Emojis are encouraged ✨⚡💫
+  - NEVER start text with "Header:" or any prefix/label
+  - NEVER use the word "grab" (e.g., NOT "grab them on amazon")
+  - NEVER end with just "(amazon)" in parentheses - sounds unnatural
+
+- MANDATORY CTA FORMAT for product slides:
+  The text MUST end with a natural sentence mentioning where to buy, like:
+  - "i got mine from amazon!"
+  - "found mine on amazon"
+  - "amazon has them"
+
+  Do NOT use:
+  - Just "(amazon)" at the end
+  - "grab yours on amazon"
+  - "[amazon]" or "{amazon}"
 
 - Example with keywords naturally included:
   "total game changer for my sleep! I keep Lumidew masks on my nightstand,
-  they warm up on their own and feel like a cozy spa moment ✨ got them on amazon"
+  they warm up on their own and feel like a cozy spa moment ✨ i got mine from amazon!"
 
 ⚠️ IMPORTANT: Use the ACTUAL brand name, NOT brackets or placeholders like "[brand]"!
 
@@ -677,10 +706,10 @@ Body variations:
   2. "cold room = better sleep! I keep mine at 65°F"
   3. "the secret? a freezing cold bedroom ❄️"
 
-Product variations (must ALL include brand name and purchase location!):
-  1. "obsessed with my lumidew steam mask! got it on amazon ✨"
-  2. "this lumidew mask is a game changer, amazon has them"
-  3. "lumidew steam masks before bed = best sleep! (amazon)"
+Product variations (must ALL include brand name and end with natural CTA!):
+  1. "obsessed with my lumidew steam mask! i got mine from amazon ✨"
+  2. "this lumidew mask is a game changer, found mine on amazon!"
+  3. "lumidew steam masks before bed = best sleep! amazon has them"
 
 OUTPUT: Use "text_variations" array instead of single "text_content":
 {{
@@ -908,6 +937,35 @@ Focus on creating a beautiful, clean visual composition WITHOUT any text."""
     elif text_style:
         font_style = text_style.get('font_style', 'modern-clean')
         style_description = _get_style_description(font_style)
+        background_box = text_style.get('background_box', 'none')
+
+        # Build enhanced box instructions if box/pill style detected
+        if background_box and ('box' in background_box.lower() or 'pill' in background_box.lower()):
+            box_instruction = """
+BOX STYLE SPECIFICATIONS (MATCH EXACTLY):
+
+VISUAL REFERENCE: Think Instagram/TikTok caption bubbles - clean, rounded, tight fit around text.
+
+CORE RULES:
+- Background: Pure white (#FFFFFF) rounded rectangle that ENVELOPS the text
+- Corner radius: Soft rounded corners (~10-15% of box height) - pill/capsule shape
+- Padding: ~15-20px around text on all sides - box hugs the text, not oversized
+- Text color: Pure black (#000000) on the white background
+- Box width: ONLY as wide as the text line needs + padding (NOT full image width!)
+
+LINE-SPECIFIC LAYOUT:
+- For 1 line: Single white pill/capsule shape tightly around the text, centered
+- For 2 lines: Each line gets its OWN separate box/pill, stacked vertically with ~8-10px gap
+- For 3+ lines: Same as 2 lines - each line gets its own box, creates "stack of pills" effect
+
+AVOID:
+- One giant box containing all lines
+- Boxes that extend to image edges
+- Oversized boxes with too much padding
+- Boxes that overlap each other
+"""
+        else:
+            box_instruction = f"- Background: {background_box}"
 
         text_style_instruction = f"""TEXT STYLE REQUIREMENTS (MATCH EXACTLY):
 
@@ -921,7 +979,7 @@ TYPOGRAPHY APPEARANCE:
 TEXT EFFECTS:
 - Shadow: {text_style.get('shadow', 'none')}
 - Outline: {text_style.get('outline', 'none')}
-- Background: {text_style.get('background_box', 'none')}
+{box_instruction}
 
 OVERALL VIBE: {text_style.get('visual_vibe', 'clean minimal')}
 Position: {text_style.get('position_style', 'varies by slide')}
@@ -1141,24 +1199,38 @@ CRITICAL TEXT PLACEMENT RULES:
 
 IMPORTANT: Do NOT include any human faces, hands, body parts, or people in this image.
 
-GENERATE A LIFESTYLE/AESTHETIC SCENE - NOT a product photo!
-Think "cozy TikTok aesthetic" not "Amazon product listing":
+GENERATE AN AUTHENTIC LIFESTYLE SCENE - NOT a stock photo!
+Think "real person's messy-but-aesthetic life" not "studio product shot":
 
-GOOD examples (lifestyle scenes):
-- Cozy bedroom with fairy lights, books, candles
-- Kitchen counter with cooking ingredients, steam from cup
-- Bathroom shelf with aesthetic items, soft towels
-- Desk setup with journal, coffee, plants
-- Cozy reading nook with blanket and book
+STYLE: Candid, lifestyle photography with natural imperfections
+- Real rooms with lived-in details (not perfectly staged)
+- Natural window lighting with soft shadows (NOT studio lights)
+- Slightly messy/casual vibes (a book left open, wrinkled sheets)
+- Warm, inviting atmosphere
 
-BAD examples (DO NOT generate these):
-- Close-up of a product bottle on plain surface
-- Generic skincare products on marble
-- Stock-photo style product arrangements
-- Plain white background product shots
+GOOD examples (authentic lifestyle scenes):
+- Unmade bed with morning sunlight, coffee on nightstand, curtains blowing
+- Kitchen counter with half-eaten breakfast, morning light, real dishes
+- Bathroom vanity with various products scattered naturally, towel draped
+- Cozy corner with blanket, book spine-down, warm lamp light
+- Desk with actual work clutter, plant, warm afternoon light through window
 
-The image should feel like a "day in my life" moment, NOT a product advertisement.
-If you generate a stock-photo-style product shot, it will be REJECTED.
+BAD examples (DO NOT generate - too fake/stock):
+- Close-up of a product on white/marble surface
+- Perfectly arranged "flat lay" product shots
+- Studio-lit product photography with no context
+- Generic stock photo aesthetics (too clean, too posed)
+- Bright uniform lighting with no shadows
+- Marble countertop with perfectly placed items
+
+AUTHENTICITY REQUIREMENTS:
+- Include subtle imperfections (soft focus areas, natural shadows)
+- Show real living spaces (not showroom-perfect)
+- Lighting should be natural/ambient (NOT studio lighting)
+- Context matters: products should be IN a scene, not the scene itself
+
+The image should feel like you peeked into someone's real life.
+If it looks like a stock photo or Amazon listing, it will be REJECTED.
 {quality_constraints}"""
 
             contents = [

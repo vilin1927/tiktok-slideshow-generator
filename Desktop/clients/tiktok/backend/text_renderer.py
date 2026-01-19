@@ -837,7 +837,7 @@ def render_multiline_box_text(
         box_height = box_data['height']
         box_x = zone_x + (zone_w - box_width) // 2
         # Ensure minimum left margin to prevent cutoff
-        min_left_margin = 15
+        min_left_margin = 30  # Increased from 15 to prevent text cutoff
         box_x = max(box_x, min_left_margin)
         box_y = start_y
 
@@ -861,7 +861,7 @@ def render_multiline_box_text(
         box_height = len(lines) * line_box_height
         box_x = zone_x + (zone_w - box_width) // 2
         # Ensure minimum left margin to prevent cutoff
-        min_left_margin = 15
+        min_left_margin = 30  # Increased from 15 to prevent text cutoff
         box_x = max(box_x, min_left_margin)
         box_y = start_y
 
@@ -1006,7 +1006,7 @@ def render_text(
             line_width = get_text_width_with_emojis(line, font, emoji_font, temp_draw, font_size)
             x = int(zone_x + (zone_w - line_width) // 2)
             # Ensure minimum left margin to prevent text/shadow cutoff
-            min_left_margin = 15
+            min_left_margin = 30  # Increased from 15 to prevent text cutoff
             x = max(x, min_left_margin)
 
             if effect.type == 'shadow':
