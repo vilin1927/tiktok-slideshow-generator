@@ -155,6 +155,24 @@ def extract_audio_url(tiktok_url: str) -> str:
     raise TikTokScraperError('Could not extract audio URL')
 
 
+def _validate_audio(file_path: str) -> bool:
+    """
+    Validate that a file is a valid audio file (basic size check).
+
+    Args:
+        file_path: Path to the audio file
+
+    Returns:
+        True if valid audio, False otherwise
+    """
+    try:
+        size = os.path.getsize(file_path)
+        # Audio files should be at least 10KB
+        return size > 10000
+    except Exception:
+        return False
+
+
 def download_media(url: str, save_path: str, use_proxy: bool = True, request_id: str = None) -> str:
     """
     Download media file (image or audio) from URL
@@ -171,9 +189,12 @@ def download_media(url: str, save_path: str, use_proxy: bool = True, request_id:
     log = get_request_logger('scraper', request_id) if request_id else logger
     filename = os.path.basename(save_path)
 
+    # Determine if this is an audio file (don't validate as image)
+    is_audio = filename.endswith(('.mp3', '.m4a', '.wav', '.aac'))
+
     headers = {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
+        'Accept': 'audio/mpeg,audio/*,*/*;q=0.8' if is_audio else 'image/webp,image/apng,image/*,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.9',
         'Referer': 'https://www.tiktok.com/',
     }
@@ -181,30 +202,39 @@ def download_media(url: str, save_path: str, use_proxy: bool = True, request_id:
     # Create directory if it doesn't exist
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
 
-    # Try direct download first (increased timeout for large images)
+    # Try direct download first (increased timeout for audio)
     try:
         log.debug(f"Direct download: {filename}")
-        response = requests.get(url, headers=headers, stream=True, timeout=15)
+        response = requests.get(url, headers=headers, stream=True, timeout=30 if is_audio else 15)
         response.raise_for_status()
         with open(save_path, 'wb') as f:
             for chunk in response.iter_content(chunk_size=8192):
                 f.write(chunk)
-        # Validate the downloaded image is complete
-        if _validate_image(save_path):
-            log.debug(f"Direct download success: {filename}")
-            return save_path
+        # Validate based on file type
+        if is_audio:
+            if _validate_audio(save_path):
+                log.debug(f"Direct download success (audio): {filename}")
+                return save_path
+            else:
+                log.debug(f"Direct download audio too small: {filename}")
+                os.remove(save_path)
+                raise requests.exceptions.RequestException("Audio validation failed")
         else:
-            log.debug(f"Direct download incomplete/corrupt: {filename}")
-            os.remove(save_path)  # Remove partial file
-            raise requests.exceptions.RequestException("Image validation failed")
-    except requests.exceptions.RequestException:
+            if _validate_image(save_path):
+                log.debug(f"Direct download success: {filename}")
+                return save_path
+            else:
+                log.debug(f"Direct download incomplete/corrupt: {filename}")
+                os.remove(save_path)
+                raise requests.exceptions.RequestException("Image validation failed")
+    except requests.exceptions.RequestException as e:
         # Clean up partial file if exists
         if os.path.exists(save_path):
             os.remove(save_path)
         if not use_proxy:
             log.warning(f"Direct download failed, proxy disabled: {filename}")
             raise TikTokScraperError(f'Download failed and proxy disabled')
-        log.debug(f"Direct download blocked, trying proxies: {filename}")
+        log.debug(f"Direct download failed ({str(e)[:50]}), trying proxies: {filename}")
 
     # Try multiple proxies (some fail for certain URLs)
     proxy_urls = [
@@ -216,17 +246,25 @@ def download_media(url: str, save_path: str, use_proxy: bool = True, request_id:
     for i, proxy_url in enumerate(proxy_urls):
         try:
             log.debug(f"Trying proxy {i+1}/3 for: {filename}")
-            response = requests.get(proxy_url, headers={'User-Agent': headers['User-Agent']}, timeout=20)
+            response = requests.get(proxy_url, headers={'User-Agent': headers['User-Agent']}, timeout=30 if is_audio else 20)
             if response.status_code == 200 and len(response.content) > 1000:
                 with open(save_path, 'wb') as f:
                     f.write(response.content)
-                # Validate the downloaded image is complete
-                if _validate_image(save_path):
-                    log.debug(f"Proxy {i+1} success: {filename}")
-                    return save_path
+                # Validate based on file type
+                if is_audio:
+                    if _validate_audio(save_path):
+                        log.debug(f"Proxy {i+1} success (audio): {filename}")
+                        return save_path
+                    else:
+                        log.debug(f"Proxy {i+1} returned small audio: {filename}")
+                        os.remove(save_path)
                 else:
-                    log.debug(f"Proxy {i+1} returned incomplete image: {filename}")
-                    os.remove(save_path)  # Remove invalid file, try next proxy
+                    if _validate_image(save_path):
+                        log.debug(f"Proxy {i+1} success: {filename}")
+                        return save_path
+                    else:
+                        log.debug(f"Proxy {i+1} returned incomplete image: {filename}")
+                        os.remove(save_path)
         except requests.exceptions.RequestException:
             # Clean up partial file if exists
             if os.path.exists(save_path):
