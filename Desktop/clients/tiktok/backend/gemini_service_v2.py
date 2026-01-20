@@ -795,7 +795,7 @@ They should flow naturally in conversational text, not feel forced.
   Do NOT use:
   - Just "(amazon)" at the end
   - "grab yours on amazon"
-  - "[amazon]" or "{amazon}"
+  - "[amazon]" or "{{amazon}}"
 
 - Example with keywords naturally included:
   "total game changer for my sleep! I keep Lumidew masks on my nightstand,
