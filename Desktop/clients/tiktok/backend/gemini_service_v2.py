@@ -850,6 +850,16 @@ Make sure each body slide shows a DIFFERENT type of scene:
 - NOT all applying products
 - Mix indoor/outdoor, morning/night, active/relaxed moments
 
+SCENE DESCRIPTION RULES (CRITICAL):
+- ALWAYS describe scenes as STANDARD SINGLE IMAGES (one photo filling the frame)
+- NEVER describe comparison layouts, split screens, side-by-side, or grids
+- NEVER use words like "split screen", "left side vs right side", "comparison grid"
+- Even if the original TikTok has a comparison/grid layout, describe a STANDARD lifestyle scene instead
+- Each scene = ONE cohesive image (bedroom, bathroom, desk, etc.) NOT a collage or comparison
+
+GOOD scene description: "Cozy bedroom with morning sunlight, silk pillowcase on bed, coffee on nightstand"
+BAD scene description: "Split screen comparison: Left side tired skin, Right side glowing skin" (NEVER DO THIS)
+
 ═══════════════════════════════════════════════════════════════
 OUTPUT FORMAT
 ═══════════════════════════════════════════════════════════════
