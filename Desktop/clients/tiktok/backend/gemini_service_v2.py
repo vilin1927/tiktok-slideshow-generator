@@ -37,7 +37,7 @@ GROUNDING_MODEL = 'gemini-2.0-flash'  # Fast model for grounding searches
 # Rate limiting config - Optimized for throughput while respecting API limits
 # These can be overridden via environment variables for tuning
 MAX_CONCURRENT = int(os.getenv('GEMINI_MAX_CONCURRENT', '3'))  # Parallel requests (3 = good balance)
-RPM_LIMIT = int(os.getenv('GEMINI_RPM_LIMIT', '30'))           # 30 requests per minute (safe for paid tier)
+RPM_LIMIT = int(os.getenv('GEMINI_RPM_LIMIT', '15'))           # 15 requests per minute (safe under 20 RPM image limit)
 RATE_WINDOW = 60.0    # Exactly 60 seconds per window
 MAX_RETRIES = 5       # More retries for rate limit recovery
 REQUEST_TIMEOUT = 120 # 120 sec timeout per API call
