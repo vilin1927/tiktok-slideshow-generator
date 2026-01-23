@@ -24,7 +24,7 @@ from google_drive import (
     create_folder, upload_file, upload_files_parallel, set_folder_public, get_folder_link,
     GoogleDriveError
 )
-from video_generator import create_video, VideoGeneratorError
+from video_generator import create_video, create_videos_for_variations, VideoGeneratorError
 
 from logging_config import get_logger
 
@@ -228,75 +228,29 @@ def process_link(self, batch_link_id: str, parent_drive_folder_id: str):
             )
             logger.info(f"[Link {batch_link_id[:8]}] Uploaded {uploaded_count} images to Drive")
 
-            # Step 5: Generate video if requested
+            # Step 5: Generate videos for each variation (same as single run)
             video_created = False
             if generate_video and generated_images:
                 try:
-                    # Get audio from scrape result
                     audio_path = scrape_result.get('audio')
                     if audio_path and os.path.exists(audio_path):
-                        logger.info(f"[Link {batch_link_id[:8]}] Creating video with {len(generated_images)} images")
-
-                        # Sort images: hook → body slides (except last) → product → last body
-                        def sort_slides_for_batch_video(images):
-                            hooks = []
-                            bodies = {}  # {num: path}
-                            products = []
-                            others = []
-
-                            for img_path in images:
-                                filename = os.path.basename(img_path).lower()
-                                if filename.startswith('hook'):
-                                    hooks.append(img_path)
-                                elif filename.startswith('body'):
-                                    match = re.search(r'body_(\d+)', filename)
-                                    num = int(match.group(1)) if match else 0
-                                    bodies[num] = img_path
-                                elif filename.startswith('product'):
-                                    products.append(img_path)
-                                else:
-                                    others.append(img_path)
-
-                            result = []
-                            result.extend(sorted(hooks))  # Hooks first
-
-                            if bodies:
-                                sorted_body_nums = sorted(bodies.keys())
-                                if len(sorted_body_nums) > 1:
-                                    # Add all body slides except the last
-                                    for num in sorted_body_nums[:-1]:
-                                        result.append(bodies[num])
-                                    # Add products before last body
-                                    result.extend(sorted(products))
-                                    # Add last body slide
-                                    result.append(bodies[sorted_body_nums[-1]])
-                                else:
-                                    # Only one body slide - product goes after it
-                                    result.append(bodies[sorted_body_nums[0]])
-                                    result.extend(sorted(products))
-                            else:
-                                result.extend(sorted(products))
-
-                            result.extend(sorted(others))
-                            return result
-
-                        sorted_images = sort_slides_for_batch_video(generated_images)
-
-                        # Create video output path
-                        video_output_path = os.path.join(output_dir, f'slideshow_link_{link_index + 1}.mp4')
-
-                        create_video(
-                            image_paths=sorted_images,
+                        logger.info(f"[Link {batch_link_id[:8]}] Creating variation videos with {len(generated_images)} images")
+                        
+                        # Use same video generation as single run - creates one video per variation set
+                        video_paths = create_videos_for_variations(
+                            generated_images=generated_images,
                             audio_path=audio_path,
-                            output_path=video_output_path,
+                            output_dir=output_dir,
                             request_id=batch_link_id[:8]
                         )
-
-                        # Upload video to Drive
-                        if os.path.exists(video_output_path):
-                            upload_file(video_output_path, link_folder_id)
-                            video_created = True
-                            logger.info(f"[Link {batch_link_id[:8]}] Video uploaded to Drive")
+                        
+                        # Upload all videos to Drive
+                        for video_path in video_paths:
+                            if os.path.exists(video_path):
+                                upload_file(video_path, link_folder_id)
+                        
+                        video_created = len(video_paths) > 0
+                        logger.info(f"[Link {batch_link_id[:8]}] Created and uploaded {len(video_paths)} videos to Drive")
                     else:
                         logger.warning(f"[Link {batch_link_id[:8]}] No audio found for video generation")
                 except VideoGeneratorError as e:
