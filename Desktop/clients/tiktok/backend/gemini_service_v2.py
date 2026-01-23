@@ -1338,6 +1338,12 @@ CRITICAL TEXT PLACEMENT RULES:
 - If unsure, place text at TOP or BOTTOM edges of image
 - Main subject/object must be completely unobstructed
 
+LAYOUT RULES:
+- Generate ONE SINGLE product image - no comparisons
+- NO star ratings, review scores, or rating graphics
+- NO side-by-side comparisons or split screens
+- NO grids or collages
+
 GOAL: Look like "just another tip" - NOT an advertisement.
 {quality_constraints}"""
 
@@ -1515,6 +1521,15 @@ CRITICAL TEXT PLACEMENT RULES:
 - Main subject must be completely unobstructed
 
 IMPORTANT: Do NOT include any human faces, hands, body parts, or people in this image.
+
+CRITICAL LAYOUT REQUIREMENT:
+Even though the text may compare two things, generate a SINGLE lifestyle photo.
+- NO star ratings, review scores, or rating graphics
+- NO side-by-side comparisons or split screens
+- NO grids, collages, or multi-panel layouts
+- NO before/after visual comparisons
+- Just ONE beautiful lifestyle scene with the text overlaid
+- If text says "X is bad, Y is good" - show ONLY the good option in a natural setting
 
 GENERATE AN AUTHENTIC LIFESTYLE SCENE - NOT a stock photo!
 Think "real person's messy-but-aesthetic life" not "studio product shot":
