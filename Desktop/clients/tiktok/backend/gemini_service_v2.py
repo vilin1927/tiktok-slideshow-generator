@@ -170,53 +170,60 @@ Just the product names, nothing else."""
         return ""
 
 
-def _get_scene_with_real_products(
-    scene_description: str,
-    product_category: str,
-    product_description: str
-) -> str:
+def _get_scene_with_real_products(scene_description: str) -> str:
     """
-    Enhance scene description with real products from Google Search.
+    Enhance scene description with real products based on SCENE CONTEXT.
+
+    IMPORTANT: Category is determined from the scene description itself,
+    NOT from the user's product. This ensures each slide gets contextually
+    appropriate products (e.g., water scene gets water bottles, not skincare).
 
     Args:
         scene_description: Original scene description from analysis
-        product_category: Category like "skincare", "sleep aids", "wellness"
-        product_description: User's product description (to determine category)
 
     Returns:
-        Enhanced scene description with real product names
+        Enhanced scene description with contextually relevant real product names
     """
-    # Detect category from scene and product description
     scene_lower = scene_description.lower()
-    prod_lower = product_description.lower()
 
-    # Determine scene type from description
+    # Determine scene type (location) from description
     if any(word in scene_lower for word in ['bathroom', 'vanity', 'sink', 'mirror']):
         scene_type = "bathroom vanity"
-    elif any(word in scene_lower for word in ['bed', 'bedroom', 'nightstand', 'pillow']):
+    elif any(word in scene_lower for word in ['bed', 'bedroom', 'nightstand', 'pillow', 'sleep']):
         scene_type = "bedroom nightstand"
-    elif any(word in scene_lower for word in ['kitchen', 'counter', 'morning']):
-        scene_type = "morning routine"
-    elif any(word in scene_lower for word in ['desk', 'office', 'work']):
+    elif any(word in scene_lower for word in ['kitchen', 'counter', 'breakfast']):
+        scene_type = "kitchen counter"
+    elif any(word in scene_lower for word in ['desk', 'office', 'work', 'computer']):
         scene_type = "desk setup"
+    elif any(word in scene_lower for word in ['yoga', 'exercise', 'workout', 'gym']):
+        scene_type = "fitness space"
     else:
         scene_type = "lifestyle"
 
-    # Determine product category
-    if any(word in prod_lower for word in ['skin', 'face', 'serum', 'cream', 'cleanser', 'moistur']):
-        category = "skincare"
-    elif any(word in prod_lower for word in ['sleep', 'eye mask', 'pillow', 'night', 'rest']):
+    # Determine product category FROM THE SCENE CONTENT (not user's product!)
+    # This is the key fix - each scene gets products relevant to ITS context
+    if any(word in scene_lower for word in ['water', 'hydrat', 'drink', 'tea', 'coffee', 'cup', 'mug', 'bottle']):
+        category = "hydration and beverages"
+    elif any(word in scene_lower for word in ['sleep', 'eye mask', 'pillow', 'night', 'rest', 'relax', 'calm']):
         category = "sleep and relaxation"
-    elif any(word in prod_lower for word in ['hair', 'shampoo', 'conditioner']):
+    elif any(word in scene_lower for word in ['skin', 'face', 'serum', 'cream', 'cleanser', 'moistur', 'routine']):
+        category = "skincare"
+    elif any(word in scene_lower for word in ['hair', 'shampoo', 'conditioner', 'brush']):
         category = "haircare"
-    elif any(word in prod_lower for word in ['makeup', 'lipstick', 'mascara', 'foundation']):
+    elif any(word in scene_lower for word in ['makeup', 'lipstick', 'mascara', 'foundation', 'beauty']):
         category = "makeup and beauty"
-    elif any(word in prod_lower for word in ['supplement', 'vitamin', 'wellness']):
+    elif any(word in scene_lower for word in ['supplement', 'vitamin', 'wellness', 'health']):
         category = "wellness supplements"
+    elif any(word in scene_lower for word in ['yoga', 'exercise', 'workout', 'fitness', 'stretch']):
+        category = "fitness and wellness"
+    elif any(word in scene_lower for word in ['journal', 'write', 'note', 'plan', 'morning routine']):
+        category = "journaling and planning"
+    elif any(word in scene_lower for word in ['read', 'book', 'cozy', 'blanket']):
+        category = "cozy lifestyle"
     else:
-        category = "beauty and self-care"
+        category = "lifestyle essentials"
 
-    # Get real products via grounding
+    # Get real products via grounding - using scene-specific category
     real_products = _get_real_products_for_scene(category, scene_type)
 
     if not real_products:
@@ -1317,10 +1324,13 @@ IMPORTANT: Only ONE person in the image - never two people!
             ]
         else:
             # No persona needed - just style reference
-            # IMPORTANT: Do NOT inject product recommendations into body slides!
-            # This was causing all slides to show the same products.
-            # Each body slide should have its own unique scene from the analysis.
-            enhanced_scene = scene_description
+            # Enhance body slides with SCENE-APPROPRIATE products
+            # Category is now detected from the scene itself, not user's product
+            # This ensures "water tip" gets water bottles, "sleep tip" gets sleep products, etc.
+            if slide_type == 'body':
+                enhanced_scene = _get_scene_with_real_products(scene_description)
+            else:
+                enhanced_scene = scene_description
 
             prompt = f"""Generate a TikTok {slide_label} slide.
 
