@@ -76,6 +76,10 @@ class ImageTask:
         data = asdict(self)
         # Convert text_style dict to JSON string
         data['text_style'] = json.dumps(data['text_style'])
+        # Convert booleans to strings (Redis doesn't accept booleans)
+        for key, value in data.items():
+            if isinstance(value, bool):
+                data[key] = 'true' if value else 'false'
         return data
 
     @classmethod
