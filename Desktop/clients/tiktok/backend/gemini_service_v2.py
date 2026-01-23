@@ -2507,13 +2507,9 @@ def run_pipeline_queued(
     if progress_callback:
         progress_callback('analyzing', 'Analyzing slideshow...', 5)
 
-    # Pre-extract context
-    pre_extraction = _pre_extract_context(
-        slide_paths,
-        product_description,
-        product_image_paths[0] if product_image_paths else None,
-        request_id
-    )
+    # Pre-extract brand from description for validation
+    pre_extraction = _extract_brand_from_description(product_description)
+    log.debug(f"Pre-extracted brand candidates: {pre_extraction}")
 
     analysis = analyze_and_plan(
         slide_paths,
