@@ -791,7 +791,7 @@ DO NOT always default to these overused ideas:
 Instead, BE CREATIVE and pick from a WIDE variety like:
 - Specific foods/drinks: tart cherry juice, chamomile, banana with almond butter, warm golden milk
 - Unexpected products: weighted blanket, white noise machine, sunrise alarm clock, blue light glasses
-- Unique habits: legs up the wall pose, 4-7-8 breathing, body scan meditation, progressive muscle relaxation
+- Relaxation tools: yoga mat in peaceful corner, meditation cushion by window, breathing timer app on phone, foam roller on floor
 - Environment tweaks: lavender pillow spray, blackout curtains, cooling mattress pad, air purifier
 - Timing hacks: eating dinner earlier, morning sunlight exposure, consistent wake time
 - Sensory items: aromatherapy diffuser, sleep headphones, cooling eye gel mask, heated neck wrap
@@ -982,6 +982,11 @@ BAD EXAMPLE (DO NOT DO THIS - repetitive items):
 ^^^ THIS IS WRONG - same boring items everyone uses!
 
 SCENE DESCRIPTION RULES (CRITICAL):
+- For BODY slides: Describe OBJECTS and PRODUCTS only, NOT human activities or poses
+- NEVER describe: "person doing yoga", "legs up the wall", "woman meditating", etc.
+- INSTEAD describe: "yoga mat in peaceful corner", "meditation cushion by window", "foam roller on floor"
+- Body slides show PRODUCTS in lifestyle settings, not people performing actions
+
 - ALWAYS describe scenes as STANDARD SINGLE IMAGES (one photo filling the frame)
 - NEVER describe comparison layouts, split screens, side-by-side, or grids
 - NEVER use words like "split screen", "left side vs right side", "comparison grid"
