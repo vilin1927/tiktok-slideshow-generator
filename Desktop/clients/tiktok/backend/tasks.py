@@ -19,7 +19,7 @@ from database import (
     update_variation_status, create_variation
 )
 from tiktok_scraper import scrape_tiktok_slideshow, TikTokScraperError
-from gemini_service_v2 import run_pipeline, GeminiServiceError
+from gemini_service_v2 import run_pipeline, run_pipeline_queued, GeminiServiceError, USE_QUEUE_MODE
 from google_drive import (
     create_folder, upload_file, upload_files_parallel, set_folder_public, get_folder_link,
     GoogleDriveError
@@ -175,19 +175,39 @@ def process_link(self, batch_link_id: str, parent_drive_folder_id: str):
 
             # Step 3: Run generation pipeline
             logger.info(f"[Link {batch_link_id[:8]}] Running pipeline with hook={hook_photo_var}x{hook_text_var}, body={body_photo_var}x{body_text_var}, preset={preset_id}")
-            pipeline_result = run_pipeline(
-                slide_paths=slide_paths,
-                product_image_paths=[product_photo_path],  # List of product images
-                product_description=product_description,
-                output_dir=output_dir,
-                hook_photo_var=hook_photo_var,
-                hook_text_var=hook_text_var,
-                body_photo_var=body_photo_var,
-                body_text_var=body_text_var,
-                product_text_var=product_text_var,
-                request_id=batch_link_id[:8],
-                preset_id=preset_id
-            )
+
+            # Use queued pipeline if queue mode is enabled
+            if USE_QUEUE_MODE:
+                logger.info(f"[Link {batch_link_id[:8]}] Using QUEUED pipeline (global queue system)")
+                pipeline_result = run_pipeline_queued(
+                    slide_paths=slide_paths,
+                    product_image_paths=[product_photo_path],
+                    product_description=product_description,
+                    output_dir=output_dir,
+                    job_id=batch_link_id,  # Use link ID as job ID
+                    hook_photo_var=hook_photo_var,
+                    hook_text_var=hook_text_var,
+                    body_photo_var=body_photo_var,
+                    body_text_var=body_text_var,
+                    product_text_var=product_text_var,
+                    request_id=batch_link_id[:8],
+                    preset_id=preset_id
+                )
+            else:
+                logger.info(f"[Link {batch_link_id[:8]}] Using DIRECT pipeline (no queue)")
+                pipeline_result = run_pipeline(
+                    slide_paths=slide_paths,
+                    product_image_paths=[product_photo_path],
+                    product_description=product_description,
+                    output_dir=output_dir,
+                    hook_photo_var=hook_photo_var,
+                    hook_text_var=hook_text_var,
+                    body_photo_var=body_photo_var,
+                    body_text_var=body_text_var,
+                    product_text_var=product_text_var,
+                    request_id=batch_link_id[:8],
+                    preset_id=preset_id
+                )
 
             generated_images = pipeline_result.get('generated_images', [])
             logger.info(f"[Link {batch_link_id[:8]}] Generated {len(generated_images)} images")

@@ -34,108 +34,15 @@ ANALYSIS_MODEL = 'gemini-3-pro-preview'
 IMAGE_MODEL = 'gemini-3-pro-image-preview'
 GROUNDING_MODEL = 'gemini-2.0-flash'  # Fast model for grounding searches
 
-# Rate limiting config - Optimized for throughput while respecting API limits
-# These can be overridden via environment variables for tuning
-MAX_CONCURRENT = int(os.getenv('GEMINI_MAX_CONCURRENT', '3'))  # Parallel requests (3 = good balance)
-RPM_LIMIT = int(os.getenv('GEMINI_RPM_LIMIT', '15'))           # 15 requests per minute (safe under 20 RPM image limit)
-RATE_WINDOW = 60.0    # Exactly 60 seconds per window
-MAX_RETRIES = 5       # More retries for rate limit recovery
+# Generation config
+MAX_RETRIES = 5       # Retries for direct generation mode
 REQUEST_TIMEOUT = 120 # 120 sec timeout per API call
 
-# Log configuration on module load
-logger.info(f"Gemini rate config: MAX_CONCURRENT={MAX_CONCURRENT}, RPM_LIMIT={RPM_LIMIT}")
+# Queue mode flag - set via environment variable
+# When True, submits to global queue instead of direct generation
+USE_QUEUE_MODE = os.getenv('USE_IMAGE_QUEUE', 'true').lower() == 'true'
 
-# Rate limiter using semaphore + token bucket for concurrent requests
-class RateLimiter:
-    """
-    Token bucket rate limiter with semaphore for concurrency control.
-
-    Allows up to MAX_CONCURRENT parallel requests while maintaining RPM limit.
-    Uses token bucket algorithm for smooth rate limiting.
-    """
-    def __init__(self, rpm: int = RPM_LIMIT, max_concurrent: int = MAX_CONCURRENT):
-        self.semaphore = threading.Semaphore(max_concurrent)
-        self.rpm = rpm
-        self.max_concurrent = max_concurrent
-        # Token bucket: refill rate = rpm/60 tokens per second
-        self.refill_rate = rpm / RATE_WINDOW
-        self.tokens = float(max_concurrent)  # Start with some tokens
-        self.max_tokens = float(rpm)  # Max tokens = RPM (1 minute worth)
-        self.last_refill = time.time()
-        self.lock = threading.Lock()
-        self.requests_made = 0
-        self.window_start = time.time()
-        logger.info(f"RateLimiter initialized: rpm={rpm}, concurrent={max_concurrent}, refill_rate={self.refill_rate:.2f}/s")
-
-    def _refill_tokens(self):
-        """Refill tokens based on elapsed time."""
-        now = time.time()
-        elapsed = now - self.last_refill
-        new_tokens = elapsed * self.refill_rate
-        self.tokens = min(self.max_tokens, self.tokens + new_tokens)
-        self.last_refill = now
-
-    def acquire(self):
-        """Acquire permission to make a request. Blocks if rate limit exceeded."""
-        self.semaphore.acquire()
-
-        with self.lock:
-            self._refill_tokens()
-
-            # Wait until we have at least 1 token
-            while self.tokens < 1.0:
-                # Calculate wait time for 1 token
-                wait_time = (1.0 - self.tokens) / self.refill_rate
-                logger.debug(f"Rate limiter: waiting {wait_time:.2f}s for token (have {self.tokens:.2f})")
-
-                # Release lock while sleeping to allow other threads to check
-                self.lock.release()
-                time.sleep(min(wait_time + 0.1, 5.0))  # Cap at 5s to recheck
-                self.lock.acquire()
-                self._refill_tokens()
-
-            # Consume 1 token
-            self.tokens -= 1.0
-            self.requests_made += 1
-
-            # Log progress every 10 requests
-            if self.requests_made % 10 == 0:
-                elapsed = time.time() - self.window_start
-                actual_rpm = (self.requests_made / elapsed) * 60 if elapsed > 0 else 0
-                logger.info(f"Rate limiter: {self.requests_made} requests, actual RPM: {actual_rpm:.1f}")
-
-    def release(self):
-        """Release the semaphore after request completes."""
-        self.semaphore.release()
-
-    def get_stats(self):
-        """Get current rate limiter statistics."""
-        with self.lock:
-            elapsed = time.time() - self.window_start
-            actual_rpm = (self.requests_made / elapsed) * 60 if elapsed > 0 else 0
-            return {
-                'requests_made': self.requests_made,
-                'elapsed_seconds': elapsed,
-                'actual_rpm': actual_rpm,
-                'tokens_available': self.tokens,
-                'configured_rpm': self.rpm,
-                'max_concurrent': self.max_concurrent
-            }
-
-
-# Global singleton rate limiter - shared across ALL jobs
-_global_rate_limiter = None
-_rate_limiter_lock = threading.Lock()
-
-
-def get_rate_limiter():
-    """Get or create the global rate limiter (singleton)."""
-    global _global_rate_limiter
-    with _rate_limiter_lock:
-        if _global_rate_limiter is None:
-            _global_rate_limiter = RateLimiter(rpm=RPM_LIMIT, max_concurrent=MAX_CONCURRENT)
-            logger.info(f"Created global RateLimiter: rpm={RPM_LIMIT}, concurrent={MAX_CONCURRENT}")
-        return _global_rate_limiter
+logger.info(f"Gemini service: USE_QUEUE_MODE={USE_QUEUE_MODE}")
 
 
 class GeminiServiceError(Exception):
@@ -2289,12 +2196,490 @@ def run_pipeline(
     }
 
 
+# ============================================================================
+# QUEUE-BASED GENERATION (Global Queue System)
+# ============================================================================
+
+def submit_to_queue(
+    analysis: dict,
+    slide_paths: list[str],
+    product_image_paths: list[str],
+    output_dir: str,
+    job_id: str,
+    hook_photo_var: int = 1,
+    body_photo_var: int = 1,
+    request_id: str = None,
+    clean_image_mode: bool = False,
+    product_description: str = ''
+) -> int:
+    """
+    Submit image generation tasks to the global queue.
+
+    This function builds tasks from the analysis and submits them to the
+    Redis-backed global queue for batch processing.
+
+    Args:
+        analysis: Analysis dict from analyze_and_plan
+        slide_paths: Paths to scraped slides
+        product_image_paths: User's product images
+        output_dir: Output directory for generated images
+        job_id: Unique job identifier
+        hook_photo_var: Number of photo variations for hook
+        body_photo_var: Number of photo variations per body
+        request_id: Optional logging identifier
+        clean_image_mode: If True, generate without text
+        product_description: Product description for grounding
+
+    Returns:
+        Number of tasks submitted
+    """
+    from image_queue import ImageTask, get_global_queue
+
+    log = get_request_logger('gemini', request_id) if request_id else logger
+    queue = get_global_queue()
+
+    os.makedirs(output_dir, exist_ok=True)
+
+    new_slides = analysis['new_slides']
+    text_style = analysis.get('text_style', {})
+
+    tasks_submitted = 0
+
+    # Track persona dependency group
+    persona_group = f"{job_id}_persona"
+    first_persona_task_id = None
+
+    for slide in new_slides:
+        idx = slide['slide_index']
+        ref_idx = slide.get('reference_image_index', idx)
+        slide_type = slide['slide_type']
+        has_persona = slide.get('has_persona', False)
+
+        # Skip CTA slides
+        if slide_type == 'cta':
+            continue
+
+        # Get scene_variations from analysis
+        scene_variations = slide.get('scene_variations', [])
+
+        # Fallback for old format
+        if not scene_variations:
+            old_scene = slide.get('new_scene_description', '')
+            old_texts = slide.get('text_variations', [])
+            if not old_texts:
+                old_text = slide.get('text_content', '')
+                old_texts = [old_text] if old_text else ['']
+            scene_variations = [{
+                'scene_description': old_scene,
+                'text_variations': old_texts
+            }]
+
+        # Determine photo variations and slide key
+        if slide_type == 'hook':
+            expected_photo_vars = hook_photo_var
+            slide_key = 'hook'
+        elif slide_type == 'product':
+            expected_photo_vars = len(product_image_paths)
+            slide_key = 'product'
+        else:  # body
+            expected_photo_vars = body_photo_var
+            body_num = sum(1 for s in new_slides[:idx] if s['slide_type'] == 'body') + 1
+            slide_key = f'body_{body_num}'
+
+        # Create photo × text matrix of tasks
+        for p_idx in range(expected_photo_vars):
+            scene_var_idx = min(p_idx, len(scene_variations) - 1)
+            scene_var = scene_variations[scene_var_idx] if scene_variations else {'scene_description': '', 'text_variations': ['']}
+
+            scene_description = scene_var.get('scene_description', '')
+            text_variations = scene_var.get('text_variations', [''])
+
+            for t_idx, text_content in enumerate(text_variations):
+                photo_ver = p_idx + 1
+                text_ver = t_idx + 1
+
+                task_id = f"{job_id}_{slide_key}_p{photo_ver}_t{text_ver}"
+                output_path = os.path.join(output_dir, f'{slide_key}_p{photo_ver}_t{text_ver}.png')
+
+                # Determine product image for product slides
+                product_img = None
+                if slide_type == 'product' and product_image_paths:
+                    product_img = product_image_paths[p_idx] if p_idx < len(product_image_paths) else product_image_paths[0]
+
+                # Determine dependency type
+                if has_persona:
+                    if first_persona_task_id is None:
+                        dependency_type = "persona_first"
+                        first_persona_task_id = task_id
+                        depends_on = ""
+                    else:
+                        dependency_type = "persona_dependent"
+                        depends_on = first_persona_task_id
+                else:
+                    dependency_type = "none"
+                    depends_on = ""
+
+                # Skip product slides in clean_image_mode (handled separately)
+                if clean_image_mode and slide_type == 'product' and product_img:
+                    # Copy product image directly instead of queuing
+                    _copy_product_image(product_img, output_path, log)
+                    continue
+
+                # Create ImageTask
+                task = ImageTask(
+                    task_id=task_id,
+                    job_id=job_id,
+                    job_type="single",  # Will be updated by caller if batch
+                    dependency_group=persona_group if has_persona else "",
+                    dependency_type=dependency_type,
+                    depends_on_task_id=depends_on,
+                    slide_type=slide_type,
+                    slide_index=idx,
+                    scene_description=scene_description,
+                    text_content=text_content,
+                    text_position_hint=slide.get('text_position_hint', ''),
+                    reference_image_path=slide_paths[ref_idx] if ref_idx < len(slide_paths) else slide_paths[0],
+                    product_image_path=product_img or '',
+                    persona_reference_path='',  # Set by queue when dependency resolves
+                    has_persona=has_persona,
+                    text_style=text_style,
+                    clean_image_mode=clean_image_mode,
+                    product_description=product_description,
+                    version=photo_ver,
+                    output_path=output_path,
+                    output_dir=output_dir
+                )
+
+                queue.submit(task)
+                tasks_submitted += 1
+
+    log.info(f"Submitted {tasks_submitted} tasks to queue for job {job_id}")
+    return tasks_submitted
+
+
+def _copy_product_image(src_path: str, dst_path: str, log):
+    """Copy and resize product image for clean_image_mode."""
+    import shutil
+    from PIL import Image as PILImage
+
+    try:
+        with PILImage.open(src_path) as img:
+            target_w, target_h = 1080, 1440
+            img_ratio = img.width / img.height
+            target_ratio = target_w / target_h
+
+            if img_ratio > target_ratio:
+                new_h = target_h
+                new_w = int(new_h * img_ratio)
+            else:
+                new_w = target_w
+                new_h = int(new_w / img_ratio)
+
+            img_resized = img.resize((new_w, new_h), PILImage.Resampling.LANCZOS)
+            left = (new_w - target_w) // 2
+            top = (new_h - target_h) // 2
+            img_cropped = img_resized.crop((left, top, left + target_w, top + target_h))
+
+            if img_cropped.mode in ('RGBA', 'P'):
+                img_cropped = img_cropped.convert('RGB')
+            img_cropped.save(dst_path, 'PNG')
+
+        log.debug(f"Copied product image: {os.path.basename(src_path)} -> {os.path.basename(dst_path)}")
+    except Exception as e:
+        log.error(f"Failed to copy product image: {e}")
+        shutil.copy2(src_path, dst_path)
+
+
+def wait_for_job_completion(
+    job_id: str,
+    progress_callback: Optional[Callable] = None,
+    timeout: int = 3600,  # 1 hour max
+    poll_interval: float = 2.0
+) -> dict:
+    """
+    Wait for all tasks in a job to complete.
+
+    Args:
+        job_id: Job identifier
+        progress_callback: Optional callback(current, total, message)
+        timeout: Maximum wait time in seconds
+        poll_interval: Seconds between status checks
+
+    Returns:
+        dict with:
+            - images: List of generated image paths
+            - completed: Number completed
+            - failed: Number failed
+            - is_complete: Whether job fully completed
+
+    Raises:
+        GeminiServiceError: If job times out or has critical failures
+    """
+    from image_queue import get_global_queue
+
+    queue = get_global_queue()
+    start_time = time.time()
+
+    while True:
+        status = queue.get_job_status(job_id)
+
+        if progress_callback:
+            progress_callback(
+                status['completed'],
+                status['total'],
+                f"Generated {status['completed']}/{status['total']} images"
+            )
+
+        if status['is_complete']:
+            # Job finished (all tasks completed or failed)
+            if status['failed'] > 0:
+                logger.warning(f"Job {job_id} completed with {status['failed']} failures")
+
+            return {
+                'images': status['results'],
+                'completed': status['completed'],
+                'failed': status['failed'],
+                'is_complete': True
+            }
+
+        # Check timeout
+        elapsed = time.time() - start_time
+        if elapsed > timeout:
+            raise GeminiServiceError(f"Job {job_id} timed out after {timeout}s. "
+                                    f"Status: {status['completed']}/{status['total']} completed")
+
+        time.sleep(poll_interval)
+
+
+def run_pipeline_queued(
+    slide_paths: list[str],
+    product_image_paths: list[str],
+    product_description: str,
+    output_dir: str,
+    job_id: str,
+    progress_callback: Optional[Callable] = None,
+    hook_photo_var: int = 1,
+    hook_text_var: int = 1,
+    body_photo_var: int = 1,
+    body_text_var: int = 1,
+    product_text_var: int = 1,
+    request_id: str = None,
+    preset_id: str = 'gemini'
+) -> dict:
+    """
+    Run the pipeline using the global queue system.
+
+    This version submits tasks to the global queue and waits for completion
+    instead of processing directly. This ensures proper rate limiting across
+    all concurrent jobs.
+
+    Args:
+        Same as run_pipeline, plus:
+        job_id: Unique identifier for this job
+
+    Returns:
+        Same as run_pipeline
+    """
+    log = get_request_logger('gemini', request_id) if request_id else logger
+    start_time = time.time()
+
+    log.info(f"Pipeline (queued) starting for job {job_id}")
+
+    # Determine clean_image_mode
+    clean_image_mode = preset_id != 'gemini'
+
+    # Step 1: Analysis (same as direct mode)
+    if progress_callback:
+        progress_callback('analyzing', 'Analyzing slideshow...', 5)
+
+    # Pre-extract context
+    pre_extraction = _pre_extract_context(
+        slide_paths,
+        product_description,
+        product_image_paths[0] if product_image_paths else None,
+        request_id
+    )
+
+    analysis = analyze_and_plan(
+        slide_paths,
+        product_image_paths,
+        product_description,
+        output_dir,
+        hook_photo_var=hook_photo_var,
+        hook_text_var=hook_text_var,
+        body_photo_var=body_photo_var,
+        body_text_var=body_text_var,
+        product_text_var=product_text_var,
+        request_id=request_id
+    )
+
+    # Validate brand
+    brand_valid, corrected_brand = _validate_brand_not_hallucinated(
+        analysis,
+        product_description,
+        pre_extraction.get('likely_brand')
+    )
+    if not brand_valid:
+        log.warning(f"Correcting hallucinated brand to: '{corrected_brand}'")
+        if 'required_keywords' in analysis:
+            analysis['required_keywords']['brand_name'] = corrected_brand
+            analysis['required_keywords']['brand_corrected'] = True
+
+    # Validate keywords
+    is_valid, keyword_issues = _validate_required_keywords(analysis)
+    if not is_valid:
+        log.warning(f"Keyword validation failed: {keyword_issues}")
+        analysis = _inject_missing_keywords(analysis)
+
+    # Save analysis
+    analysis_path = os.path.join(output_dir, 'analysis.json')
+    with open(analysis_path, 'w') as f:
+        json.dump(analysis, f, indent=2)
+
+    if progress_callback:
+        progress_callback('generating', 'Submitting to generation queue...', 35)
+
+    # Step 2: Submit to queue
+    log.info("Step 2: Submitting to global queue")
+
+    tasks_submitted = submit_to_queue(
+        analysis=analysis,
+        slide_paths=slide_paths,
+        product_image_paths=product_image_paths,
+        output_dir=output_dir,
+        job_id=job_id,
+        hook_photo_var=hook_photo_var,
+        body_photo_var=body_photo_var,
+        request_id=request_id,
+        clean_image_mode=clean_image_mode,
+        product_description=product_description
+    )
+
+    log.info(f"Submitted {tasks_submitted} tasks to queue")
+
+    if progress_callback:
+        progress_callback('generating', 'Waiting for generation...', 40)
+
+    # Step 3: Wait for completion
+    def queue_progress(current, total, message):
+        if progress_callback:
+            percent = 40 + int(50 * current / total) if total > 0 else 40
+            progress_callback('generating', message, percent)
+
+    result = wait_for_job_completion(job_id, progress_callback=queue_progress)
+
+    # Build variations structure
+    variations_structure = {}
+    for img_path in result['images']:
+        filename = os.path.basename(img_path)
+        parts = filename.replace('.png', '').split('_')
+        if parts[0] in ['hook', 'product']:
+            slide_key = parts[0]
+        else:
+            slide_key = f"{parts[0]}_{parts[1]}"
+        if slide_key not in variations_structure:
+            variations_structure[slide_key] = []
+        variations_structure[slide_key].append(img_path)
+
+    generation_result = {
+        'images': result['images'],
+        'variations': variations_structure
+    }
+
+    # Step 4: Text rendering (if clean_image_mode)
+    if clean_image_mode and generation_result['images']:
+        if progress_callback:
+            progress_callback('rendering', 'Adding text overlays...', 92)
+
+        log.info(f"Step 4: Rendering text on {len(generation_result['images'])} images")
+
+        # Build text mapping
+        text_mapping = {}
+        for slide in analysis.get('new_slides', []):
+            idx = slide['slide_index']
+            slide_type = slide['slide_type']
+            text_variations = slide.get('text_variations', [slide.get('text_content', '')])
+
+            if slide_type == 'hook':
+                slide_key = 'hook'
+            elif slide_type == 'product':
+                slide_key = 'product'
+            elif slide_type == 'cta':
+                continue
+            else:
+                body_num = sum(1 for s in analysis['new_slides'][:idx] if s['slide_type'] == 'body') + 1
+                slide_key = f'body_{body_num}'
+
+            text_mapping[slide_key] = text_variations
+
+        # Render text on images
+        rendered_images = []
+        for img_path in generation_result['images']:
+            try:
+                filename = os.path.basename(img_path)
+                parts = filename.replace('.png', '').split('_')
+
+                if parts[0] in ['hook', 'product']:
+                    slide_key = parts[0]
+                else:
+                    slide_key = f"{parts[0]}_{parts[1]}"
+
+                text_idx = 0
+                for part in parts:
+                    if part.startswith('t'):
+                        text_idx = int(part[1:]) - 1
+                        break
+
+                texts = text_mapping.get(slide_key, [''])
+                text_content = texts[text_idx] if text_idx < len(texts) else texts[0] if texts else ''
+
+                if not text_content:
+                    rendered_images.append(img_path)
+                    continue
+
+                safe_zone_result = detect_safe_zones(img_path)
+                if not safe_zone_result.safe_zones:
+                    rendered_images.append(img_path)
+                    continue
+
+                zone = safe_zone_result.safe_zones[safe_zone_result.recommended_zone or 0]
+                render_text(
+                    image_path=img_path,
+                    text=text_content,
+                    zone=zone,
+                    preset_id=preset_id,
+                    output_path=img_path
+                )
+                rendered_images.append(img_path)
+
+            except Exception as e:
+                log.error(f"Failed to render text on {img_path}: {e}")
+                rendered_images.append(img_path)
+
+        generation_result['images'] = rendered_images
+
+    # Cleanup queue data
+    from image_queue import get_global_queue
+    get_global_queue().cleanup_job(job_id)
+
+    elapsed = time.time() - start_time
+    log.info(f"Pipeline (queued) complete in {elapsed:.1f}s: {len(generation_result['images'])} images")
+
+    return {
+        'analysis': analysis,
+        'generated_images': generation_result['images'],
+        'variations': generation_result['variations'],
+        'analysis_path': analysis_path
+    }
+
+
 # For testing
 if __name__ == '__main__':
     print('Gemini Service V2 - Redesigned Pipeline')
     print(f'Analysis Model: {ANALYSIS_MODEL}')
     print(f'Image Model: {IMAGE_MODEL}')
     print(f'API Key configured: {bool(os.getenv("GEMINI_API_KEY"))}')
+    print(f'Queue Mode: {USE_QUEUE_MODE}')
     print()
     print('Changes from V1:')
     print('- Smart product insertion (6 slideshow types)')
@@ -2303,3 +2688,4 @@ if __name__ == '__main__':
     print('- Clear image labeling (STYLE_REFERENCE, PERSONA_REFERENCE, PRODUCT_PHOTO)')
     print('- Exact text content generation (not just descriptions)')
     print('- Optional CTA detection')
+    print('- Global queue system for rate limiting')

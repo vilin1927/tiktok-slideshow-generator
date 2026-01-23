@@ -1,0 +1,24 @@
+[Unit]
+Description=TikTok Image Queue Processor
+Documentation=https://github.com/vilin1927/tiktok-slideshow-generator
+After=network.target redis.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/tiktok-slideshow-generator/Desktop/tiktok/backend
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 queue_processor.py
+Restart=always
+RestartSec=10
+
+# Logging
+StandardOutput=append:/var/log/image-queue-processor.log
+StandardError=append:/var/log/image-queue-processor.log
+
+# Resource limits
+MemoryHigh=600M
+MemoryMax=800M
+
+[Install]
+WantedBy=multi-user.target

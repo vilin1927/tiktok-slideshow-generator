@@ -24,7 +24,7 @@ logger = get_logger('app')
 
 # Import our modules
 from tiktok_scraper import scrape_tiktok_slideshow, TikTokScraperError
-from gemini_service_v2 import run_pipeline, GeminiServiceError
+from gemini_service_v2 import run_pipeline, run_pipeline_queued, GeminiServiceError, USE_QUEUE_MODE
 from google_drive import upload_slideshow_output, GoogleDriveError
 from batch_routes import batch_bp
 from admin_routes import admin_bp
@@ -32,6 +32,9 @@ from video_routes import video_bp
 from preset_routes import preset_bp
 from video_generator import create_videos_for_variations, VideoGeneratorError
 from database import create_job, update_job_status
+
+# Log queue mode status
+logger.info(f"Queue mode: {'ENABLED' if USE_QUEUE_MODE else 'DISABLED'}")
 
 # Global progress tracking
 progress_status = {}
@@ -159,20 +162,40 @@ def run_generation(session_id, job_id, tiktok_url, folder_name, product_context,
             update_progress(session_id, step, message, percent)
 
         try:
-            result = run_pipeline(
-                slide_paths=scraped['images'],
-                product_image_paths=saved_product_images,
-                product_description=product_context,
-                output_dir=session_generated,
-                progress_callback=progress_callback,
-                hook_photo_var=hook_photo_var,
-                hook_text_var=hook_text_var,
-                body_photo_var=body_photo_var,
-                body_text_var=body_text_var,
-                product_text_var=product_text_var,
-                request_id=session_id,
-                preset_id=preset_id
-            )
+            # Use queued pipeline if queue mode is enabled
+            if USE_QUEUE_MODE:
+                log.info("Using QUEUED pipeline (global queue system)")
+                result = run_pipeline_queued(
+                    slide_paths=scraped['images'],
+                    product_image_paths=saved_product_images,
+                    product_description=product_context,
+                    output_dir=session_generated,
+                    job_id=job_id,  # Required for queue mode
+                    progress_callback=progress_callback,
+                    hook_photo_var=hook_photo_var,
+                    hook_text_var=hook_text_var,
+                    body_photo_var=body_photo_var,
+                    body_text_var=body_text_var,
+                    product_text_var=product_text_var,
+                    request_id=session_id,
+                    preset_id=preset_id
+                )
+            else:
+                log.info("Using DIRECT pipeline (no queue)")
+                result = run_pipeline(
+                    slide_paths=scraped['images'],
+                    product_image_paths=saved_product_images,
+                    product_description=product_context,
+                    output_dir=session_generated,
+                    progress_callback=progress_callback,
+                    hook_photo_var=hook_photo_var,
+                    hook_text_var=hook_text_var,
+                    body_photo_var=body_photo_var,
+                    body_text_var=body_text_var,
+                    product_text_var=product_text_var,
+                    request_id=session_id,
+                    preset_id=preset_id
+                )
         except GeminiServiceError as e:
             log.error(f"Generation failed: {str(e)}")
             update_progress(session_id, 'error', f'Generation failed: {str(e)}', 0)
