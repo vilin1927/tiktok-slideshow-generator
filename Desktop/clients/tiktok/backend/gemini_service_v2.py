@@ -170,75 +170,129 @@ Just the product names, nothing else."""
         return ""
 
 
-def _get_scene_with_real_products(scene_description: str) -> str:
+def _get_specific_brand_for_product(generic_product: str) -> str:
     """
-    Enhance scene description with real products based on SCENE CONTEXT.
-
-    IMPORTANT: Category is determined from the scene description itself,
-    NOT from the user's product. This ensures each slide gets contextually
-    appropriate products (e.g., water scene gets water bottles, not skincare).
+    Get a SINGLE specific real brand name for a generic product.
 
     Args:
-        scene_description: Original scene description from analysis
+        generic_product: Generic product like "tart cherry juice", "weighted blanket"
 
     Returns:
-        Enhanced scene description with contextually relevant real product names
+        Specific brand name like "Cheribundi tart cherry juice" or empty if failed
+    """
+    cache_key = f"brand_{generic_product.lower().strip()}"
+
+    with _grounding_cache_lock:
+        if cache_key in _grounding_cache:
+            logger.debug(f"Using cached brand for {generic_product}")
+            return _grounding_cache[cache_key]
+
+    try:
+        client = _get_client(timeout=20)
+
+        query = f"""What is ONE popular, recognizable brand of {generic_product} that's trending on TikTok?
+
+Return ONLY the brand name + product, like:
+- "Cheribundi Tart Cherry Juice"
+- "Bearaby Napper Weighted Blanket"
+- "Hatch Restore Sunrise Alarm"
+
+Just the single brand + product name, nothing else. Pick something visually recognizable."""
+
+        response = client.models.generate_content(
+            model=GROUNDING_MODEL,
+            contents=query,
+            config=types.GenerateContentConfig(
+                tools=[types.Tool(google_search=types.GoogleSearch())],
+                temperature=0.5  # Some variety in brand selection
+            )
+        )
+
+        brand = response.text.strip().strip('"').strip("'")
+
+        # Cache the result
+        with _grounding_cache_lock:
+            _grounding_cache[cache_key] = brand
+
+        logger.info(f"Grounded brand for '{generic_product}': {brand}")
+        return brand
+
+    except Exception as e:
+        logger.warning(f"Brand grounding failed for {generic_product}: {e}")
+        return ""
+
+
+# Products that should be replaced with real brands
+BRANDABLE_PRODUCTS = [
+    # Drinks
+    ('tart cherry juice', 'tart cherry juice'),
+    ('cherry juice', 'tart cherry juice'),
+    ('chamomile tea', 'chamomile tea'),
+    ('herbal tea', 'herbal tea'),
+    ('golden milk', 'golden milk turmeric drink'),
+    ('matcha', 'matcha powder'),
+
+    # Sleep products
+    ('weighted blanket', 'weighted blanket'),
+    ('silk pillowcase', 'silk pillowcase'),
+    ('sleep mask', 'sleep mask'),
+    ('eye mask', 'sleep eye mask'),
+    ('white noise machine', 'white noise machine'),
+    ('sunrise alarm', 'sunrise alarm clock'),
+    ('sound machine', 'sleep sound machine'),
+
+    # Wellness
+    ('magnesium spray', 'magnesium spray'),
+    ('magnesium powder', 'magnesium supplement powder'),
+    ('diffuser', 'aromatherapy diffuser'),
+    ('essential oil', 'lavender essential oil'),
+    ('humidifier', 'bedroom humidifier'),
+
+    # Other
+    ('blue light glasses', 'blue light blocking glasses'),
+    ('journal', 'wellness journal'),
+    ('yoga mat', 'yoga mat'),
+    ('foam roller', 'foam roller'),
+    ('ice roller', 'face ice roller'),
+]
+
+
+def _enhance_scene_with_real_brand(scene_description: str) -> str:
+    """
+    Detect if scene mentions a brandable product and replace with real brand.
+
+    Only enhances if a specific product is mentioned - doesn't add random products.
+
+    Args:
+        scene_description: Original scene description
+
+    Returns:
+        Enhanced scene with real brand name, or original if no product detected
     """
     scene_lower = scene_description.lower()
 
-    # Determine scene type (location) from description
-    if any(word in scene_lower for word in ['bathroom', 'vanity', 'sink', 'mirror']):
-        scene_type = "bathroom vanity"
-    elif any(word in scene_lower for word in ['bed', 'bedroom', 'nightstand', 'pillow', 'sleep']):
-        scene_type = "bedroom nightstand"
-    elif any(word in scene_lower for word in ['kitchen', 'counter', 'breakfast']):
-        scene_type = "kitchen counter"
-    elif any(word in scene_lower for word in ['desk', 'office', 'work', 'computer']):
-        scene_type = "desk setup"
-    elif any(word in scene_lower for word in ['yoga', 'exercise', 'workout', 'gym']):
-        scene_type = "fitness space"
-    else:
-        scene_type = "lifestyle"
+    # Check if scene mentions any brandable product
+    for product_phrase, search_term in BRANDABLE_PRODUCTS:
+        if product_phrase in scene_lower:
+            # Found a brandable product - get real brand
+            real_brand = _get_specific_brand_for_product(search_term)
 
-    # Determine product category FROM THE SCENE CONTENT (not user's product!)
-    # This is the key fix - each scene gets products relevant to ITS context
-    if any(word in scene_lower for word in ['water', 'hydrat', 'drink', 'tea', 'coffee', 'cup', 'mug', 'bottle']):
-        category = "hydration and beverages"
-    elif any(word in scene_lower for word in ['sleep', 'eye mask', 'pillow', 'night', 'rest', 'relax', 'calm']):
-        category = "sleep and relaxation"
-    elif any(word in scene_lower for word in ['skin', 'face', 'serum', 'cream', 'cleanser', 'moistur', 'routine']):
-        category = "skincare"
-    elif any(word in scene_lower for word in ['hair', 'shampoo', 'conditioner', 'brush']):
-        category = "haircare"
-    elif any(word in scene_lower for word in ['makeup', 'lipstick', 'mascara', 'foundation', 'beauty']):
-        category = "makeup and beauty"
-    elif any(word in scene_lower for word in ['supplement', 'vitamin', 'wellness', 'health']):
-        category = "wellness supplements"
-    elif any(word in scene_lower for word in ['yoga', 'exercise', 'workout', 'fitness', 'stretch']):
-        category = "fitness and wellness"
-    elif any(word in scene_lower for word in ['journal', 'write', 'note', 'plan', 'morning routine']):
-        category = "journaling and planning"
-    elif any(word in scene_lower for word in ['read', 'book', 'cozy', 'blanket']):
-        category = "cozy lifestyle"
-    else:
-        category = "lifestyle essentials"
+            if real_brand:
+                # Replace generic with branded version in the scene
+                # Make it natural - just mention the brand should be visible
+                enhanced = f"""{scene_description}
 
-    # Get real products via grounding - using scene-specific category
-    real_products = _get_real_products_for_scene(category, scene_type)
+SPECIFIC PRODUCT: Show {real_brand} (this exact brand should be recognizable in the image).
+Only show this ONE product as the hero item - no other random products cluttering the scene."""
 
-    if not real_products:
-        return scene_description
+                logger.info(f"Enhanced scene with brand: {product_phrase} -> {real_brand}")
+                return enhanced
 
-    # Enhance the scene description
-    enhanced = f"""{scene_description}
+            # If grounding failed, still return original
+            break
 
-REAL PRODUCTS TO INCLUDE IN SCENE (use 2-3 of these recognizable items):
-{real_products}
-
-These are REAL products that TikTok users will recognize. Include them naturally in the scene
-(on the counter, shelf, or visible in background) to make it look authentic."""
-
-    return enhanced
+    # No brandable product found or grounding failed - return original
+    return scene_description
 
 
 def _load_image_bytes(image_path: str) -> bytes:
@@ -764,13 +818,24 @@ BODY SLIDES (tips/steps that are NOT product):
 - DO NOT copy or recreate the original tips!!!
 - Think: What are 5-6 DIFFERENT tips a creator would give about this topic?
 - Each tip should be UNIQUE and valuable on its own
-- Mix up the scenes: morning moments, nighttime, self-care, lifestyle activities
-- Example categories of tips to inspire variety:
-  - Environment/setting tips ("keep your bedroom cool")
-  - Habit tips ("no phone 30 mins before bed")
-  - Product-adjacent tips ("silk pillowcase")
-  - Mindset tips ("journal your thoughts")
-  - Routine tips ("stretch for 5 mins")
+
+⚠️ CRITICAL - AVOID REPETITIVE/OVERUSED TIPS:
+DO NOT always default to these overused ideas:
+- magnesium spray/supplements (too common)
+- silk pillowcase (overused)
+- cold room temperature (repetitive)
+- journaling/brain dump (cliché)
+- no phone before bed (everyone says this)
+
+Instead, BE CREATIVE and pick from a WIDE variety like:
+- Specific foods/drinks: tart cherry juice, chamomile, banana with almond butter, warm golden milk
+- Unexpected products: weighted blanket, white noise machine, sunrise alarm clock, blue light glasses
+- Unique habits: legs up the wall pose, 4-7-8 breathing, body scan meditation, progressive muscle relaxation
+- Environment tweaks: lavender pillow spray, blackout curtains, cooling mattress pad, air purifier
+- Timing hacks: eating dinner earlier, morning sunlight exposure, consistent wake time
+- Sensory items: aromatherapy diffuser, sleep headphones, cooling eye gel mask, heated neck wrap
+
+RANDOMIZE your choices - don't pick the first thing that comes to mind!
 
 PRODUCT SLIDE (exactly ONE):
 - Frame as tip/recommendation, NOT advertisement
@@ -861,28 +926,28 @@ Each body slide MUST show a COMPLETELY DIFFERENT:
 3. ACTIVITY (different action/moment)
 
 MANDATORY: Use DIFFERENT locations from this list for each body slide:
-- Bathroom vanity (skincare products, towels, mirror)
-- Bedroom nightstand (books, lamp, alarm clock)
-- Kitchen counter (water bottle, fruit, morning light)
-- Cozy reading corner (blanket, book, tea cup)
-- Home office desk (plants, candles, laptop)
-- Living room couch (pillows, soft lighting)
-- Yoga/meditation space (mat, plants, calm vibes)
-- Outdoor balcony/patio (plants, morning coffee)
+- Bathroom vanity
+- Kitchen counter
+- Cozy reading corner
+- Home office desk
+- Living room couch
+- Yoga/meditation space
+- Outdoor balcony/patio
+- Bedroom (but with DIFFERENT focus each time)
 
-BAD EXAMPLE (DO NOT DO THIS - same location repeated):
-- Body slide 1: "bedroom nightstand with products"
-- Body slide 2: "bedroom nightstand different angle"
-- Body slide 3: "nightstand with morning light"
-- Body slide 4: "cozy bedroom nightstand setup"
-^^^ THIS IS WRONG - all slides are basically the same bedroom nightstand!
+GOOD EXAMPLE (each slide = completely different world with UNIQUE items):
+- Body slide 1: "Kitchen counter with tart cherry juice in a glass, morning light"
+- Body slide 2: "Cozy reading corner with weighted blanket draped over chair"
+- Body slide 3: "Bathroom counter with aromatherapy diffuser releasing mist"
+- Body slide 4: "Desk with blue light blocking glasses next to laptop"
+^^^ THIS IS CORRECT - each slide has DIFFERENT location AND different featured item!
 
-GOOD EXAMPLE (each slide = completely different world):
-- Body slide 1: "Bathroom vanity with morning skincare routine, CeraVe bottles visible"
-- Body slide 2: "Kitchen counter with lemon water and fruit bowl, morning sunlight"
-- Body slide 3: "Cozy reading corner with blanket, book spine-down, warm lamp"
-- Body slide 4: "Home office desk with plant, candle burning, laptop in background"
-^^^ THIS IS CORRECT - each slide transports viewer to a different space!
+BAD EXAMPLE (DO NOT DO THIS - repetitive items):
+- Body slide 1: "bedroom with silk pillowcase"
+- Body slide 2: "bathroom with skincare products"
+- Body slide 3: "nightstand with magnesium spray"
+- Body slide 4: "bed with silk pillowcase again"
+^^^ THIS IS WRONG - same boring items everyone uses!
 
 SCENE DESCRIPTION RULES (CRITICAL):
 - ALWAYS describe scenes as STANDARD SINGLE IMAGES (one photo filling the frame)
@@ -1258,7 +1323,22 @@ LAYOUT: {text_position_hint}
         # Add variation instruction for versions > 1
         variation_instruction = ""
         if version > 1:
-            variation_instruction = f"""
+            if slide_type == 'body':
+                # For body slides: each variation should be a COMPLETELY DIFFERENT scene
+                variation_instruction = f"""
+VARIATION #{version}: Create a COMPLETELY DIFFERENT scene!
+- DO NOT just change the angle - create an ENTIRELY NEW setting
+- Use a DIFFERENT room/location than variation #1
+- Show DIFFERENT products/items (same theme, different specific items)
+- This should look like a completely separate photo, not just a reshoot
+
+Example: If variation #1 showed "magnesium spray on bathroom vanity",
+variation #{version} could show "chamomile tea on kitchen counter" or "diffuser in bedroom".
+Same relaxation theme, but TOTALLY DIFFERENT scene!
+"""
+            else:
+                # For hook/other slides: different angle is fine
+                variation_instruction = f"""
 VARIATION #{version}: Create a DIFFERENT visual interpretation:
 - Use a different camera angle or perspective
 - Change the pose or body position
@@ -1351,18 +1431,30 @@ IMPORTANT: Only ONE person in the image - never two people!
             ]
         else:
             # No persona needed - just style reference
-            # DO NOT inject extra products! The scene description already specifies
-            # exactly what should be in the image. Adding "REAL PRODUCTS TO INCLUDE"
-            # causes all slides to show the same skincare products everywhere.
-            enhanced_scene = scene_description
+            # For body slides: detect if scene mentions a brandable product,
+            # and if so, replace with a specific real brand name.
+            if slide_type == 'body':
+                enhanced_scene = _enhance_scene_with_real_brand(scene_description)
+            else:
+                enhanced_scene = scene_description
 
-            prompt = f"""Generate a TikTok {slide_label} slide.
+            # For body slide variations #2+, tell Gemini to create a COMPLETELY NEW scene
+            if slide_type == 'body' and version > 1:
+                scene_instruction = f"""
+IGNORE the scene description below - it was for variation #1.
+For variation #{version}, CREATE A COMPLETELY NEW SCENE that fits the text/tip theme.
 
-{text_style_instruction}
-{variation_instruction}
-[STYLE_REFERENCE] - Reference slide for visual composition and mood ONLY (colors, fonts, text style).
-DO NOT copy the scene/location from the reference! Generate a COMPLETELY DIFFERENT setting.
+The text says: "{text_content}"
 
+Based on this tip, INVENT a totally different scene:
+- DIFFERENT location (if #1 was bathroom, use kitchen/bedroom/desk/etc.)
+- DIFFERENT products (if #1 had magnesium, show chamomile tea or diffuser or weighted blanket)
+- Same relaxation/wellness VIBE but completely different visual
+
+THINK: What's another way to visually represent this tip? Create THAT scene.
+"""
+            else:
+                scene_instruction = f"""
 NEW SCENE (generate THIS exact setting): {enhanced_scene}
 
 CRITICAL - SHOW ONLY WHAT'S DESCRIBED:
@@ -1371,10 +1463,19 @@ CRITICAL - SHOW ONLY WHAT'S DESCRIBED:
 - If scene says "journal and pen on bed" → show ONLY journal and pen on bed
 - DO NOT add random skincare products, bottles, or items not mentioned in the scene
 - Each slide should feature ONE MAIN ITEM that matches the tip being given
-- The scene should HIGHLIGHT that specific item, not clutter it with unrelated products
 
 WRONG: Scene says "tart cherry juice" but image shows juice + skincare bottles + random products
 RIGHT: Scene says "tart cherry juice" and image shows ONLY the juice as the hero item
+"""
+
+            prompt = f"""Generate a TikTok {slide_label} slide.
+
+{text_style_instruction}
+{variation_instruction}
+[STYLE_REFERENCE] - Reference slide for visual composition and mood ONLY (colors, fonts, text style).
+DO NOT copy the scene/location from the reference! Generate a COMPLETELY DIFFERENT setting.
+
+{scene_instruction}
 
 TEXT TO DISPLAY:
 {text_content}
