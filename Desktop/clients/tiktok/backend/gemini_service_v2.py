@@ -34,41 +34,93 @@ ANALYSIS_MODEL = 'gemini-3-pro-preview'
 IMAGE_MODEL = 'gemini-3-pro-image-preview'
 GROUNDING_MODEL = 'gemini-2.0-flash'  # Fast model for grounding searches
 
-# Rate limiting config - SIMPLE: 19 requests per minute, sequential
-MAX_CONCURRENT = 1    # Sequential - no concurrent requests (prevents burst overload)
-RPM_LIMIT = 19        # 19 requests per minute (conservative for Gemini Preview stability)
+# Rate limiting config - Optimized for throughput while respecting API limits
+# These can be overridden via environment variables for tuning
+MAX_CONCURRENT = int(os.getenv('GEMINI_MAX_CONCURRENT', '3'))  # Parallel requests (3 = good balance)
+RPM_LIMIT = int(os.getenv('GEMINI_RPM_LIMIT', '30'))           # 30 requests per minute (safe for paid tier)
 RATE_WINDOW = 60.0    # Exactly 60 seconds per window
 MAX_RETRIES = 5       # More retries for rate limit recovery
 REQUEST_TIMEOUT = 120 # 120 sec timeout per API call
 
-# Rate limiter using semaphore + delay
+# Log configuration on module load
+logger.info(f"Gemini rate config: MAX_CONCURRENT={MAX_CONCURRENT}, RPM_LIMIT={RPM_LIMIT}")
+
+# Rate limiter using semaphore + token bucket for concurrent requests
 class RateLimiter:
     """
-    Semaphore-based rate limiter that enforces RPM limits.
-    Ensures delay BEFORE each request, not after.
+    Token bucket rate limiter with semaphore for concurrency control.
+
+    Allows up to MAX_CONCURRENT parallel requests while maintaining RPM limit.
+    Uses token bucket algorithm for smooth rate limiting.
     """
     def __init__(self, rpm: int = RPM_LIMIT, max_concurrent: int = MAX_CONCURRENT):
         self.semaphore = threading.Semaphore(max_concurrent)
-        self.min_interval = RATE_WINDOW / rpm  # seconds between requests (65s/25 = 2.6s)
-        self.last_request_time = 0.0
+        self.rpm = rpm
+        self.max_concurrent = max_concurrent
+        # Token bucket: refill rate = rpm/60 tokens per second
+        self.refill_rate = rpm / RATE_WINDOW
+        self.tokens = float(max_concurrent)  # Start with some tokens
+        self.max_tokens = float(rpm)  # Max tokens = RPM (1 minute worth)
+        self.last_refill = time.time()
         self.lock = threading.Lock()
-        logger.debug(f"RateLimiter initialized: rpm={rpm}, max_concurrent={max_concurrent}")
+        self.requests_made = 0
+        self.window_start = time.time()
+        logger.info(f"RateLimiter initialized: rpm={rpm}, concurrent={max_concurrent}, refill_rate={self.refill_rate:.2f}/s")
+
+    def _refill_tokens(self):
+        """Refill tokens based on elapsed time."""
+        now = time.time()
+        elapsed = now - self.last_refill
+        new_tokens = elapsed * self.refill_rate
+        self.tokens = min(self.max_tokens, self.tokens + new_tokens)
+        self.last_refill = now
 
     def acquire(self):
         """Acquire permission to make a request. Blocks if rate limit exceeded."""
         self.semaphore.acquire()
+
         with self.lock:
-            now = time.time()
-            elapsed = now - self.last_request_time
-            if elapsed < self.min_interval:
-                wait_time = self.min_interval - elapsed
-                logger.debug(f"Rate limiter: waiting {wait_time:.2f}s")
-                time.sleep(wait_time)
-            self.last_request_time = time.time()
+            self._refill_tokens()
+
+            # Wait until we have at least 1 token
+            while self.tokens < 1.0:
+                # Calculate wait time for 1 token
+                wait_time = (1.0 - self.tokens) / self.refill_rate
+                logger.debug(f"Rate limiter: waiting {wait_time:.2f}s for token (have {self.tokens:.2f})")
+
+                # Release lock while sleeping to allow other threads to check
+                self.lock.release()
+                time.sleep(min(wait_time + 0.1, 5.0))  # Cap at 5s to recheck
+                self.lock.acquire()
+                self._refill_tokens()
+
+            # Consume 1 token
+            self.tokens -= 1.0
+            self.requests_made += 1
+
+            # Log progress every 10 requests
+            if self.requests_made % 10 == 0:
+                elapsed = time.time() - self.window_start
+                actual_rpm = (self.requests_made / elapsed) * 60 if elapsed > 0 else 0
+                logger.info(f"Rate limiter: {self.requests_made} requests, actual RPM: {actual_rpm:.1f}")
 
     def release(self):
         """Release the semaphore after request completes."""
         self.semaphore.release()
+
+    def get_stats(self):
+        """Get current rate limiter statistics."""
+        with self.lock:
+            elapsed = time.time() - self.window_start
+            actual_rpm = (self.requests_made / elapsed) * 60 if elapsed > 0 else 0
+            return {
+                'requests_made': self.requests_made,
+                'elapsed_seconds': elapsed,
+                'actual_rpm': actual_rpm,
+                'tokens_available': self.tokens,
+                'configured_rpm': self.rpm,
+                'max_concurrent': self.max_concurrent
+            }
 
 
 # Global singleton rate limiter - shared across ALL jobs
@@ -1973,6 +2025,10 @@ def generate_all_images(
             log.error(f"  {task_id}: {err}")
         error_msgs = [f"{task_id}: {err}" for task_id, err in errors]
         raise GeminiServiceError(f"Image generation failed:\n" + "\n".join(error_msgs))
+
+    # Log rate limiter stats
+    stats = rate_limiter.get_stats()
+    log.info(f"Rate limiter stats: {stats['requests_made']} requests in {stats['elapsed_seconds']:.1f}s, actual RPM: {stats['actual_rpm']:.1f}")
 
     # Merge copy_only_results into results
     results.update(copy_only_results)
