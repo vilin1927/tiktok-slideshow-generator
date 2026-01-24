@@ -5,6 +5,7 @@ Endpoints for managing API keys with password protection
 import os
 import re
 import secrets
+import subprocess
 import time
 from functools import wraps
 from flask import Blueprint, request, jsonify
@@ -56,6 +57,33 @@ def mask_key(key: str) -> str:
     if not key or len(key) < 12:
         return '****'
     return f"{key[:4]}...{key[-4:]}"
+
+
+def restart_worker_services() -> bool:
+    """Restart image-queue-processor and celery-worker to pick up new env vars"""
+    try:
+        # Only restart on Linux (production server)
+        if os.name != 'posix' or not os.path.exists('/etc/systemd/system'):
+            logger.info("Not on systemd server, skipping service restart")
+            return True
+
+        services = ['image-queue-processor', 'celery-worker']
+        for service in services:
+            result = subprocess.run(
+                ['systemctl', 'restart', service],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            if result.returncode != 0:
+                logger.error(f"Failed to restart {service}: {result.stderr}")
+            else:
+                logger.info(f"Restarted {service}")
+
+        return True
+    except Exception as e:
+        logger.error(f"Failed to restart services: {e}")
+        return False
 
 
 def update_env_file(key: str, value: str) -> bool:
@@ -229,10 +257,14 @@ def update_api_keys():
                 'message': 'No keys provided to update'
             })
 
+        # Restart worker services to pick up new API keys
+        services_restarted = restart_worker_services()
+
         return jsonify({
             'status': 'updated',
             'updated': updated,
-            'message': f'Updated: {", ".join(updated)}'
+            'services_restarted': services_restarted,
+            'message': f'Updated: {", ".join(updated)}. Workers restarted: {services_restarted}'
         })
 
     except Exception as e:
