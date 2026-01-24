@@ -292,7 +292,7 @@ def create_from_slideshow():
 
         for img_path in all_images:
             filename = os.path.basename(img_path)
-            match = re.search(r'_p(\d+)_t(\d+)\.png$', filename, re.IGNORECASE)
+            match = re.search(r'_p(\d+)_t(\d+)\.(jpg|png)$', filename, re.IGNORECASE)
 
             if match:
                 var_key = f"p{match.group(1)}_t{match.group(2)}"

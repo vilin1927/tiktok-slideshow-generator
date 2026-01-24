@@ -245,8 +245,8 @@ def create_videos_for_variations(
     log_prefix = f"[{request_id}] " if request_id else ""
 
     # Group images by variation key
-    # Naming convention: {slide_type}_p{photo}_t{text}.png
-    # e.g., hook_p1_t1.png, body_1_p1_t1.png, product_p1_t1.png
+    # Naming convention: {slide_type}_p{photo}_t{text}.jpg
+    # e.g., hook_p1_t1.jpg, body_1_p1_t1.jpg, product_p1_t1.jpg
 
     variation_groups = {}
 
@@ -256,7 +256,7 @@ def create_videos_for_variations(
         # Extract variation key (e.g., "p1_t1")
         # Look for pattern like _p1_t1 or _p2_t2 at end of filename
         import re
-        match = re.search(r'_p(\d+)_t(\d+)\.png$', filename, re.IGNORECASE)
+        match = re.search(r'_p(\d+)_t(\d+)\.(jpg|png)$', filename, re.IGNORECASE)
 
         if match:
             var_key = f"p{match.group(1)}_t{match.group(2)}"
