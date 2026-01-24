@@ -750,17 +750,17 @@ POSITION RULES (all types):
 - Product slide should feel like it BELONGS, not interrupts
 
 ═══════════════════════════════════════════════════════════════
-TASK 5: CREATE A COMPLETELY NEW SLIDESHOW (NOT A COPY!)
+TASK 5: MIMIC THE ORIGINAL SLIDESHOW CONTENT
 ═══════════════════════════════════════════════════════════════
 
-CRITICAL: Do NOT recreate or copy the original scenes!
-The reference images are ONLY for visual style (font, colors, layout).
-Create ENTIRELY NEW and FRESH content that fits the user's product.
+CRITICAL: Your job is to MIMIC and RECREATE what's in the original slides!
+Analyze each slide carefully and create SIMILAR content that matches:
+- The TYPE of content shown (aesthetic shot, action, product, lifestyle moment)
+- The VIBE and FEELING of the slide
+- The VISUAL COMPOSITION and style
 
-THINK LIKE A CONTENT CREATOR:
-- What tips would actually help someone in this category?
-- What lifestyle moments relate to this product?
-- What would make Gen-Z actually save this post?
+DO NOT invent random tips or force "tips list" structure on every slideshow!
+Each slideshow is UNIQUE - analyze what's ACTUALLY shown and recreate it.
 
 TEXT RULES FOR ALL SLIDES:
 - NEVER end sentences with "."
@@ -770,33 +770,23 @@ TEXT RULES FOR ALL SLIDES:
 - Keep text SHORT - max 2 lines, each line under 6 words
 
 HOOK SLIDE (slide 0):
-- Create a NEW attention-grabbing hook for the product category
-- Use same STYLE (provocative, listicle, relatable) but DIFFERENT content
-- Be creative! Don't just replace one word in the original hook.
+- Analyze what the original hook shows and says
+- Create a SIMILAR hook that captures the same energy/promise
+- Match the style (provocative, listicle, relatable, etc.)
 
-BODY SLIDES (tips/steps that are NOT product):
-- INVENT completely NEW tips relevant to the product's category
-- DO NOT copy or recreate the original tips!!!
-- Think: What are 5-6 DIFFERENT tips a creator would give about this topic?
-- Each tip should be UNIQUE and valuable on its own
+BODY SLIDES (slides that are NOT product):
+- ANALYZE what is ACTUALLY shown in each original body slide
+- MIMIC the same type of content for each slide position
+- If original shows a skincare product → show a similar skincare moment
+- If original shows a lifestyle scene → recreate a similar lifestyle scene
+- If original shows an action/habit → show a similar action/habit
+- DO NOT force "tips" structure if the original isn't about tips!
 
-⚠️ CRITICAL - AVOID REPETITIVE/OVERUSED TIPS:
-DO NOT always default to these overused ideas:
-- magnesium spray/supplements (too common)
-- silk pillowcase (overused)
-- cold room temperature (repetitive)
-- journaling/brain dump (cliché)
-- no phone before bed (everyone says this)
-
-Instead, BE CREATIVE and pick from a WIDE variety like:
-- Specific foods/drinks: tart cherry juice, chamomile, banana with almond butter, warm golden milk
-- Unexpected products: weighted blanket, white noise machine, sunrise alarm clock, blue light glasses
-- Relaxation tools: yoga mat in peaceful corner, meditation cushion by window, breathing timer app on phone, foam roller on floor
-- Environment tweaks: lavender pillow spray, blackout curtains, cooling mattress pad, air purifier
-- Timing hacks: eating dinner earlier, morning sunlight exposure, consistent wake time
-- Sensory items: aromatherapy diffuser, sleep headphones, cooling eye gel mask, heated neck wrap
-
-RANDOMIZE your choices - don't pick the first thing that comes to mind!
+For each body slide, ask yourself:
+- What is the SUBJECT of this slide? (product, action, aesthetic, moment)
+- What is the MOOD? (cozy, energetic, calm, luxurious)
+- What STORY is it telling?
+Then recreate something SIMILAR that fits the user's product context.
 
 PRODUCT SLIDE (exactly ONE):
 - Frame as tip/recommendation, NOT advertisement
@@ -847,42 +837,43 @@ TASK 6: GENERATE SCENE & TEXT VARIATIONS (CRITICAL!)
 
 ⚠️ THIS IS THE MOST IMPORTANT SECTION - READ CAREFULLY!
 
-For BODY SLIDES: Generate {body_photo_var} COMPLETELY DIFFERENT TIPS per slide position!
-For HOOK SLIDES: Generate {hook_photo_var} COMPLETELY DIFFERENT HOOK CONCEPTS!
+For BODY SLIDES: Generate {body_photo_var} VARIATIONS of what's shown in the ORIGINAL slide!
+For HOOK SLIDES: Generate {hook_photo_var} VARIATIONS of the ORIGINAL hook concept!
 
-THIS IS NOT ABOUT REWORDING THE SAME TIP!
-Each "scene variation" = A COMPLETELY DIFFERENT TIP/IDEA with its own scene and texts.
+IMPORTANT: Variations should be SIMILAR to the original, not completely different topics!
+Each "scene variation" = A DIFFERENT TAKE on the SAME concept from the original slide.
 
 STRUCTURE FOR BODY SLIDES (body_photo_var={body_photo_var}):
-- Each body slide position gets {body_photo_var} DIFFERENT tips
-- Each tip has its OWN scene description (different product/location)
-- Each tip has {body_text_var} text variations (same tip, different wording)
+- First, analyze what the ORIGINAL slide shows
+- Then create {body_photo_var} variations of SIMILAR content
+- Each variation has a slightly different scene but SAME type of content
+- Each variation has {body_text_var} text variations (same concept, different wording)
 
-EXAMPLE: Body slide position 2 with body_photo_var=2, body_text_var=3:
+EXAMPLE: If original body slide shows "someone applying face serum":
 {{
     "slide_index": 2,
     "slide_type": "body",
     "scene_variations": [
         {{
-            "scene_description": "Kitchen counter with glass of tart cherry juice, morning light",
+            "scene_description": "Close-up of hands applying serum to face, bathroom mirror reflection",
             "text_variations": [
-                "tart cherry juice 🍒\\n\\ndrink it 1 hour before bed for natural melatonin",
-                "sleepy girl mocktail 🍷\\n\\ntart cherry juice = nature's sleep aid",
-                "natural melatonin boost ✨\\n\\na glass of cherry juice before bed works magic"
+                "my nightly serum ritual ✨",
+                "the serum that changed everything",
+                "applying my favorite serum 💫"
             ]
         }},
         {{
-            "scene_description": "Cozy couch with weighted blanket draped over it, warm ambient light",
+            "scene_description": "Serum dropper with product dripping, soft bathroom lighting",
             "text_variations": [
-                "weighted blanket 🛋️\\n\\nthe deep pressure calms your nervous system instantly",
-                "pressure therapy ✨\\n\\nmy weighted blanket is the ultimate anxiety hack",
-                "cozy sleep hack 😴\\n\\nweighted blankets reduce cortisol and help you sleep deeper"
+                "a few drops goes a long way ✨",
+                "serum application 101",
+                "this serum hits different 💫"
             ]
         }}
     ]
 }}
 
-^^^ THIS IS CORRECT! Two completely different tips (cherry juice vs weighted blanket) for the same slide position!
+^^^ BOTH variations are about SERUM (matching the original) - not random different products!
 
 STRUCTURE FOR HOOK SLIDES (hook_photo_var={hook_photo_var}):
 - Generate {hook_photo_var} DIFFERENT hook concepts
@@ -941,60 +932,50 @@ FOR CTA SLIDE (only 1 scene):
 }}
 
 VARIATION RULES:
-- scene_variations = array of DIFFERENT TIPS (for body) or DIFFERENT CONCEPTS (for hook)
-- text_variations = array of different WORDINGS for the SAME tip
+- scene_variations = array of VARIATIONS of the SAME concept from the original slide
+- text_variations = array of different WORDINGS for the SAME concept
 - Each scene_variation must have a UNIQUE scene_description
 - Body slides MUST have {body_photo_var} scene_variations
 - Hook slides MUST have {hook_photo_var} scene_variations
 - Product/CTA slides have exactly 1 scene_variation
 
 ═══════════════════════════════════════════════════════════════
-SCENE DIVERSITY REQUIREMENT (ABSOLUTELY CRITICAL!)
+MIMIC THE ORIGINAL CONTENT (ABSOLUTELY CRITICAL!)
 ═══════════════════════════════════════════════════════════════
 
-Each body slide MUST show a COMPLETELY DIFFERENT:
-1. LOCATION (different room/setting)
-2. PRODUCTS (different items visible in scene)
-3. ACTIVITY (different action/moment)
+For EACH body slide, you MUST:
+1. ANALYZE what the original slide actually shows
+2. DESCRIBE what type of content it is (product shot, lifestyle moment, action, aesthetic)
+3. CREATE similar content that matches the original's vibe
 
-MANDATORY: Use DIFFERENT locations from this list for each body slide:
-- Bathroom vanity
-- Kitchen counter
-- Cozy reading corner
-- Home office desk
-- Living room couch
-- Yoga/meditation space
-- Outdoor balcony/patio
-- Bedroom (but with DIFFERENT focus each time)
+DO NOT force "tips" or specific product categories on slides!
+Each slideshow is UNIQUE - recreate what you SEE in the original.
 
-GOOD EXAMPLE (each slide = completely different world with UNIQUE items):
-- Body slide 1: "Kitchen counter with tart cherry juice in a glass, morning light"
-- Body slide 2: "Cozy reading corner with weighted blanket draped over chair"
-- Body slide 3: "Bathroom counter with aromatherapy diffuser releasing mist"
-- Body slide 4: "Desk with blue light blocking glasses next to laptop"
-^^^ THIS IS CORRECT - each slide has DIFFERENT location AND different featured item!
+EXAMPLES of how to mimic:
+- If original shows a skincare product close-up → create similar skincare product shot
+- If original shows a cozy bedroom scene → create similar cozy bedroom scene
+- If original shows food/drink → create similar food/drink shot
+- If original shows an outfit/fashion → create similar fashion content
+- If original shows a self-care moment → create similar self-care moment
 
-BAD EXAMPLE (DO NOT DO THIS - repetitive items):
-- Body slide 1: "bedroom with silk pillowcase"
-- Body slide 2: "bathroom with skincare products"
-- Body slide 3: "nightstand with magnesium spray"
-- Body slide 4: "bed with silk pillowcase again"
-^^^ THIS IS WRONG - same boring items everyone uses!
+The KEY is to match:
+- The TYPE of content (product, lifestyle, action, aesthetic)
+- The MOOD (cozy, energetic, luxurious, minimal)
+- The VISUAL STYLE (close-up, wide shot, flat lay, etc.)
 
-SCENE DESCRIPTION RULES (CRITICAL):
-- For BODY slides: Describe OBJECTS and PRODUCTS only, NOT human activities or poses
-- NEVER describe: "person doing yoga", "legs up the wall", "woman meditating", etc.
-- INSTEAD describe: "yoga mat in peaceful corner", "meditation cushion by window", "foam roller on floor"
-- Body slides show PRODUCTS in lifestyle settings, not people performing actions
+SCENE DESCRIPTION RULES:
+- MIMIC what the original slide shows - if it's a product shot, describe a product shot
+- If original shows lifestyle/aesthetic scenes, recreate similar scenes
+- Match the VISUAL STYLE of the original (close-up, wide shot, flat lay, etc.)
 
 - ALWAYS describe scenes as STANDARD SINGLE IMAGES (one photo filling the frame)
 - NEVER describe comparison layouts, split screens, side-by-side, or grids
 - NEVER use words like "split screen", "left side vs right side", "comparison grid"
 - Even if the original TikTok has a comparison/grid layout, describe a STANDARD lifestyle scene instead
-- Each scene = ONE cohesive image (bedroom, bathroom, desk, etc.) NOT a collage or comparison
+- Each scene = ONE cohesive image NOT a collage or comparison
 
-GOOD scene description: "Cozy bedroom with morning sunlight, silk pillowcase on bed, coffee on nightstand"
-BAD scene description: "Split screen comparison: Left side tired skin, Right side glowing skin" (NEVER DO THIS)
+GOOD: Match the type of content from the original slide
+BAD: Inventing random "tips" that have nothing to do with the original
 
 ═══════════════════════════════════════════════════════════════
 OUTPUT FORMAT
@@ -1081,12 +1062,12 @@ Return ONLY valid JSON:
             "text_position_hint": "center middle",
             "scene_variations": [
                 {{
-                    "scene_description": "Kitchen counter with tart cherry juice glass",
-                    "text_variations": ["tip about cherry juice v1", "tip about cherry juice v2"]
+                    "scene_description": "Similar scene to original slide 1 - mimic the content type and vibe",
+                    "text_variations": ["text matching original style v1", "text matching original style v2"]
                 }},
                 {{
-                    "scene_description": "Cozy couch with weighted blanket draped over it",
-                    "text_variations": ["tip about weighted blanket v1", "tip about weighted blanket v2"]
+                    "scene_description": "Variation of the same concept from original slide 1",
+                    "text_variations": ["alternative text v1", "alternative text v2"]
                 }}
             ]
         }},
@@ -1110,9 +1091,9 @@ Return ONLY valid JSON:
 }}
 
 IMPORTANT - reference_image_index explained:
-- This tells us which ORIGINAL slide to use as STYLE reference
-- STYLE = font, colors, text box design, layout
-- STYLE ≠ scene content! The scene should be COMPLETELY DIFFERENT!
+- This tells us which ORIGINAL slide to use as reference
+- MIMIC both the STYLE (font, colors, layout) AND the TYPE of content
+- Create SIMILAR content that matches what the original slide shows
 
 CRITICAL RULES FOR scene_variations:
 1. Exactly {num_slides} slides in new_slides array
@@ -1509,8 +1490,8 @@ RIGHT: Scene says "tart cherry juice" and image shows ONLY the juice as the hero
 
 {text_style_instruction}
 {variation_instruction}
-[STYLE_REFERENCE] - Reference slide for visual composition and mood ONLY (colors, fonts, text style).
-DO NOT copy the scene/location from the reference! Generate a COMPLETELY DIFFERENT setting.
+[STYLE_REFERENCE] - Reference slide for visual composition, mood, and content type.
+MIMIC the type of content shown in the reference - create SIMILAR scenes that match the original's vibe.
 
 {scene_instruction}
 
