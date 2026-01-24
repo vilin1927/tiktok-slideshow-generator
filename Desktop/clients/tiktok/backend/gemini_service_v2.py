@@ -940,6 +940,34 @@ VARIATION RULES:
 - Product/CTA slides have exactly 1 scene_variation
 
 ═══════════════════════════════════════════════════════════════
+MULTI-POSITION TEXT RULE (CRITICAL!)
+═══════════════════════════════════════════════════════════════
+
+If the original slide has text in MULTIPLE positions (top AND bottom, etc.):
+- DO NOT write the SAME text for both positions
+- SPLIT the message into TWO DIFFERENT parts using " | " separator
+- Format: "top text | bottom text"
+
+EXAMPLE - Original has text at top and bottom:
+- WRONG: "skincare hack that actually works ⚡" (will be duplicated)
+- CORRECT: "skincare hack ⚡ | that actually works"
+
+EXAMPLE - Hook with top and bottom text:
+{{
+    "text_variations": [
+        "morning routine tip 💫 | watch til the end",
+        "my secret hack ✨ | this changed everything"
+    ]
+}}
+
+The " | " separator tells the image generator to place:
+- First part at TOP position
+- Second part at BOTTOM position
+
+If text_position_hint says "top and bottom" or "multiple positions" → USE THE SEPARATOR!
+If text is only in ONE position → write normal text without separator.
+
+═══════════════════════════════════════════════════════════════
 MIMIC THE ORIGINAL CONTENT (ABSOLUTELY CRITICAL!)
 ═══════════════════════════════════════════════════════════════
 
@@ -1324,6 +1352,13 @@ CRITICAL TEXT PLACEMENT RULES:
 - If unsure, place text at TOP or BOTTOM edges of image
 - Main subject/object must be completely unobstructed
 
+MULTI-POSITION TEXT RULE:
+- If TEXT TO DISPLAY contains " | " (pipe separator), it means TWO separate texts
+- Format: "TOP_TEXT | BOTTOM_TEXT"
+- Place the FIRST part (before |) at the TOP of the image
+- Place the SECOND part (after |) at the BOTTOM of the image
+- NEVER place both texts in the same location - they must be in DIFFERENT positions
+
 LAYOUT RULES:
 - Generate ONE SINGLE product image - no comparisons
 - NO star ratings, review scores, or rating graphics
@@ -1406,6 +1441,13 @@ CRITICAL TEXT PLACEMENT RULES:
 - Text should be in empty/background areas only
 - If unsure, place text at TOP or BOTTOM edges of image
 
+MULTI-POSITION TEXT RULE:
+- If TEXT TO DISPLAY contains " | " (pipe separator), it means TWO separate texts
+- Format: "TOP_TEXT | BOTTOM_TEXT"
+- Place the FIRST part (before |) at the TOP of the image
+- Place the SECOND part (after |) at the BOTTOM of the image
+- NEVER place both texts in the same location - they must be in DIFFERENT positions
+
 IMPORTANT: Only ONE person in the image - never two people!
 {quality_constraints}"""
 
@@ -1449,6 +1491,13 @@ CRITICAL TEXT PLACEMENT RULES:
 - NEVER cover main objects/products with text
 - Text should be in empty/background areas only
 - If unsure, place text at TOP or BOTTOM edges of image
+
+MULTI-POSITION TEXT RULE:
+- If TEXT TO DISPLAY contains " | " (pipe separator), it means TWO separate texts
+- Format: "TOP_TEXT | BOTTOM_TEXT"
+- Place the FIRST part (before |) at the TOP of the image
+- Place the SECOND part (after |) at the BOTTOM of the image
+- NEVER place both texts in the same location - they must be in DIFFERENT positions
 
 IMPORTANT: Only ONE person in the image - never two people!
 {quality_constraints}"""
@@ -1505,6 +1554,13 @@ CRITICAL TEXT PLACEMENT RULES:
 - Text should be in empty/background areas only
 - If unsure, place text at TOP or BOTTOM edges of image
 - Main subject must be completely unobstructed
+
+MULTI-POSITION TEXT RULE:
+- If TEXT TO DISPLAY contains " | " (pipe separator), it means TWO separate texts
+- Format: "TOP_TEXT | BOTTOM_TEXT"
+- Place the FIRST part (before |) at the TOP of the image
+- Place the SECOND part (after |) at the BOTTOM of the image
+- NEVER place both texts in the same location - they must be in DIFFERENT positions
 
 IMPORTANT HUMAN BODY RULES:
 - PREFER showing objects/products instead of human body parts
