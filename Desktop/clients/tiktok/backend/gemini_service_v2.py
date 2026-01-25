@@ -2097,11 +2097,13 @@ def run_pipeline(
     hook_total = hook_photo_var * hook_text_var
     body_count = max(1, len(slide_paths) - 2)  # Estimate body slides
     body_total = body_count * body_photo_var * body_text_var
-    product_total = len(product_image_paths) * product_text_var
+    # Product photo vars must match hook/body to ensure all slideshows have products
+    product_photo_var = max(hook_photo_var, body_photo_var)
+    product_total = product_photo_var * product_text_var
     total_estimate = hook_total + body_total + product_total
 
     log.info(f"Starting pipeline: {len(slide_paths)} slides, ~{total_estimate} total images, preset={preset_id}")
-    log.debug(f"Photo vars: hook={hook_photo_var}, body={body_photo_var}, product={len(product_image_paths)}")
+    log.debug(f"Photo vars: hook={hook_photo_var}, body={body_photo_var}, product={product_photo_var}")
     log.debug(f"Text vars: hook={hook_text_var}, body={body_text_var}, product={product_text_var}")
 
     # Determine if we need clean images (no text) for manual preset
