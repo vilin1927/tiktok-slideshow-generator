@@ -1792,8 +1792,9 @@ def generate_all_images(
             expected_photo_vars = hook_photo_var
             slide_key = 'hook'
         elif slide_type == 'product':
-            # Product photo variations = number of uploaded product images
-            expected_photo_vars = len(product_image_paths)
+            # Product photo variations must match hook/body to ensure all slideshows have products
+            # Use max of hook_photo_var and body_photo_var to cover all slideshow variations
+            expected_photo_vars = max(hook_photo_var, body_photo_var)
             slide_key = 'product'
         else:  # body
             expected_photo_vars = body_photo_var
@@ -2359,7 +2360,8 @@ def submit_to_queue(
             expected_photo_vars = hook_photo_var
             slide_key = 'hook'
         elif slide_type == 'product':
-            expected_photo_vars = len(product_image_paths)
+            # Product photo variations must match hook/body to ensure all slideshows have products
+            expected_photo_vars = max(hook_photo_var, body_photo_var)
             slide_key = 'product'
         else:  # body
             expected_photo_vars = body_photo_var
