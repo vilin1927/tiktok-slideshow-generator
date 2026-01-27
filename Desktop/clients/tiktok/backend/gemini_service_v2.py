@@ -602,44 +602,41 @@ OUTPUT in "required_keywords":
 If you output a brand that doesn't exist in the description, you have FAILED this task.
 
 ═══════════════════════════════════════════════════════════════
-TASK 1: UNDERSTAND THE ORIGINAL SLIDESHOW
+TASK 1: UNDERSTAND THE SLIDESHOW NARRATIVE
 ═══════════════════════════════════════════════════════════════
 
-Identify what TYPE of slideshow this is:
+Instead of classifying into rigid types, understand the ACTUAL STORY:
 
-TYPE A - "Tips/Habits List" (most common)
-- Hook: "X things I do to..." / "habits that changed my life"
-- Body: List of tips (each slide = one tip)
-- CTA: "share yours" / engagement question (optional)
-- Example: "simple things I do to make my hair 10x better"
+1. STORY SUMMARY (one sentence):
+   What is this slideshow about?
+   Example: "Woman shares how face tape reduced her forehead lines"
 
-TYPE B - "Transformation/Journey"
-- Hook: Before state or problem
-- Body: Steps or changes made
-- CTA: Results or encouragement
-- Example: "things I fixed to look prettier"
+2. NARRATIVE ARC:
+   How does the story flow from start to finish?
+   • Hook: What grabs attention in slide 1?
+   • Build: How does the story develop through middle slides?
+   • Climax: What's the key moment/revelation?
+   • End: How does it conclude?
 
-TYPE C - "Routine/Day in Life"
-- Hook: "my morning routine" / "romanticizing my..."
-- Body: Sequential steps of routine
-- CTA: Reflection or question
-- Example: "romanticizing my night routine"
+3. VIRAL FACTOR:
+   What makes this content shareable/engaging?
+   • Relatable problem?
+   • Surprising transformation?
+   • Useful tips?
+   • Social proof?
+   • Emotional connection?
 
-TYPE D - "Product Roundup/Favorites"
-- Hook: "my holy grails" / "products I swear by"
-- Body: Multiple products shown
-- CTA: "what's yours?"
-- Example: "high maintenance habits worth every penny"
+4. CONTENT THEME:
+   What topic/niche is this? (skincare, fitness, wellness, sleep, beauty, lifestyle, etc.)
 
-TYPE E - "Affirmation/Motivation"
-- Hook: Emotional statement
-- Body: Lifestyle aspirations
-- CTA: Encouragement
-- Example: "the 'boring' generation that stays in"
+5. SLIDE ROLES:
+   For each slide, what is its PURPOSE in the story?
+   • Slide 0: [role] - e.g., "Hook - shows the problem"
+   • Slide 1: [role] - e.g., "Tip - practical advice"
+   • Slide 2: [role] - e.g., "Proof - shows results"
+   • etc.
 
-TYPE F - "Other/Mixed"
-- Doesn't fit above patterns
-- Describe what it actually is
+This narrative understanding will guide how we recreate the slideshow with the user's product.
 
 ═══════════════════════════════════════════════════════════════
 TASK 2: IDENTIFY TARGET AUDIENCE (ICP)
@@ -659,23 +656,38 @@ Map the product to audience pain points:
 - What benefit would resonate most with THIS audience?
 
 ═══════════════════════════════════════════════════════════════
-TASK 3: DETECT PERSONA USAGE
+TASK 3: ANALYZE PERSONA (CRITICAL FOR CONSISTENCY)
 ═══════════════════════════════════════════════════════════════
 
-Check each slide: Does it show a PERSON (face, body, selfie)?
+Look at the person(s) in the ORIGINAL slideshow and describe:
 
-Track:
-- persona_gender: "female" | "male" | "none" | "mixed"
-- persona_slides: list of slide indices that show a person
+1. GENDER: male | female | none (if no person shown)
 
-⚠️ IMPORTANT FOR NEW SLIDESHOW GENERATION:
-- Hook slide: CAN have persona (if original does)
-- Body slides: MUST have has_persona: false (product/aesthetic shots only)
-- Product slide: MUST have has_persona: false (focus on product)
-- CTA slide: Can have persona OR be text-only
+2. AGE RANGE: 20s | 30s | 40s | 50s | 60s+
 
-Viral TikTok slideshows typically show the creator in hook/CTA only.
-Body slides should be aesthetic product/lifestyle shots WITHOUT faces.
+3. ETHNICITY/APPEARANCE:
+   - Describe skin tone (fair, olive, tan, brown, dark)
+   - Hair color and style
+   - General facial features
+
+4. STYLE/VIBE:
+   - casual | glamorous | natural | edgy | professional
+   - Describe clothing style, makeup level, overall aesthetic
+
+5. DISTINGUISHING FEATURES:
+   - Any notable features that define the "look"
+   - Hair style, glasses, jewelry, etc.
+
+PERSONA SLIDE TRACKING:
+- Check EACH original slide: Does it show a person?
+- Track which slide indices show a person
+- For generated slides: has_persona should MATCH the original
+  (if original slide 2 shows a person, generated slide 2 should too)
+
+⚠️ CRITICAL CONSISTENCY RULE:
+This SAME persona must appear in ALL generated slides where has_persona=true.
+Generate ONE new person matching these attributes.
+This person appears consistently across every slide that has a persona.
 
 ═══════════════════════════════════════════════════════════════
 TASK 4: ANALYZE TEXT STYLE (CRITICAL FOR GENERATION)
@@ -710,43 +722,45 @@ Look at the text overlays and describe the typography VISUALLY (not font names):
 This visual description will be used to generate matching text - be VERY specific!
 
 ═══════════════════════════════════════════════════════════════
-TASK 5: FIND OPTIMAL PRODUCT INSERTION POINT
+TASK 5: DETECT COMPETITOR SLIDE & DETERMINE PRODUCT PLACEMENT
 ═══════════════════════════════════════════════════════════════
 
+STEP 1: SCAN FOR COMPETITOR SIGNALS
+
+For EACH slide's text, check if it contains ANY of these signals (case-insensitive):
+
+PURCHASE/LINK MENTIONS:
+- "amazon" / "Amazon"
+- "link in bio" / "link in profile"
+- "shop now" / "get yours" / "get it here"
+- "I got mine from..." / "available at..."
+- "use my code" / "discount code" / "use code"
+- "% off" / "swipe up" / "tap to shop"
+- Any @brand mention with purchase intent
+
+PRODUCT PROMOTION SIGNALS:
+- "This is the one I use"
+- "My favorite [product]"
+- "I've been using [brand]"
+- "I swear by [product]"
+
+If MULTIPLE slides contain competitor signals, use the LAST one (final CTA is usually main promotion).
+
+STEP 2: DETERMINE PRODUCT PLACEMENT ACTION
+
+┌─────────────────────────────────────────────────────────────────────┐
+│  IF competitor_slide_found == TRUE:                                 │
+│     ACTION: REPLACE the competitor slide with our product slide     │
+│     OUTPUT: Same number of slides as original                       │
+│     product_slide_index = competitor_slide_index                    │
+│                                                                     │
+│  ELSE (organic content, no competitor):                             │
+│     ACTION: ADD our product slide at the END                        │
+│     OUTPUT: Original slides + 1                                     │
+│     product_slide_index = last position (after all original slides) │
+└─────────────────────────────────────────────────────────────────────┘
+
 RULE: Insert product in EXACTLY ONE slide. Never multiple.
-
-STRATEGY BY TYPE:
-
-IF Type A (Tips List):
-- Find a tip that RELATES to product category
-- Replace that tip with product-as-tip
-- If no tip relates, insert at middle-to-late position
-- Product becomes "one of the tips"
-
-IF Type B (Transformation):
-- Insert product as "the solution" or "game changer" step
-- Position: after problem slides, before results
-- Product becomes "what helped me transform"
-
-IF Type C (Routine):
-- Insert product as "one step in my routine"
-- Position: where it naturally fits the routine flow
-- Product becomes "part of how I romanticize my life"
-
-IF Type D (Product Roundup):
-- Replace ONE existing product with user's product
-- Keep same position and framing
-- Product becomes "one of my favorites"
-
-IF Type E (Affirmation) or Type F (Other):
-- FALLBACK: Insert product at middle-late position
-- Frame as "small thing that makes a difference"
-- Keep it subtle - one casual mention that fits the vibe
-
-POSITION RULES (all types):
-- NEVER slide 0 (hook) or slide 1 (too early)
-- NEVER the last slide if it's a CTA
-- IDEAL: Middle-to-late position (slide 3 to {num_slides - 2})
 - Product slide should feel like it BELONGS, not interrupts
 
 ═══════════════════════════════════════════════════════════════
@@ -1012,15 +1026,37 @@ OUTPUT FORMAT
 Return ONLY valid JSON:
 
 {{
-    "slideshow_type": "A" | "B" | "C" | "D" | "E" | "F",
-    "slideshow_type_name": "Tips List | Transformation | Routine | Product Roundup | Affirmation | Other",
-    
-    "original_analysis": {{
-        "topic": "what the original is about",
-        "hook_angle": "how it grabs attention",
-        "mood": "aesthetic vibe in 2-3 words",
-        "persona_gender": "female | male | none | mixed",
-        "persona_slides": [0, 2, 5]
+    "narrative": {{
+        "story_summary": "one sentence describing what this slideshow is about",
+        "narrative_arc": {{
+            "hook": "how slide 1 grabs attention",
+            "build": "how the story develops through middle slides",
+            "climax": "key moment or revelation",
+            "end": "how it concludes"
+        }},
+        "viral_factor": "what makes this content shareable (relatable problem, transformation, useful tips, etc.)",
+        "content_theme": "skincare | fitness | wellness | sleep | beauty | lifestyle | other"
+    }},
+
+    "persona": {{
+        "gender": "female | male | none",
+        "age_range": "20s | 30s | 40s | 50s | 60s+",
+        "ethnicity": "description of skin tone and features",
+        "appearance": "hair color/style, notable features",
+        "style": "casual | glamorous | natural | edgy | professional",
+        "vibe": "overall feeling (e.g., friendly, approachable, authentic)"
+    }},
+
+    "competitor_detection": {{
+        "found": true | false,
+        "slide_index": null or [index of competitor slide],
+        "signals": ["list of signals detected, e.g., amazon, link in bio"]
+    }},
+
+    "product_placement": {{
+        "action": "replace | add",
+        "product_slide_index": [index where product slide goes],
+        "total_output_slides": [number of slides in output]
     }},
 
     "required_keywords": {{
@@ -1042,42 +1078,50 @@ Return ONLY valid JSON:
         "visual_vibe": "overall feeling in 2-3 words (e.g., clean minimal, soft feminine)",
         "position_style": "where text is typically placed (e.g., centered middle, bottom third)"
     }},
-    
+
     "target_audience": {{
         "demographic": "who this is for",
         "pain_points": ["problem 1", "problem 2"],
         "aspirations": ["desire 1", "desire 2"],
         "tone": "how they talk"
     }},
-    
+
     "product_fit": {{
         "relevant_pain_point": "which audience problem this product solves",
         "benefit_angle": "how to position the product for THIS audience",
         "insertion_rationale": "why this position makes sense"
     }},
-    
+
     "structure": {{
-        "total_slides": {num_slides},
+        "total_slides": "same as original if replacing, original+1 if adding",
         "hook_index": 0,
         "body_indices": [1, 2, 3, 5],
-        "product_index": 4,
+        "product_index": "from product_placement.product_slide_index",
         "cta_index": 6 or null
     }},
-    
+
     "new_slides": [
         {{
             "slide_index": 0,
             "slide_type": "hook",
+            "role_in_story": "Hook - grabs attention with relatable problem",
             "reference_image_index": 0,
             "has_persona": true,
+            "visual": {{
+                "subject": "woman's face, selfie style",
+                "framing": "close-up",
+                "angle": "straight on",
+                "position": "centered",
+                "background": "blurred bedroom"
+            }},
             "text_position_hint": "where text goes, what NOT to cover",
             "scene_variations": [
                 {{
-                    "scene_description": "Girl in cozy loungewear, soft bedroom lighting",
+                    "scene_description": "Girl in cozy loungewear, soft bedroom lighting. COMPOSITION: framing=close-up, angle=straight, position=center, background=blurred bedroom",
                     "text_variations": ["hook text option 1", "hook text option 2", "hook text option 3"]
                 }},
                 {{
-                    "scene_description": "Close-up selfie with glowing skin, morning light",
+                    "scene_description": "Close-up selfie with glowing skin, morning light. COMPOSITION: framing=close-up, angle=slightly above, position=center, background=window light",
                     "text_variations": ["different hook concept 1", "different hook concept 2", "different hook concept 3"]
                 }}
             ]
@@ -1085,16 +1129,24 @@ Return ONLY valid JSON:
         {{
             "slide_index": 1,
             "slide_type": "body",
+            "role_in_story": "Tip 1 - practical advice",
             "reference_image_index": 1,
             "has_persona": false,
+            "visual": {{
+                "subject": "skincare product on nightstand",
+                "framing": "medium shot",
+                "angle": "slightly above",
+                "position": "centered",
+                "background": "cozy bedroom"
+            }},
             "text_position_hint": "center middle",
             "scene_variations": [
                 {{
-                    "scene_description": "Similar scene to original slide 1 - mimic the content type and vibe",
+                    "scene_description": "Similar scene to original slide 1 - mimic the content type and vibe. COMPOSITION: framing=medium, angle=above, position=center, background=bedroom",
                     "text_variations": ["text matching original style v1", "text matching original style v2"]
                 }},
                 {{
-                    "scene_description": "Variation of the same concept from original slide 1",
+                    "scene_description": "Variation of the same concept from original slide 1. COMPOSITION: framing=medium, angle=straight, position=center, background=bathroom",
                     "text_variations": ["alternative text v1", "alternative text v2"]
                 }}
             ]
@@ -1102,12 +1154,20 @@ Return ONLY valid JSON:
         {{
             "slide_index": 4,
             "slide_type": "product",
+            "role_in_story": "Product recommendation - natural fit in the narrative",
             "reference_image_index": 4,
             "has_persona": false,
+            "visual": {{
+                "subject": "user's product prominently displayed",
+                "framing": "medium shot",
+                "angle": "straight on",
+                "position": "centered",
+                "background": "lifestyle setting matching slideshow vibe"
+            }},
             "text_position_hint": "text at top, DO NOT cover product",
             "scene_variations": [
                 {{
-                    "scene_description": "User's product on nightstand with cozy bedroom background",
+                    "scene_description": "User's product on nightstand with cozy bedroom background. COMPOSITION: framing=medium, angle=straight, position=center, background=bedroom",
                     "text_variations": [
                         "steam eye mask before bed\\n\\nlumidew masks are my fave! got them on amazon ✨",
                         "heated eye spa\\n\\nobsessed with lumidew masks from amazon!"
@@ -1123,16 +1183,20 @@ IMPORTANT - reference_image_index explained:
 - MIMIC both the STYLE (font, colors, layout) AND the TYPE of content
 - Create SIMILAR content that matches what the original slide shows
 
-CRITICAL RULES FOR scene_variations:
-1. Exactly {num_slides} slides in new_slides array
+CRITICAL RULES:
+1. SLIDE COUNT:
+   - If competitor_detection.found == true: new_slides array has {num_slides} slides (REPLACE competitor)
+   - If competitor_detection.found == false: new_slides array has {num_slides} + 1 slides (ADD product at end)
 2. Exactly ONE slide with slide_type="product"
 3. Hook slides: {hook_photo_var} scene_variations, each with {hook_text_var} text_variations
 4. Body slides: {body_photo_var} scene_variations, each with {body_text_var} text_variations
 5. Product slides: 1 scene_variation with {product_text_var} text_variations
 6. CTA slides: 1 scene_variation
-7. Each scene_variation MUST have a different scene_description (different tip/concept!)
-8. has_persona must be true/false for each slide
-9. cta_index is null if original has no CTA slide
+7. Each scene_variation MUST have a different scene_description (different take on same concept!)
+8. has_persona: set to true if ORIGINAL slide shows a person, false otherwise
+9. Include "visual" object for each slide with composition details
+10. Include "role_in_story" for each slide describing its narrative purpose
+11. scene_description MUST end with "COMPOSITION: framing=X, angle=Y, position=Z, background=W"
 """
 
     # Build content with all images
@@ -1180,9 +1244,17 @@ CRITICAL RULES FOR scene_variations:
         if 'new_slides' not in analysis:
             log.error("Missing new_slides in analysis")
             raise GeminiServiceError('Missing new_slides in analysis')
-        if len(analysis['new_slides']) != num_slides:
-            log.error(f"Slide count mismatch: expected {num_slides}, got {len(analysis['new_slides'])}")
-            raise GeminiServiceError(f"Expected {num_slides} slides, got {len(analysis['new_slides'])}")
+
+        # Validate slide count based on product_placement action
+        # - "replace": same number of slides as original
+        # - "add": original + 1 (product slide added at end)
+        product_placement = analysis.get('product_placement', {})
+        placement_action = product_placement.get('action', 'add')
+        expected_slides = num_slides if placement_action == 'replace' else num_slides + 1
+
+        if len(analysis['new_slides']) != expected_slides:
+            log.error(f"Slide count mismatch: expected {expected_slides} (action={placement_action}), got {len(analysis['new_slides'])}")
+            raise GeminiServiceError(f"Expected {expected_slides} slides (action={placement_action}), got {len(analysis['new_slides'])}")
 
         # Validate exactly one product slide
         product_slides = [s for s in analysis['new_slides'] if s.get('slide_type') == 'product']
@@ -1431,6 +1503,11 @@ LAYOUT: {text_position_hint}
 {text_style_instruction}
 {variation_instruction}
 [STYLE_REFERENCE] - Reference slide for visual composition and mood.
+MIRROR the exact composition from the reference:
+- Same framing (close-up, medium, wide)
+- Same camera angle (straight, above, below, side)
+- Same subject position in frame (center, left, right)
+- Similar background vibe and setting
 
 [PERSONA_REFERENCE] - Person to use. Generate the EXACT SAME PERSON in a new scene:
 - SAME face, hair color, skin tone, facial features
@@ -1438,6 +1515,16 @@ LAYOUT: {text_position_hint}
 - DIFFERENT clothing appropriate for this scene context
 - The outfit should match the situation (casual at home, dressed for going out, workout clothes for gym, etc.)
 - This must look like the same creator, just in different clothes
+
+SKIN REALISM (CRITICAL - apply to all faces):
+Increase skin realism with subtle natural pores, fine micro-bumps, and gentle uneven smoothness.
+Add tasteful micro-imperfections: tiny blemishes, faint redness, subtle under-eye texture, slight natural tone variation.
+Correct highlights to avoid plastic shine—soft realistic specular highlights with mild oiliness in the T-zone.
+Add a few natural baby hairs and minimal stray strands around the hairline.
+Introduce very subtle natural asymmetry without changing identity.
+Finish with soft camera realism: light grain, mild shadow noise, natural micro-contrast, no over-sharpening.
+
+DO NOT create: perfect poreless skin, overly smooth texture, plastic or waxy appearance, symmetrical "AI perfect" faces, over-brightened or glowing skin.
 
 NEW SCENE: {scene_description}
 
@@ -1482,6 +1569,11 @@ IMPORTANT: Only ONE person in the image - never two people!
 {text_style_instruction}
 {variation_instruction}
 [STYLE_REFERENCE] - Reference slide for visual composition and mood.
+MIRROR the exact composition from the reference:
+- Same framing (close-up, medium, wide)
+- Same camera angle (straight, above, below, side)
+- Same subject position in frame (center, left, right)
+- Similar background vibe and setting
 (Do NOT copy the person - create a NEW person)
 
 CREATE A NEW PERSONA:
@@ -1489,6 +1581,16 @@ CREATE A NEW PERSONA:
 - Natural, authentic appearance
 - Clothing appropriate for this scene context
 - Will be used as reference for other slides
+
+SKIN REALISM (CRITICAL - apply to all faces):
+Increase skin realism with subtle natural pores, fine micro-bumps, and gentle uneven smoothness.
+Add tasteful micro-imperfections: tiny blemishes, faint redness, subtle under-eye texture, slight natural tone variation.
+Correct highlights to avoid plastic shine—soft realistic specular highlights with mild oiliness in the T-zone.
+Add a few natural baby hairs and minimal stray strands around the hairline.
+Introduce very subtle natural asymmetry without changing identity.
+Finish with soft camera realism: light grain, mild shadow noise, natural micro-contrast, no over-sharpening.
+
+DO NOT create: perfect poreless skin, overly smooth texture, plastic or waxy appearance, symmetrical "AI perfect" faces, over-brightened or glowing skin.
 
 NEW SCENE: {scene_description}
 
@@ -1551,6 +1653,11 @@ RIGHT: Scene says "tart cherry juice" and image shows ONLY the juice as the hero
 {text_style_instruction}
 {variation_instruction}
 [STYLE_REFERENCE] - Reference slide for visual composition, mood, and content type.
+MIRROR the exact composition from the reference:
+- Same framing (close-up, medium, wide)
+- Same camera angle (straight, above, below, side)
+- Same subject position in frame (center, left, right)
+- Similar background vibe and setting
 MIMIC the type of content shown in the reference - create SIMILAR scenes that match the original's vibe.
 
 {scene_instruction}
