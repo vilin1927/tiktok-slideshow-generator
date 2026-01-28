@@ -61,6 +61,69 @@ SAFETY_SETTINGS = [
     ),
 ]
 
+# Safety fallback: word replacements to sanitize prompts that get blocked
+# These replace potentially triggering words with safer alternatives
+SAFETY_WORD_REPLACEMENTS = [
+    # Clothing
+    (r'\bslip dress\b', 'elegant dress'),
+    (r'\blingerie\b', 'loungewear'),
+    (r'\bbikini\b', 'swimwear'),
+    (r'\bunderwear\b', 'comfortable clothes'),
+    (r'\bbra\b', 'top'),
+    (r'\bnightgown\b', 'sleepwear'),
+    (r'\bbodycon\b', 'fitted'),
+    (r'\blow[- ]cut\b', 'stylish'),
+    (r'\bskinny\b', 'fitted'),
+    (r'\btight[- ]fitting\b', 'well-fitted'),
+
+    # Settings/atmosphere
+    (r'\bbedroom\b', 'cozy indoor space'),
+    (r'\bbed\b', 'cozy setting'),
+    (r'\bcandlelit\b', 'warm ambient lighting'),
+    (r'\bcandle[- ]lit\b', 'warm ambient lighting'),
+    (r'\bintimate\b', 'cozy'),
+    (r'\bromantic\b', 'warm'),
+    (r'\bseductive\b', 'confident'),
+    (r'\bsensual\b', 'relaxed'),
+    (r'\bsultry\b', 'confident'),
+    (r'\bsteamy\b', 'relaxing'),
+
+    # Body descriptions
+    (r'\bbare\b', 'natural'),
+    (r'\bnaked\b', 'natural'),
+    (r'\bexposed\b', 'visible'),
+    (r'\bcleavage\b', 'neckline'),
+    (r'\bcurves\b', 'figure'),
+    (r'\bcurvy\b', 'natural'),
+    (r'\bskin[- ]tight\b', 'form-fitting'),
+
+    # Actions
+    (r'\blying in bed\b', 'relaxing at home'),
+    (r'\blaying in bed\b', 'relaxing at home'),
+    (r'\bon the bed\b', 'in cozy setting'),
+    (r'\bundressing\b', 'getting ready'),
+    (r'\bshowering\b', 'freshening up'),
+    (r'\bbathing\b', 'relaxing'),
+]
+
+def _sanitize_scene_description(scene: str) -> tuple[str, bool]:
+    """
+    Sanitize a scene description by replacing potentially triggering words.
+
+    Returns:
+        tuple: (sanitized_scene, was_modified)
+    """
+    sanitized = scene
+    was_modified = False
+
+    for pattern, replacement in SAFETY_WORD_REPLACEMENTS:
+        new_text = re.sub(pattern, replacement, sanitized, flags=re.IGNORECASE)
+        if new_text != sanitized:
+            was_modified = True
+            sanitized = new_text
+
+    return sanitized, was_modified
+
 # Queue mode flag - set via environment variable
 # When True, submits to global queue instead of direct generation
 USE_QUEUE_MODE = os.getenv('USE_IMAGE_QUEUE', 'true').lower() == 'true'
@@ -1743,13 +1806,17 @@ If it looks like a stock photo or Amazon listing, it will be REJECTED.
                 )
             ]
 
-    # Retry logic with validation
+    # Retry logic with validation and safety fallback
     last_error = None
+    tried_sanitized = False  # Track if we've attempted with sanitized prompt
+    current_scene = scene_description  # Track current scene description
+    current_contents = contents  # Track current prompt contents
+
     for attempt in range(MAX_RETRIES):
         try:
             response = client.models.generate_content(
                 model=IMAGE_MODEL,
-                contents=contents,
+                contents=current_contents,
                 config=types.GenerateContentConfig(
                     response_modalities=['image', 'text'],
                     image_config=types.ImageConfig(
@@ -1760,8 +1827,21 @@ If it looks like a stock photo or Amazon listing, it will be REJECTED.
                 )
             )
 
-            # Extract generated image
+            # Extract generated image - check for safety block
             if not response.parts:
+                # Safety block detected - try sanitizing if we haven't yet
+                if not tried_sanitized:
+                    sanitized_scene, was_modified = _sanitize_scene_description(current_scene)
+                    if was_modified:
+                        logger.warning(f"Safety block detected, retrying with sanitized scene: '{current_scene[:50]}...' -> '{sanitized_scene[:50]}...'")
+                        tried_sanitized = True
+                        current_scene = sanitized_scene
+                        # Rebuild prompt with sanitized scene (update the prompt string in contents)
+                        current_contents = [c if not isinstance(c, str) or 'NEW SCENE:' not in c
+                                           else c.replace(scene_description, sanitized_scene)
+                                           for c in current_contents]
+                        continue  # Retry with sanitized prompt (don't count as attempt)
+
                 raise GeminiServiceError('Empty response from Gemini - content may have been blocked')
             for part in response.parts:
                 if hasattr(part, 'inline_data') and part.inline_data:
@@ -1799,10 +1879,26 @@ If it looks like a stock photo or Amazon listing, it will be REJECTED.
 
         except Exception as e:
             last_error = e
-            error_str = str(e)
+            error_str = str(e).lower()
+
+            # Check for safety-related errors and try sanitizing
+            safety_indicators = ['safety', 'blocked', 'harmful', 'policy', 'content filter']
+            is_safety_error = any(indicator in error_str for indicator in safety_indicators)
+
+            if is_safety_error and not tried_sanitized:
+                sanitized_scene, was_modified = _sanitize_scene_description(current_scene)
+                if was_modified:
+                    logger.warning(f"Safety error detected, retrying with sanitized scene: {str(e)[:100]}")
+                    tried_sanitized = True
+                    current_scene = sanitized_scene
+                    current_contents = [c if not isinstance(c, str) or 'NEW SCENE:' not in c
+                                       else c.replace(scene_description, sanitized_scene)
+                                       for c in current_contents]
+                    time.sleep(2)  # Brief pause before retry
+                    continue  # Retry with sanitized prompt
 
             # Check for rate limit error and extract retry delay
-            if '429' in error_str or 'RESOURCE_EXHAUSTED' in error_str:
+            if '429' in str(e) or 'RESOURCE_EXHAUSTED' in str(e):
                 # Try to extract retry delay from error (e.g., "retry in 51s")
                 match = re.search(r'retry in (\d+\.?\d*)s', error_str)
                 if match:
