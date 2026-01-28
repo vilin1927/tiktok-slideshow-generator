@@ -28,6 +28,7 @@ from presets import get_preset
 
 from google import genai
 from google.genai import types
+from google.genai.types import HarmCategory, HarmBlockThreshold, SafetySetting
 
 # Model names
 ANALYSIS_MODEL = 'gemini-3-pro-preview'
@@ -37,6 +38,28 @@ GROUNDING_MODEL = 'gemini-2.0-flash'  # Fast model for grounding searches
 # Generation config
 MAX_RETRIES = 5       # Retries for direct generation mode
 REQUEST_TIMEOUT = 120 # 120 sec timeout per API call
+
+# Safety settings - use BLOCK_ONLY_HIGH to allow benign lifestyle content
+# This prevents false positives on scenes like "candlelit dinner", "slip dress", etc.
+# while still blocking truly harmful content
+SAFETY_SETTINGS = [
+    SafetySetting(
+        category=HarmCategory.HARM_CATEGORY_HARASSMENT,
+        threshold=HarmBlockThreshold.BLOCK_ONLY_HIGH,
+    ),
+    SafetySetting(
+        category=HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+        threshold=HarmBlockThreshold.BLOCK_ONLY_HIGH,
+    ),
+    SafetySetting(
+        category=HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+        threshold=HarmBlockThreshold.BLOCK_ONLY_HIGH,
+    ),
+    SafetySetting(
+        category=HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+        threshold=HarmBlockThreshold.BLOCK_ONLY_HIGH,
+    ),
+]
 
 # Queue mode flag - set via environment variable
 # When True, submits to global queue instead of direct generation
@@ -1199,7 +1222,10 @@ CRITICAL RULES:
         log.debug(f"Calling {ANALYSIS_MODEL} with {len(contents)} content parts")
         response = client.models.generate_content(
             model=ANALYSIS_MODEL,
-            contents=contents
+            contents=contents,
+            config=types.GenerateContentConfig(
+                safety_settings=SAFETY_SETTINGS  # Allow benign lifestyle content analysis
+            )
         )
         elapsed = time.time() - start_time
         result_text = response.text
@@ -1729,7 +1755,8 @@ If it looks like a stock photo or Amazon listing, it will be REJECTED.
                     image_config=types.ImageConfig(
                         aspect_ratio="3:4",
                         image_size="4K"  # 4096px for better text quality
-                    )
+                    ),
+                    safety_settings=SAFETY_SETTINGS  # Allow benign lifestyle content
                 )
             )
 
