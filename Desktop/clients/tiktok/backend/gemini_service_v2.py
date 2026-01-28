@@ -79,6 +79,13 @@ SAFETY_WORD_REPLACEMENTS = [
     # Settings/atmosphere
     (r'\bbedroom\b', 'cozy indoor space'),
     (r'\bbed\b', 'cozy setting'),
+    (r'\bsilk pillowcases?\b', 'soft cushion covers'),
+    (r'\bpillowcases?\b', 'cushion covers'),
+    (r'\bpillows?\b', 'cushions'),
+    (r'\bsheets\b', 'soft linens'),
+    (r'\bduvet\b', 'cozy blanket'),
+    (r'\bbedding\b', 'soft furnishings'),
+    (r'\bmattress\b', 'comfortable surface'),
     (r'\bcandlelit\b', 'warm ambient lighting'),
     (r'\bcandle[- ]lit\b', 'warm ambient lighting'),
     (r'\bintimate\b', 'cozy'),
