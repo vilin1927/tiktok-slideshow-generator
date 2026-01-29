@@ -1823,12 +1823,12 @@ LAYOUT: {text_position_hint}
             if product_in_use_reference and os.path.exists(product_in_use_reference):
                 product_on_face_instruction = """
 PRODUCT ON FACE (CRITICAL):
-[PRODUCT_IN_USE_REFERENCE] shows how the product looks when WORN ON THE FACE.
-The person MUST be WEARING this product:
-- Show lavender/purple face tape patches on the skin
-- Place patches on: forehead (horizontal strips), under eyes (crescent shapes), and/or smile lines
-- The patches should look natural and match the reference image
-- Product must be clearly visible on the person's face"""
+[PRODUCT_IN_USE_REFERENCE] shows LumiDew face tape worn on the face.
+The person MUST be WEARING LumiDew face tape exactly as shown:
+- Match the appearance from reference: lavender/purple silicone patches
+- Place on same areas as reference (forehead, under eyes, smile lines)
+- Patches should have subtle "LumiDew" branding visible if shown in reference
+- Product must be clearly visible and look natural on the skin"""
 
             prompt = f"""Generate a TikTok {slide_label} slide.
 
@@ -1943,12 +1943,12 @@ Only match: lighting mood, camera angle, setting vibe."""
             if product_in_use_reference and os.path.exists(product_in_use_reference):
                 product_on_face_instruction = """
 PRODUCT ON FACE (CRITICAL):
-[PRODUCT_IN_USE_REFERENCE] shows how the product looks when WORN ON THE FACE.
-The person MUST be WEARING this product:
-- Show lavender/purple face tape patches on the skin
-- Place patches on: forehead (horizontal strips), under eyes (crescent shapes), and/or smile lines
-- The patches should look natural and match the reference image
-- Product must be clearly visible on the person's face"""
+[PRODUCT_IN_USE_REFERENCE] shows LumiDew face tape worn on the face.
+The person MUST be WEARING LumiDew face tape exactly as shown:
+- Match the appearance from reference: lavender/purple silicone patches
+- Place on same areas as reference (forehead, under eyes, smile lines)
+- Patches should have subtle "LumiDew" branding visible if shown in reference
+- Product must be clearly visible and look natural on the skin"""
 
             prompt = f"""Generate a TikTok {slide_label} slide.
 
