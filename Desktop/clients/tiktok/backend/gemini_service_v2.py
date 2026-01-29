@@ -2019,22 +2019,37 @@ IMPORTANT: Only ONE person in the image - never two people!
 {text_style_instruction}
 {visual_style_instruction}
 {variation_instruction}
-[STYLE_REFERENCE] - Reference for COMPOSITION and LIGHTING only.
-⚠️ DO NOT copy the person's face/appearance from STYLE_REFERENCE!
-MIRROR ONLY the composition:
-- Same framing (close-up, medium, wide)
-- Same camera angle (straight, above, below, side)
-- Same subject position in frame (center, left, right)
-- Similar background vibe and setting
+⚠️⚠️⚠️ CRITICAL - PERSONA IDENTITY (READ FIRST) ⚠️⚠️⚠️
 
-[PERSONA_REFERENCE] - THE PERSON TO USE. Generate the EXACT SAME PERSON from THIS image:
-✓ SAME face as PERSONA_REFERENCE (not STYLE_REFERENCE!)
-✓ SAME hair color and style as PERSONA_REFERENCE
-✓ SAME skin tone and facial features as PERSONA_REFERENCE
-✓ SAME body type and general appearance as PERSONA_REFERENCE
-✗ DO NOT use the person from STYLE_REFERENCE
-- DIFFERENT clothing appropriate for this scene context
-- This must look like the same creator from PERSONA_REFERENCE, just in different clothes
+[PERSONA_REFERENCE] - THIS IS THE PERSON YOU MUST GENERATE:
+Generate the EXACT SAME PERSON from [PERSONA_REFERENCE]. This is NON-NEGOTIABLE.
+
+MANDATORY IDENTITY MATCH:
+✓ SAME face shape and facial structure
+✓ SAME body type and build (if plus-size, generate plus-size; if slim, generate slim)
+✓ SAME hair color (exact shade - red, burgundy, blonde, etc.)
+✓ SAME skin tone
+✓ SAME approximate age
+✓ SAME general appearance and vibe
+
+WHAT CAN CHANGE:
+- Clothing (different outfit appropriate for scene)
+- Hairstyle slightly (but SAME color)
+- Expression
+
+[STYLE_REFERENCE] - Reference for COMPOSITION and LIGHTING only.
+⚠️ COMPLETELY IGNORE the person shown in STYLE_REFERENCE!
+The person in STYLE_REFERENCE is IRRELEVANT - only use it for:
+- Framing (close-up, medium, wide)
+- Camera angle
+- Background vibe
+- Lighting mood
+
+❌ DO NOT blend features from both references
+❌ DO NOT create a "middle ground" between the two people
+❌ DO NOT use STYLE_REFERENCE person's face, body type, or hair color
+
+The output person must be RECOGNIZABLE as the same individual from [PERSONA_REFERENCE].
 
 SKIN REALISM (CRITICAL - apply to all faces):
 Increase skin realism with subtle natural pores, fine micro-bumps, and gentle uneven smoothness.
@@ -2069,17 +2084,18 @@ MULTI-POSITION TEXT RULE:
 IMPORTANT: Only ONE person in the image - never two people!
 {quality_constraints}"""
 
+                # PERSONA_REFERENCE first - model anchors on first image
                 contents = [
                     prompt,
-                    "[STYLE_REFERENCE]",
-                    types.Part.from_bytes(
-                        data=_load_image_bytes(reference_image_path),
-                        mime_type=_get_image_mime_type(reference_image_path)
-                    ),
                     "[PERSONA_REFERENCE]",
                     types.Part.from_bytes(
                         data=_load_image_bytes(persona_reference_path),
                         mime_type=_get_image_mime_type(persona_reference_path)
+                    ),
+                    "[STYLE_REFERENCE]",
+                    types.Part.from_bytes(
+                        data=_load_image_bytes(reference_image_path),
+                        mime_type=_get_image_mime_type(reference_image_path)
                     )
                 ]
         elif has_persona:
