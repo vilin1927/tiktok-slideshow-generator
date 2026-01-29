@@ -1415,7 +1415,7 @@ Return ONLY valid JSON:
             "role_in_story": "Hook - grabs attention with relatable problem",
             "reference_image_index": 0,
             "has_persona": true,
-            "shows_product_on_face": false,  // HOOK: almost always false (hooks rarely show face tape)
+            "shows_product_on_face": false,  // FALSE: original hook shows person but NO face tape patches visible on face
             "visual": {{
                 "subject": "woman's face, selfie style",
                 "framing": "close-up",
@@ -1461,7 +1461,7 @@ Return ONLY valid JSON:
             "role_in_story": "Tip 2 - shows results/application",
             "reference_image_index": 2,
             "has_persona": true,
-            "shows_product_on_face": true,  // TRUE: original slide 2 shows person WEARING face tape patches on face!
+            "shows_product_on_face": true,  // TRUE: original slide 2 shows person WEARING face tape patches visibly ON their face!
             "visual": {{
                 "subject": "woman with face tape patches on forehead and under eyes",
                 "framing": "close-up",
@@ -1478,12 +1478,34 @@ Return ONLY valid JSON:
             ]
         }},
         {{
+            "slide_index": 3,
+            "slide_type": "body",
+            "role_in_story": "Tip 3 - lifestyle advice",
+            "reference_image_index": 3,
+            "has_persona": true,
+            "shows_product_on_face": false,  // FALSE: original slide 3 shows person but NO face tape visible on their face
+            "visual": {{
+                "subject": "woman drinking water",
+                "framing": "medium shot",
+                "angle": "straight on",
+                "position": "centered",
+                "background": "kitchen"
+            }},
+            "text_position_hint": "bottom of image",
+            "scene_variations": [
+                {{
+                    "scene_description": "Woman drinking glass of water in kitchen. COMPOSITION: framing=medium, angle=straight, position=center, background=kitchen",
+                    "text_variations": ["hydration tip text"]
+                }}
+            ]
+        }},
+        {{
             "slide_index": 4,
             "slide_type": "product",
             "role_in_story": "Product recommendation - natural fit in the narrative",
             "reference_image_index": 4,
             "has_persona": false,
-            "shows_product_on_face": false,  // false: product slides show product packaging, not worn on face
+            "shows_product_on_face": false,  // FALSE: product slides show product PACKAGING, not worn on anyone's face
             "visual": {{
                 "subject": "user's product prominently displayed",
                 "framing": "medium shot",
@@ -1497,6 +1519,28 @@ Return ONLY valid JSON:
                 {{
                     "scene_description": "User's product on nightstand with cozy bedroom background. COMPOSITION: framing=medium, angle=straight, position=center, background=bedroom",
                     "text_variations": ["product text with brand + amazon - generate exactly {product_text_var} items here"]
+                }}
+            ]
+        }},
+        {{
+            "slide_index": 5,
+            "slide_type": "cta",
+            "role_in_story": "Call to action - follow for more",
+            "reference_image_index": 5,
+            "has_persona": true,
+            "shows_product_on_face": false,  // FALSE: CTA slides typically show person waving/smiling, no face tape visible
+            "visual": {{
+                "subject": "woman smiling at camera",
+                "framing": "medium shot",
+                "angle": "straight on",
+                "position": "centered",
+                "background": "same as hook"
+            }},
+            "text_position_hint": "center of image",
+            "scene_variations": [
+                {{
+                    "scene_description": "Woman smiling and waving at camera. COMPOSITION: framing=medium, angle=straight, position=center, background=bedroom",
+                    "text_variations": ["Follow for more tips!"]
                 }}
             ]
         }}
