@@ -1823,7 +1823,7 @@ LAYOUT: {text_position_hint}
             if product_in_use_reference and os.path.exists(product_in_use_reference):
                 product_on_face_instruction = """
 [PRODUCT_IN_USE_REFERENCE] shows LumiDew face tape.
-Apply this face tape to the person's face - ONE patch on forehead with "LumiDew" text visible."""
+Apply this face tape to the person's face with "LumiDew" text visible. Use 1-3 patches in natural zones: forehead and/or under eyes."""
 
             prompt = f"""Generate a TikTok {slide_label} slide.
 
@@ -1938,7 +1938,7 @@ Only match: lighting mood, camera angle, setting vibe."""
             if product_in_use_reference and os.path.exists(product_in_use_reference):
                 product_on_face_instruction = """
 [PRODUCT_IN_USE_REFERENCE] shows LumiDew face tape.
-Apply this face tape to the person's face - ONE patch on forehead with "LumiDew" text visible."""
+Apply this face tape to the person's face with "LumiDew" text visible. Use 1-3 patches in natural zones: forehead and/or under eyes."""
 
             prompt = f"""Generate a TikTok {slide_label} slide.
 
