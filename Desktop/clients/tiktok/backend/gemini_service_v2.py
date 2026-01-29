@@ -160,6 +160,32 @@ PRODUCT_IN_USE_REFERENCES = {
     'face_tape': os.path.join(os.path.dirname(__file__), 'static', 'product_references', 'face_tape_reference.png'),
 }
 
+# Facial variation sets for persona diversity
+# Each version gets different facial features to ensure personas look distinct
+# while still matching the target demographic
+FACIAL_VARIATION_SETS = {
+    1: {'face_shape': 'oval', 'eye_shape': 'almond-shaped', 'nose_type': 'straight with a soft bridge', 'distinctive_feature': 'subtle dimples when smiling'},
+    2: {'face_shape': 'heart-shaped with a delicate chin', 'eye_shape': 'round and larger', 'nose_type': 'slightly upturned', 'distinctive_feature': 'high prominent cheekbones'},
+    3: {'face_shape': 'square with soft angles', 'eye_shape': 'hooded with depth', 'nose_type': 'prominent bridge', 'distinctive_feature': 'strong defined jawline'},
+    4: {'face_shape': 'round and youthful', 'eye_shape': 'wide-set and expressive', 'nose_type': 'small button nose', 'distinctive_feature': 'apple cheeks'},
+    5: {'face_shape': 'long and elegant', 'eye_shape': 'cat-eye shaped', 'nose_type': 'aquiline with character', 'distinctive_feature': 'defined brow bone'},
+}
+
+def _get_facial_variation(version: int) -> dict:
+    """
+    Get facial variation features based on version number.
+    Cycles through 5 distinct feature sets.
+
+    Args:
+        version: The version/photo variation number (1-based)
+
+    Returns:
+        Dict with face_shape, eye_shape, nose_type, distinctive_feature
+    """
+    # Cycle through 5 variations (version 1->1, 2->2, ..., 6->1, 7->2, etc.)
+    variation_key = ((version - 1) % 5) + 1
+    return FACIAL_VARIATION_SETS[variation_key]
+
 def _get_product_in_use_reference(product_on_face_config: dict) -> Optional[str]:
     """
     Get the product-in-use reference image path based on analysis config.
@@ -1822,15 +1848,15 @@ LAYOUT: {text_position_hint}
             product_on_face_instruction = ""
             if product_in_use_reference and os.path.exists(product_in_use_reference):
                 product_on_face_instruction = """
-[PRODUCT_IN_USE_REFERENCE] shows LumiDew face tape.
-Apply this face tape to the person's face with "LumiDew" text visible. Use 1-3 patches in natural zones: forehead and/or under eyes."""
+[PRODUCT_IN_USE_REFERENCE] shows LumiDew face tape (lavender/purple patches).
+IGNORE any face tape in STYLE_REFERENCE - use ONLY the LumiDew patches from PRODUCT_IN_USE_REFERENCE. Apply 1-3 lavender patches with "LumiDew" text on forehead and/or under eyes."""
 
             prompt = f"""Generate a TikTok {slide_label} slide.
 
 {text_style_instruction}
 {visual_style_instruction}
 {variation_instruction}
-[STYLE_REFERENCE] - Reference slide for visual composition and mood.
+[STYLE_REFERENCE] - Reference for composition and lighting ONLY (ignore any products/face tape shown).
 MIRROR the exact composition from the reference:
 - Same framing (close-up, medium, wide)
 - Same camera angle (straight, above, below, side)
@@ -1904,6 +1930,9 @@ IMPORTANT: Only ONE person in the image - never two people!
         elif has_persona:
             # Has persona but NO reference yet - CREATE a new persona
             # Simple instruction: recreate a similar person, NOT the same face
+            # Use facial variation to ensure diversity across photo variations
+            facial_variation = _get_facial_variation(version)
+
             if persona_info:
                 persona_demographics = f"""
 PERSONA INSTRUCTION - GENERATE A NEW PERSON:
@@ -1913,16 +1942,27 @@ DO NOT COPY from the reference:
 ✗ DO NOT copy the hair color or style
 ✗ DO NOT copy the clothing/outfit
 
-GENERATE a new person with:
-✓ Demographics: {persona_info.get('gender', 'female')}, {persona_info.get('age_range', '20s')}, {persona_info.get('style', 'casual')} style
-✓ DIFFERENT face shape and features
-✓ DIFFERENT hair color and style
-✓ DIFFERENT clothing (any casual outfit that fits the vibe)
+TARGET AUDIENCE DEMOGRAPHICS (keep within this demographic):
+- Gender: {persona_info.get('gender', 'female')}
+- Age Range: {persona_info.get('age_range', '20s')}
+- Style: {persona_info.get('style', 'casual')}
+
+UNIQUE FACIAL FEATURES (VERSION {version}) - CREATE THIS SPECIFIC LOOK:
+- Face Shape: {facial_variation['face_shape']}
+- Eye Shape: {facial_variation['eye_shape']}
+- Nose: {facial_variation['nose_type']}
+- Distinctive Feature: {facial_variation['distinctive_feature']}
+
+GENERATE a person with:
+✓ The SPECIFIC facial features listed above (face shape, eyes, nose, distinctive feature)
+✓ Hair that fits the demographic but is DIFFERENT from the reference
+✓ Clothing that fits the scene (any casual outfit that fits the vibe)
 
 The ONLY things to match from reference: warm lighting mood, selfie angle, indoor setting vibe.
-Think "someone from the same target audience" - NOT a twin or relative of the reference person."""
+Think "could be their friend from the same target audience" - NOT a twin, NOT a relative, NOT the same person."""
             else:
-                persona_demographics = """
+                # Fallback without persona_info - still use facial variation
+                persona_demographics = f"""
 PERSONA INSTRUCTION - GENERATE A NEW PERSON:
 
 DO NOT COPY from the reference:
@@ -1930,7 +1970,14 @@ DO NOT COPY from the reference:
 ✗ DO NOT copy the hair color or style
 ✗ DO NOT copy the clothing/outfit
 
-Generate a completely NEW person with different features, different hair, different clothes.
+UNIQUE FACIAL FEATURES (VERSION {version}) - CREATE THIS SPECIFIC LOOK:
+- Face Shape: {facial_variation['face_shape']}
+- Eye Shape: {facial_variation['eye_shape']}
+- Nose: {facial_variation['nose_type']}
+- Distinctive Feature: {facial_variation['distinctive_feature']}
+
+Generate a completely NEW person with the SPECIFIC facial features above.
+Use different hair color and style, different clothes from the reference.
 Only match: lighting mood, camera angle, setting vibe."""
 
             # Add product-on-face instruction if reference provided
