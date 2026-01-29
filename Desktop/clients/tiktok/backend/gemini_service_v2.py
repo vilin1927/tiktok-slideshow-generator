@@ -1380,6 +1380,7 @@ Return ONLY valid JSON:
             "role_in_story": "Hook - grabs attention with relatable problem",
             "reference_image_index": 0,
             "has_persona": true,
+            "shows_product_on_face": false,  // true ONLY if original slide shows person wearing face tape/patches
             "visual": {{
                 "subject": "woman's face, selfie style",
                 "framing": "close-up",
@@ -1402,6 +1403,7 @@ Return ONLY valid JSON:
             "role_in_story": "Tip 1 - practical advice",
             "reference_image_index": 1,
             "has_persona": false,
+            "shows_product_on_face": false,
             "visual": {{
                 "subject": "skincare product on nightstand",
                 "framing": "medium shot",
@@ -1424,6 +1426,7 @@ Return ONLY valid JSON:
             "role_in_story": "Product recommendation - natural fit in the narrative",
             "reference_image_index": 4,
             "has_persona": false,
+            "shows_product_on_face": false,
             "visual": {{
                 "subject": "user's product prominently displayed",
                 "framing": "medium shot",
@@ -1462,6 +1465,7 @@ CRITICAL RULES:
 9. Include "visual" object for each slide with composition details
 10. Include "role_in_story" for each slide describing its narrative purpose
 11. scene_description MUST end with "COMPOSITION: framing=X, angle=Y, position=Z, background=W"
+12. shows_product_on_face: set to true ONLY if the ORIGINAL slide shows a person wearing face tape/patches/stickers ON their face. false otherwise. Look for patches on forehead, under eyes, or smile lines in the original slide.
 """
 
     # Build content with all images
@@ -2422,7 +2426,8 @@ def generate_all_images(
                     'text_position_hint': slide.get('text_position_hint', ''),
                     'output_path': output_path,
                     'product_image_path': product_img,
-                    'has_persona': has_persona
+                    'has_persona': has_persona,
+                    'shows_product_on_face': slide.get('shows_product_on_face', False)  # Per-slide face tape detection
                 }
                 all_tasks.append(task)
 
@@ -2511,6 +2516,8 @@ def generate_all_images(
         try:
             rate_limiter.acquire()
             try:
+                # Only pass face tape reference if THIS specific slide shows product on face
+                task_product_ref = product_in_use_reference if task.get('shows_product_on_face') else ''
                 return task['task_id'], _generate_single_image(
                     client,
                     task['slide_type'],
@@ -2528,7 +2535,7 @@ def generate_all_images(
                     task['version'],  # Pass version for variation diversity
                     clean_image_mode,  # Generate without text for PIL rendering
                     product_description,  # For real product grounding in scenes
-                    product_in_use_reference  # Face tape reference if product goes on face
+                    task_product_ref  # Face tape reference ONLY if original slide shows it
                 )
             finally:
                 rate_limiter.release()
@@ -2928,6 +2935,7 @@ def submit_to_queue(
         ref_idx = slide.get('reference_image_index', idx)
         slide_type = slide['slide_type']
         has_persona = slide.get('has_persona', False)
+        shows_product_on_face = slide.get('shows_product_on_face', False)  # Per-slide face tape
 
         # Skip CTA slides
         if slide_type == 'cta':
@@ -3022,7 +3030,7 @@ def submit_to_queue(
                     persona_info=persona_info,  # Demographics for new persona creation
                     clean_image_mode=clean_image_mode,
                     product_description=product_description,
-                    product_in_use_reference=product_in_use_reference,  # Face tape reference
+                    product_in_use_reference=product_in_use_reference if shows_product_on_face else '',  # Face tape only if original shows it
                     version=photo_ver,
                     output_path=output_path,
                     output_dir=output_dir
