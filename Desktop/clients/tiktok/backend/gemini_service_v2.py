@@ -1844,12 +1844,27 @@ LAYOUT: {text_position_hint}
 
         if has_persona and persona_reference_path:
             # With persona - need consistency
-            # Add product-on-face instruction if reference provided
-            product_on_face_instruction = ""
-            if product_in_use_reference and os.path.exists(product_in_use_reference):
-                product_on_face_instruction = """
-[PRODUCT_IN_USE_REFERENCE] shows LumiDew face tape (lavender/purple patches).
-IGNORE any face tape in STYLE_REFERENCE - use ONLY the LumiDew patches from PRODUCT_IN_USE_REFERENCE. Apply 1-3 lavender patches with "LumiDew" text on forehead and/or under eyes."""
+            # Check if we should show face tape on this persona
+            # product_in_use_reference being truthy indicates shows_product_on_face=true
+            show_face_tape = bool(product_in_use_reference) and product_image_path and os.path.exists(product_image_path)
+
+            # Build face tape instruction using markdown format (proven to work)
+            face_tape_instruction = ""
+            if show_face_tape:
+                face_tape_instruction = """
+---
+
+### **Face Tape Application**
+The person should be **wearing face tape** from [FACE_TAPE_PRODUCT].
+
+Apply exactly this face tape, 1-3 patches:
+* One on the forehead
+* One by one under eyes (optional - AI decides based on natural look)
+
+Exactly this face tape with the text as you can see on the patches.
+The "LumiDew" text should be visible on the patches.
+
+---"""
 
             prompt = f"""Generate a TikTok {slide_label} slide.
 
@@ -1869,7 +1884,7 @@ MIRROR the exact composition from the reference:
 - DIFFERENT clothing appropriate for this scene context
 - The outfit should match the situation (casual at home, dressed for going out, workout clothes for gym, etc.)
 - This must look like the same creator, just in different clothes
-{product_on_face_instruction}
+{face_tape_instruction}
 
 SKIN REALISM (CRITICAL - apply to all faces):
 Increase skin realism with subtle natural pores, fine micro-bumps, and gentle uneven smoothness.
@@ -1918,13 +1933,13 @@ IMPORTANT: Only ONE person in the image - never two people!
                 )
             ]
 
-            # Add product-in-use reference if provided
-            if product_in_use_reference and os.path.exists(product_in_use_reference):
+            # Add face tape product image if we should show face tape on persona
+            if show_face_tape:
                 contents.extend([
-                    "[PRODUCT_IN_USE_REFERENCE]",
+                    "[FACE_TAPE_PRODUCT]",
                     types.Part.from_bytes(
-                        data=_load_image_bytes(product_in_use_reference),
-                        mime_type=_get_image_mime_type(product_in_use_reference)
+                        data=_load_image_bytes(product_image_path),
+                        mime_type=_get_image_mime_type(product_image_path)
                     )
                 ])
         elif has_persona:
@@ -1980,12 +1995,26 @@ Generate a completely NEW person with the SPECIFIC facial features above.
 Use different hair color and style, different clothes from the reference.
 Only match: lighting mood, camera angle, setting vibe."""
 
-            # Add product-on-face instruction if reference provided
-            product_on_face_instruction = ""
-            if product_in_use_reference and os.path.exists(product_in_use_reference):
-                product_on_face_instruction = """
-[PRODUCT_IN_USE_REFERENCE] shows LumiDew face tape.
-Apply this face tape to the person's face with "LumiDew" text visible. Use 1-3 patches in natural zones: forehead and/or under eyes."""
+            # Check if we should show face tape on this new persona
+            show_face_tape = bool(product_in_use_reference) and product_image_path and os.path.exists(product_image_path)
+
+            # Build face tape instruction using markdown format
+            face_tape_instruction = ""
+            if show_face_tape:
+                face_tape_instruction = """
+---
+
+### **Face Tape Application**
+The person should be **wearing face tape** from [FACE_TAPE_PRODUCT].
+
+Apply exactly this face tape, 1-3 patches:
+* One on the forehead
+* One by one under eyes (optional - AI decides based on natural look)
+
+Exactly this face tape with the text as you can see on the patches.
+The "LumiDew" text should be visible on the patches.
+
+---"""
 
             prompt = f"""Generate a TikTok {slide_label} slide.
 
@@ -2000,7 +2029,7 @@ Use from reference:
 ✓ Similar background vibe
 
 {persona_demographics}
-{product_on_face_instruction}
+{face_tape_instruction}
 
 SKIN REALISM (CRITICAL - apply to all faces):
 Increase skin realism with subtle natural pores, fine micro-bumps, and gentle uneven smoothness.
@@ -2044,13 +2073,13 @@ IMPORTANT: Only ONE person in the image - never two people!
                 )
             ]
 
-            # Add product-in-use reference if provided
-            if product_in_use_reference and os.path.exists(product_in_use_reference):
+            # Add face tape product image if we should show face tape on persona
+            if show_face_tape:
                 contents.extend([
-                    "[PRODUCT_IN_USE_REFERENCE]",
+                    "[FACE_TAPE_PRODUCT]",
                     types.Part.from_bytes(
-                        data=_load_image_bytes(product_in_use_reference),
-                        mime_type=_get_image_mime_type(product_in_use_reference)
+                        data=_load_image_bytes(product_image_path),
+                        mime_type=_get_image_mime_type(product_image_path)
                     )
                 ])
         else:
