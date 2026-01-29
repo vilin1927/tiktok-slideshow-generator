@@ -210,7 +210,7 @@ class BatchProcessor:
                 version=task.version,
                 clean_image_mode=task.clean_image_mode,
                 product_description=task.product_description,
-                product_in_use_reference=task.product_in_use_reference  # Face tape reference
+                shows_product_on_face=task.shows_product_on_face  # Per-slide face tape flag
             )
 
             return result_path

@@ -1595,7 +1595,7 @@ def _generate_single_image(
     version: int = 1,
     clean_image_mode: bool = False,
     product_description: str = "",
-    product_in_use_reference: Optional[str] = None
+    shows_product_on_face: bool = False
 ) -> str:
     """
     Generate a single image with clear image labeling.
@@ -1844,9 +1844,8 @@ LAYOUT: {text_position_hint}
 
         if has_persona and persona_reference_path:
             # With persona - need consistency
-            # Check if we should show face tape on this persona
-            # product_in_use_reference being truthy indicates shows_product_on_face=true
-            show_face_tape = bool(product_in_use_reference) and product_image_path and os.path.exists(product_image_path)
+            # Check if we should show face tape on this persona (per-slide detection)
+            show_face_tape = shows_product_on_face and product_image_path and os.path.exists(product_image_path)
 
             # Build face tape instruction using markdown format (proven to work)
             face_tape_instruction = ""
@@ -1995,8 +1994,8 @@ Generate a completely NEW person with the SPECIFIC facial features above.
 Use different hair color and style, different clothes from the reference.
 Only match: lighting mood, camera angle, setting vibe."""
 
-            # Check if we should show face tape on this new persona
-            show_face_tape = bool(product_in_use_reference) and product_image_path and os.path.exists(product_image_path)
+            # Check if we should show face tape on this new persona (per-slide detection)
+            show_face_tape = shows_product_on_face and product_image_path and os.path.exists(product_image_path)
 
             # Build face tape instruction using markdown format
             face_tape_instruction = ""
@@ -2582,8 +2581,6 @@ def generate_all_images(
         try:
             rate_limiter.acquire()
             try:
-                # Only pass face tape reference if THIS specific slide shows product on face
-                task_product_ref = product_in_use_reference if task.get('shows_product_on_face') else ''
                 return task['task_id'], _generate_single_image(
                     client,
                     task['slide_type'],
@@ -2601,7 +2598,7 @@ def generate_all_images(
                     task['version'],  # Pass version for variation diversity
                     clean_image_mode,  # Generate without text for PIL rendering
                     product_description,  # For real product grounding in scenes
-                    task_product_ref  # Face tape reference ONLY if original slide shows it
+                    task.get('shows_product_on_face', False)  # Per-slide face tape flag
                 )
             finally:
                 rate_limiter.release()
@@ -3096,7 +3093,7 @@ def submit_to_queue(
                     persona_info=persona_info,  # Demographics for new persona creation
                     clean_image_mode=clean_image_mode,
                     product_description=product_description,
-                    product_in_use_reference=product_in_use_reference if shows_product_on_face else '',  # Face tape only if original shows it
+                    shows_product_on_face=shows_product_on_face,  # Per-slide face tape flag
                     version=photo_ver,
                     output_path=output_path,
                     output_dir=output_dir
