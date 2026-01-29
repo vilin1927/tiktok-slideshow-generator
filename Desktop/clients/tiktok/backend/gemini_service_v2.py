@@ -1900,14 +1900,20 @@ LAYOUT: {text_position_hint}
 ---
 
 ### **Face Tape Application**
-The person should be **wearing face tape** from [FACE_TAPE_PRODUCT].
+The person should be **wearing face tape patches** that look **EXACTLY** like [FACE_TAPE_PRODUCT].
 
-Apply exactly this face tape, 1-3 patches:
+⚠️ CRITICAL - COPY THE EXACT PATCHES FROM THE REFERENCE:
+- Use the EXACT same purple/lavender color as shown in [FACE_TAPE_PRODUCT]
+- Use the EXACT same "LumiDew" text pattern (repeated diagonal text as shown)
+- Use the EXACT same oval/pill shape as the reference patches
+- DO NOT simplify or modify the patch design - copy it exactly
+
+Apply 1-3 patches on the face:
 * One on the forehead
-* One by one under eyes (optional - AI decides based on natural look)
+* Optionally one or two under eyes (AI decides based on natural look)
 
-Exactly this face tape with the text as you can see on the patches.
-The "LumiDew" text should be visible on the patches.
+The patches must look IDENTICAL to [FACE_TAPE_PRODUCT] - same color, same text pattern, same shape.
+DO NOT generate a simplified version with just "LumiDew" once - use the full repeated text pattern.
 
 ---
 
@@ -2094,14 +2100,20 @@ Only match: lighting mood, camera angle, setting vibe."""
 ---
 
 ### **Face Tape Application**
-The person should be **wearing face tape** from [FACE_TAPE_PRODUCT].
+The person should be **wearing face tape patches** that look **EXACTLY** like [FACE_TAPE_PRODUCT].
 
-Apply exactly this face tape, 1-3 patches:
+⚠️ CRITICAL - COPY THE EXACT PATCHES FROM THE REFERENCE:
+- Use the EXACT same purple/lavender color as shown in [FACE_TAPE_PRODUCT]
+- Use the EXACT same "LumiDew" text pattern (repeated diagonal text as shown)
+- Use the EXACT same oval/pill shape as the reference patches
+- DO NOT simplify or modify the patch design - copy it exactly
+
+Apply 1-3 patches on the face:
 * One on the forehead
-* One by one under eyes (optional - AI decides based on natural look)
+* Optionally one or two under eyes (AI decides based on natural look)
 
-Exactly this face tape with the text as you can see on the patches.
-The "LumiDew" text should be visible on the patches.
+The patches must look IDENTICAL to [FACE_TAPE_PRODUCT] - same color, same text pattern, same shape.
+DO NOT generate a simplified version with just "LumiDew" once - use the full repeated text pattern.
 
 ---"""
 
