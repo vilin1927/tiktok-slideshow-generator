@@ -33,7 +33,7 @@ from google.genai.types import HarmCategory, HarmBlockThreshold, SafetySetting
 # Model names
 ANALYSIS_MODEL = 'gemini-3-pro-preview'
 IMAGE_MODEL = 'gemini-3-pro-image-preview'
-GROUNDING_MODEL = 'gemini-2.0-flash'  # Fast model for grounding searches
+GROUNDING_MODEL = 'gemini-3-flash'  # Fast model for grounding searches
 
 # Generation config
 MAX_RETRIES = 5       # Retries for direct generation mode
