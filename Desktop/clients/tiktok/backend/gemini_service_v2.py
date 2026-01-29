@@ -1042,29 +1042,38 @@ RULE: Insert product in EXACTLY ONE slide. Never multiple.
 - Product slide should feel like it BELONGS, not interrupts
 
 ═══════════════════════════════════════════════════════════════
-TASK 5b: PRODUCT ON FACE DETECTION
+TASK 5b: PRODUCT ON FACE DETECTION (TWO LEVELS)
 ═══════════════════════════════════════════════════════════════
 
-Some products are WORN ON THE FACE (patches, tapes, masks that stick to skin).
-If the product is this type, set product_on_face.show_on_persona = true.
+LEVEL 1 - PRODUCT TYPE DETECTION (product_on_face.show_on_persona):
+Some products are WORN ON THE FACE. Detect from PRODUCT DESCRIPTION:
 
 PRODUCTS THAT GO ON FACE (set show_on_persona = true):
 - Face tape / facial tape / wrinkle patches / anti-wrinkle tape
 - Under-eye patches / eye masks that stick to skin
 - Forehead patches / frown line patches
-- Smile line patches / nasolabial patches
 - Pimple patches / acne patches
-- Hydrogel patches / silicone patches worn on face
 
 PRODUCTS THAT DO NOT GO ON FACE (set show_on_persona = false):
-- Steam eye masks (heated, cover eyes like sleep mask)
-- Sheet masks (full face, one-time use)
-- Creams, serums, lotions (applied but not visible)
-- Supplements, drinks, food products
-- Devices, tools, accessories
+- Steam eye masks, sheet masks, creams, serums, supplements, devices
 
-When show_on_persona = true, the persona slides will show the person WEARING the product.
-This is determined by the PRODUCT DESCRIPTION, not the slideshow content.
+LEVEL 2 - PER-SLIDE FACE TAPE DETECTION (shows_product_on_face per slide):
+For EACH slide, look at the ORIGINAL IMAGE and detect if face tape is VISIBLE on a person's face.
+
+Set shows_product_on_face = true ONLY if:
+- The ORIGINAL slide image shows a person with patches/tape visibly ON their face
+- Look for: patches on forehead, under eyes, smile lines
+
+Set shows_product_on_face = false if:
+- Slide shows product packaging only (not on face)
+- Slide shows person WITHOUT patches on face
+- Slide shows lifestyle scene without visible face patches
+
+⚠️ CRITICAL: ONLY ONE SLIDE should have shows_product_on_face = true!
+If multiple original slides show face tape, pick the BEST one:
+- Prefer body/tip slides over hook slide
+- Prefer slides where face tape is clearly prominent
+- The hook slide should NOT have face tape unless it's the ONLY slide showing it
 
 ═══════════════════════════════════════════════════════════════
 TASK 5: MIMIC THE ORIGINAL SLIDESHOW CONTENT
@@ -1491,7 +1500,7 @@ CRITICAL RULES:
 9. Include "visual" object for each slide with composition details
 10. Include "role_in_story" for each slide describing its narrative purpose
 11. scene_description MUST end with "COMPOSITION: framing=X, angle=Y, position=Z, background=W"
-12. shows_product_on_face: set to true ONLY if the ORIGINAL slide shows a person wearing face tape/patches/stickers ON their face. false otherwise. Look for patches on forehead, under eyes, or smile lines in the original slide.
+12. shows_product_on_face: Look at each ORIGINAL slide image. Set true ONLY if that slide shows a person with face tape/patches visibly ON their face (forehead, under eyes, smile lines). ⚠️ ONLY ONE slide should be true - pick the best body/tip slide showing face tape. Hook should be false unless it's the only slide with face tape.
 """
 
     # Build content with all images
@@ -1845,14 +1854,27 @@ LAYOUT: {text_position_hint}
         if has_persona and persona_reference_path:
             # With persona - need consistency
             # Check if we should show face tape on this persona (per-slide detection)
-            # Use hardcoded face tape reference image (not product_image_path which is empty for non-product slides)
+            # Use hardcoded face tape reference image
             face_tape_ref_path = PRODUCT_IN_USE_REFERENCES.get('face_tape', '')
             show_face_tape = shows_product_on_face and face_tape_ref_path and os.path.exists(face_tape_ref_path)
 
-            # Build face tape instruction using markdown format (proven to work)
-            face_tape_instruction = ""
             if show_face_tape:
-                face_tape_instruction = """
+                # ===== FACE TAPE SLIDE =====
+                # DON'T use STYLE_REFERENCE (shows wrong person with face tape)
+                # Use ONLY: PERSONA_REFERENCE (our hook persona) + FACE_TAPE_PRODUCT (hardcoded patches)
+                prompt = f"""Generate a TikTok {slide_label} slide.
+
+{text_style_instruction}
+{visual_style_instruction}
+
+[PERSONA_REFERENCE] - THE PERSON TO USE (and composition reference):
+✓ Generate the EXACT SAME PERSON from this image
+✓ SAME face, hair color, skin tone, facial features
+✓ SAME body type and general appearance
+✓ Use similar framing and angle as this image
+✓ This person should be wearing face tape from [FACE_TAPE_PRODUCT]
+- DIFFERENT clothing appropriate for this scene context
+
 ---
 
 ### **Face Tape Application**
@@ -1865,30 +1887,7 @@ Apply exactly this face tape, 1-3 patches:
 Exactly this face tape with the text as you can see on the patches.
 The "LumiDew" text should be visible on the patches.
 
----"""
-
-            prompt = f"""Generate a TikTok {slide_label} slide.
-
-{text_style_instruction}
-{visual_style_instruction}
-{variation_instruction}
-[STYLE_REFERENCE] - Reference for COMPOSITION and LIGHTING only.
-⚠️ DO NOT copy the person's face/appearance from STYLE_REFERENCE!
-MIRROR ONLY the composition:
-- Same framing (close-up, medium, wide)
-- Same camera angle (straight, above, below, side)
-- Same subject position in frame (center, left, right)
-- Similar background vibe and setting
-
-[PERSONA_REFERENCE] - THE PERSON TO USE. Generate the EXACT SAME PERSON from THIS image:
-✓ SAME face as PERSONA_REFERENCE (not STYLE_REFERENCE!)
-✓ SAME hair color and style as PERSONA_REFERENCE
-✓ SAME skin tone and facial features as PERSONA_REFERENCE
-✓ SAME body type and general appearance as PERSONA_REFERENCE
-✗ DO NOT use the person from STYLE_REFERENCE
-- DIFFERENT clothing appropriate for this scene context
-- This must look like the same creator from PERSONA_REFERENCE, just in different clothes
-{face_tape_instruction}
+---
 
 SKIN REALISM (CRITICAL - apply to all faces):
 Increase skin realism with subtle natural pores, fine micro-bumps, and gentle uneven smoothness.
@@ -1923,29 +1922,91 @@ MULTI-POSITION TEXT RULE:
 IMPORTANT: Only ONE person in the image - never two people!
 {quality_constraints}"""
 
-            contents = [
-                prompt,
-                "[STYLE_REFERENCE]",
-                types.Part.from_bytes(
-                    data=_load_image_bytes(reference_image_path),
-                    mime_type=_get_image_mime_type(reference_image_path)
-                ),
-                "[PERSONA_REFERENCE]",
-                types.Part.from_bytes(
-                    data=_load_image_bytes(persona_reference_path),
-                    mime_type=_get_image_mime_type(persona_reference_path)
-                )
-            ]
-
-            # Add face tape product image if we should show face tape on persona
-            if show_face_tape:
-                contents.extend([
+                # NO STYLE_REFERENCE - only persona + face tape product
+                contents = [
+                    prompt,
+                    "[PERSONA_REFERENCE]",
+                    types.Part.from_bytes(
+                        data=_load_image_bytes(persona_reference_path),
+                        mime_type=_get_image_mime_type(persona_reference_path)
+                    ),
                     "[FACE_TAPE_PRODUCT]",
                     types.Part.from_bytes(
                         data=_load_image_bytes(face_tape_ref_path),
                         mime_type=_get_image_mime_type(face_tape_ref_path)
                     )
-                ])
+                ]
+            else:
+                # ===== NORMAL PERSONA SLIDE (no face tape) =====
+                # Use STYLE_REFERENCE + PERSONA_REFERENCE
+                prompt = f"""Generate a TikTok {slide_label} slide.
+
+{text_style_instruction}
+{visual_style_instruction}
+{variation_instruction}
+[STYLE_REFERENCE] - Reference for COMPOSITION and LIGHTING only.
+⚠️ DO NOT copy the person's face/appearance from STYLE_REFERENCE!
+MIRROR ONLY the composition:
+- Same framing (close-up, medium, wide)
+- Same camera angle (straight, above, below, side)
+- Same subject position in frame (center, left, right)
+- Similar background vibe and setting
+
+[PERSONA_REFERENCE] - THE PERSON TO USE. Generate the EXACT SAME PERSON from THIS image:
+✓ SAME face as PERSONA_REFERENCE (not STYLE_REFERENCE!)
+✓ SAME hair color and style as PERSONA_REFERENCE
+✓ SAME skin tone and facial features as PERSONA_REFERENCE
+✓ SAME body type and general appearance as PERSONA_REFERENCE
+✗ DO NOT use the person from STYLE_REFERENCE
+- DIFFERENT clothing appropriate for this scene context
+- This must look like the same creator from PERSONA_REFERENCE, just in different clothes
+
+SKIN REALISM (CRITICAL - apply to all faces):
+Increase skin realism with subtle natural pores, fine micro-bumps, and gentle uneven smoothness.
+Add tasteful micro-imperfections: tiny blemishes, faint redness, subtle under-eye texture, slight natural tone variation.
+Correct highlights to avoid plastic shine—soft realistic specular highlights with mild oiliness in the T-zone.
+Add a few natural baby hairs and minimal stray strands around the hairline.
+Introduce very subtle natural asymmetry without changing identity.
+Finish with soft camera realism: light grain, mild shadow noise, natural micro-contrast, no over-sharpening.
+
+DO NOT create: perfect poreless skin, overly smooth texture, plastic or waxy appearance, symmetrical "AI perfect" faces, over-brightened or glowing skin.
+
+NEW SCENE: {scene_description}
+
+TEXT TO DISPLAY:
+{text_content}
+
+LAYOUT: {text_position_hint}
+
+CRITICAL TEXT PLACEMENT RULES:
+- NEVER cover face or person with text
+- NEVER cover main objects/products with text
+- Text should be in empty/background areas only
+- If unsure, place text at TOP or BOTTOM edges of image
+
+MULTI-POSITION TEXT RULE:
+- If TEXT TO DISPLAY contains " | " (pipe separator), it means TWO separate texts
+- Format: "TOP_TEXT | BOTTOM_TEXT"
+- Place the FIRST part (before |) at the TOP of the image
+- Place the SECOND part (after |) at the BOTTOM of the image
+- NEVER place both texts in the same location - they must be in DIFFERENT positions
+
+IMPORTANT: Only ONE person in the image - never two people!
+{quality_constraints}"""
+
+                contents = [
+                    prompt,
+                    "[STYLE_REFERENCE]",
+                    types.Part.from_bytes(
+                        data=_load_image_bytes(reference_image_path),
+                        mime_type=_get_image_mime_type(reference_image_path)
+                    ),
+                    "[PERSONA_REFERENCE]",
+                    types.Part.from_bytes(
+                        data=_load_image_bytes(persona_reference_path),
+                        mime_type=_get_image_mime_type(persona_reference_path)
+                    )
+                ]
         elif has_persona:
             # Has persona but NO reference yet - CREATE a new persona
             # Simple instruction: recreate a similar person, NOT the same face
