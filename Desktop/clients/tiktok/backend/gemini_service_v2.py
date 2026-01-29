@@ -1845,7 +1845,9 @@ LAYOUT: {text_position_hint}
         if has_persona and persona_reference_path:
             # With persona - need consistency
             # Check if we should show face tape on this persona (per-slide detection)
-            show_face_tape = shows_product_on_face and product_image_path and os.path.exists(product_image_path)
+            # Use hardcoded face tape reference image (not product_image_path which is empty for non-product slides)
+            face_tape_ref_path = PRODUCT_IN_USE_REFERENCES.get('face_tape', '')
+            show_face_tape = shows_product_on_face and face_tape_ref_path and os.path.exists(face_tape_ref_path)
 
             # Build face tape instruction using markdown format (proven to work)
             face_tape_instruction = ""
@@ -1870,19 +1872,22 @@ The "LumiDew" text should be visible on the patches.
 {text_style_instruction}
 {visual_style_instruction}
 {variation_instruction}
-[STYLE_REFERENCE] - Reference for composition and lighting ONLY (ignore any products/face tape shown).
-MIRROR the exact composition from the reference:
+[STYLE_REFERENCE] - Reference for COMPOSITION and LIGHTING only.
+⚠️ DO NOT copy the person's face/appearance from STYLE_REFERENCE!
+MIRROR ONLY the composition:
 - Same framing (close-up, medium, wide)
 - Same camera angle (straight, above, below, side)
 - Same subject position in frame (center, left, right)
 - Similar background vibe and setting
 
-[PERSONA_REFERENCE] - Person to use. Generate the EXACT SAME PERSON in a new scene:
-- SAME face, hair color, skin tone, facial features
-- SAME body type and general appearance
+[PERSONA_REFERENCE] - THE PERSON TO USE. Generate the EXACT SAME PERSON from THIS image:
+✓ SAME face as PERSONA_REFERENCE (not STYLE_REFERENCE!)
+✓ SAME hair color and style as PERSONA_REFERENCE
+✓ SAME skin tone and facial features as PERSONA_REFERENCE
+✓ SAME body type and general appearance as PERSONA_REFERENCE
+✗ DO NOT use the person from STYLE_REFERENCE
 - DIFFERENT clothing appropriate for this scene context
-- The outfit should match the situation (casual at home, dressed for going out, workout clothes for gym, etc.)
-- This must look like the same creator, just in different clothes
+- This must look like the same creator from PERSONA_REFERENCE, just in different clothes
 {face_tape_instruction}
 
 SKIN REALISM (CRITICAL - apply to all faces):
@@ -1937,8 +1942,8 @@ IMPORTANT: Only ONE person in the image - never two people!
                 contents.extend([
                     "[FACE_TAPE_PRODUCT]",
                     types.Part.from_bytes(
-                        data=_load_image_bytes(product_image_path),
-                        mime_type=_get_image_mime_type(product_image_path)
+                        data=_load_image_bytes(face_tape_ref_path),
+                        mime_type=_get_image_mime_type(face_tape_ref_path)
                     )
                 ])
         elif has_persona:
@@ -1995,7 +2000,9 @@ Use different hair color and style, different clothes from the reference.
 Only match: lighting mood, camera angle, setting vibe."""
 
             # Check if we should show face tape on this new persona (per-slide detection)
-            show_face_tape = shows_product_on_face and product_image_path and os.path.exists(product_image_path)
+            # Use hardcoded face tape reference image (not product_image_path which is empty for non-product slides)
+            face_tape_ref_path = PRODUCT_IN_USE_REFERENCES.get('face_tape', '')
+            show_face_tape = shows_product_on_face and face_tape_ref_path and os.path.exists(face_tape_ref_path)
 
             # Build face tape instruction using markdown format
             face_tape_instruction = ""
@@ -2077,8 +2084,8 @@ IMPORTANT: Only ONE person in the image - never two people!
                 contents.extend([
                     "[FACE_TAPE_PRODUCT]",
                     types.Part.from_bytes(
-                        data=_load_image_bytes(product_image_path),
-                        mime_type=_get_image_mime_type(product_image_path)
+                        data=_load_image_bytes(face_tape_ref_path),
+                        mime_type=_get_image_mime_type(face_tape_ref_path)
                     )
                 ])
         else:
