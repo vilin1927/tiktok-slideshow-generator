@@ -1822,13 +1822,8 @@ LAYOUT: {text_position_hint}
             product_on_face_instruction = ""
             if product_in_use_reference and os.path.exists(product_in_use_reference):
                 product_on_face_instruction = """
-PRODUCT ON FACE (CRITICAL):
-[PRODUCT_IN_USE_REFERENCE] shows LumiDew face tape worn on the face.
-The person MUST be WEARING LumiDew face tape exactly as shown:
-- Match the appearance from reference: lavender/purple silicone patches
-- Place on same areas as reference (forehead, under eyes, smile lines)
-- Patches should have subtle "LumiDew" branding visible if shown in reference
-- Product must be clearly visible and look natural on the skin"""
+[PRODUCT_IN_USE_REFERENCE] shows LumiDew face tape.
+Apply this face tape to the person's face - ONE patch on forehead with "LumiDew" text visible."""
 
             prompt = f"""Generate a TikTok {slide_label} slide.
 
@@ -1942,13 +1937,8 @@ Only match: lighting mood, camera angle, setting vibe."""
             product_on_face_instruction = ""
             if product_in_use_reference and os.path.exists(product_in_use_reference):
                 product_on_face_instruction = """
-PRODUCT ON FACE (CRITICAL):
-[PRODUCT_IN_USE_REFERENCE] shows LumiDew face tape worn on the face.
-The person MUST be WEARING LumiDew face tape exactly as shown:
-- Match the appearance from reference: lavender/purple silicone patches
-- Place on same areas as reference (forehead, under eyes, smile lines)
-- Patches should have subtle "LumiDew" branding visible if shown in reference
-- Product must be clearly visible and look natural on the skin"""
+[PRODUCT_IN_USE_REFERENCE] shows LumiDew face tape.
+Apply this face tape to the person's face - ONE patch on forehead with "LumiDew" text visible."""
 
             prompt = f"""Generate a TikTok {slide_label} slide.
 
