@@ -1078,11 +1078,9 @@ Set shows_product_on_face = false if:
 - Slide shows person WITHOUT patches on face
 - Slide shows lifestyle scene without visible face patches
 
-⚠️ CRITICAL: ONLY ONE SLIDE should have shows_product_on_face = true!
-If multiple original slides show face tape, pick the BEST one:
-- Prefer body/tip slides over hook slide
-- Prefer slides where face tape is clearly prominent
-- The hook slide should NOT have face tape unless it's the ONLY slide showing it
+⚠️ IMPORTANT: Set shows_product_on_face = true for EVERY slide where the original shows face tape!
+If 3 original slides show face tape, then 3 output slides should have shows_product_on_face = true.
+Match the original exactly - if they wore tape in slides 2, 3, 4 then we show tape in slides 2, 3, 4.
 
 ═══════════════════════════════════════════════════════════════
 TASK 5: MIMIC THE ORIGINAL SLIDESHOW CONTENT
@@ -1575,7 +1573,7 @@ CRITICAL RULES:
 9. Include "visual" object for each slide with composition details
 10. Include "role_in_story" for each slide describing its narrative purpose
 11. scene_description MUST end with "COMPOSITION: framing=X, angle=Y, position=Z, background=W"
-12. shows_product_on_face: CRITICAL - LOOK AT EACH ORIGINAL SLIDE IMAGE! Set true if that original slide shows a person with face tape/patches ON their face (forehead, under eyes). Set false if the slide shows product packaging only, or person WITHOUT tape on face. ⚠️ ONLY ONE slide should have shows_product_on_face=true - pick the best body slide showing face tape. Hook should be false unless it's the only slide with face tape visible.
+12. shows_product_on_face: CRITICAL - LOOK AT EACH ORIGINAL SLIDE IMAGE! Set true for EVERY slide where the original shows a person with face tape/patches ON their face (forehead, under eyes). Set false if the slide shows product packaging only, or person WITHOUT tape on face. If original has tape in 3 slides, set true for all 3!
 """
 
     # Build content with all images
