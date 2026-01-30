@@ -2027,7 +2027,9 @@ IMPORTANT: Only ONE person in the image - never two people!
                 ]
             else:
                 # ===== NORMAL PERSONA SLIDE (no face tape) =====
-                # Use STYLE_REFERENCE + PERSONA_REFERENCE
+                # Use ONLY PERSONA_REFERENCE (serves as both persona AND style reference)
+                # The persona reference already has styled text on it from previous generation
+                # NO separate style reference - prevents product mixing from original TikTok
                 prompt = f"""Generate a TikTok {slide_label} slide.
 
 {text_style_instruction}
@@ -2035,7 +2037,7 @@ IMPORTANT: Only ONE person in the image - never two people!
 {variation_instruction}
 ⚠️⚠️⚠️ CRITICAL - PERSONA IDENTITY (READ FIRST) ⚠️⚠️⚠️
 
-[PERSONA_REFERENCE] - THIS IS THE PERSON YOU MUST GENERATE:
+[PERSONA_REFERENCE] - THIS IS YOUR ONLY REFERENCE (serves as BOTH persona AND style):
 Generate the EXACT SAME PERSON from [PERSONA_REFERENCE]. This is NON-NEGOTIABLE.
 
 MANDATORY IDENTITY MATCH:
@@ -2046,22 +2048,16 @@ MANDATORY IDENTITY MATCH:
 ✓ SAME approximate age
 ✓ SAME general appearance and vibe
 
+STYLE FROM SAME REFERENCE:
+✓ Match the text styling (font, color, effects) from [PERSONA_REFERENCE]
+✓ Match the overall visual mood and lighting
+✓ Match the composition style (framing, camera angle)
+
 WHAT CAN CHANGE:
 - Clothing (different outfit appropriate for scene)
 - Hairstyle slightly (but SAME color)
 - Expression
-
-[STYLE_REFERENCE] - Reference for COMPOSITION and LIGHTING only.
-⚠️ COMPLETELY IGNORE the person shown in STYLE_REFERENCE!
-The person in STYLE_REFERENCE is IRRELEVANT - only use it for:
-- Framing (close-up, medium, wide)
-- Camera angle
-- Background vibe
-- Lighting mood
-
-❌ DO NOT blend features from both references
-❌ DO NOT create a "middle ground" between the two people
-❌ DO NOT use STYLE_REFERENCE person's face, body type, or hair color
+- Background (appropriate for new scene)
 
 The output person must be RECOGNIZABLE as the same individual from [PERSONA_REFERENCE].
 
@@ -2076,6 +2072,11 @@ Finish with soft camera realism: light grain, mild shadow noise, natural micro-c
 TEXT-VISUAL MATCH: Read the TEXT TO DISPLAY below. If the text mentions skin problems (wrinkles, forehead lines, 11 lines, frown lines, acne, dark circles, eye bags, etc.), the persona MUST show those problems visibly in the image. Don't generate perfect smooth skin when the text talks about having lines or skin issues!
 
 DO NOT create: perfect poreless skin, overly smooth texture, plastic or waxy appearance, symmetrical "AI perfect" faces, over-brightened or glowing skin.
+
+⚠️ CRITICAL - NO PRODUCT MIXING:
+- The persona's face must be CLEAN - no patches, tapes, or skincare products attached
+- DO NOT add any face tape, nose strips, under-eye patches, or similar products
+- Only the PRODUCT slide shows the actual product
 
 NEW SCENE: {scene_description}
 
@@ -2100,18 +2101,14 @@ MULTI-POSITION TEXT RULE:
 IMPORTANT: Only ONE person in the image - never two people!
 {quality_constraints}"""
 
-                # PERSONA_REFERENCE first - model anchors on first image
+                # ONLY PERSONA_REFERENCE - no separate style reference
+                # Persona reference serves as both: same person + style guide
                 contents = [
                     prompt,
                     "[PERSONA_REFERENCE]",
                     types.Part.from_bytes(
                         data=_load_image_bytes(persona_reference_path),
                         mime_type=_get_image_mime_type(persona_reference_path)
-                    ),
-                    "[STYLE_REFERENCE]",
-                    types.Part.from_bytes(
-                        data=_load_image_bytes(reference_image_path),
-                        mime_type=_get_image_mime_type(reference_image_path)
                     )
                 ]
         elif has_persona:
