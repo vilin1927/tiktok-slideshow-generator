@@ -26,6 +26,15 @@ from safe_zone_detector import analyze_image as detect_safe_zones
 from text_renderer import render_text
 from presets import get_preset
 
+# Import new diversity and consistency modules
+from persona_components import generate_diverse_persona, format_persona_prompt, get_persona_summary
+from physical_consistency import validate_and_log as validate_scene_consistency, enhance_scene_with_attire_rules
+
+# Feature flags for new improvements (set to True to enable)
+USE_EXPANDED_PERSONAS = True      # Use 100+ persona combinations instead of 5
+USE_SCENE_VARIETY = True          # Add scene variety instructions
+USE_PHYSICAL_CONSISTENCY = True   # Validate scenes for impossible combinations
+
 from google import genai
 from google.genai import types
 from google.genai.types import HarmCategory, HarmBlockThreshold, SafetySetting
@@ -2101,11 +2110,30 @@ IMPORTANT: Only ONE person in the image - never two people!
         elif has_persona:
             # Has persona but NO reference yet - CREATE a new persona
             # Simple instruction: recreate a similar person, NOT the same face
-            # Use facial variation to ensure diversity across photo variations
-            facial_variation = _get_facial_variation(version)
 
-            if persona_info:
+            if USE_EXPANDED_PERSONAS:
+                # NEW: Use expanded persona system with 100+ combinations
+                diverse_persona = generate_diverse_persona(
+                    target_audience=persona_info,
+                    version=version
+                )
+                logger.info(f"Generated diverse persona v{version}: {get_persona_summary(diverse_persona)}")
+
                 persona_demographics = f"""
+<persona_instruction>
+GENERATE A NEW PERSON - DO NOT COPY THE REFERENCE PERSON
+
+{format_persona_prompt(diverse_persona)}
+
+Match from reference ONLY: lighting mood, camera angle, setting vibe.
+Generate a completely DIFFERENT person with the SPECIFIC features listed above.
+</persona_instruction>"""
+            else:
+                # FALLBACK: Use old 5-variation system
+                facial_variation = _get_facial_variation(version)
+
+                if persona_info:
+                    persona_demographics = f"""
 PERSONA INSTRUCTION - GENERATE A NEW PERSON:
 
 DO NOT COPY from the reference:
@@ -2131,9 +2159,9 @@ GENERATE a person with:
 
 The ONLY things to match from reference: warm lighting mood, selfie angle, indoor setting vibe.
 Think "could be their friend from the same target audience" - NOT a twin, NOT a relative, NOT the same person."""
-            else:
-                # Fallback without persona_info - still use facial variation
-                persona_demographics = f"""
+                else:
+                    # Fallback without persona_info - still use facial variation
+                    persona_demographics = f"""
 PERSONA INSTRUCTION - GENERATE A NEW PERSON:
 
 DO NOT COPY from the reference:
@@ -2193,7 +2221,12 @@ Use from reference:
 ✓ Same framing (close-up, medium, wide)
 ✓ Same camera angle
 ✓ Similar warm lighting mood
-✓ Similar background vibe
+
+<scene_variety_rule>
+Create a DIFFERENT scene within the SAME content category.
+Match the VIBE and aesthetic, but vary the specific location/setting.
+Think: different photo from the same week-long photoshoot.
+</scene_variety_rule>
 
 {persona_demographics}
 {face_tape_instruction}
@@ -2280,12 +2313,26 @@ RIGHT: Scene says "tart cherry juice" and image shows ONLY the juice as the hero
 {visual_style_instruction}
 {variation_instruction}
 [STYLE_REFERENCE] - Reference slide for visual composition, mood, and content type.
-MIRROR the exact composition from the reference:
-- Same framing (close-up, medium, wide)
-- Same camera angle (straight, above, below, side)
-- Same subject position in frame (center, left, right)
-- Similar background vibe and setting
-MIMIC the type of content shown in the reference - create SIMILAR scenes that match the original's vibe.
+MATCH from reference:
+- Framing type (close-up, medium, wide)
+- Camera angle (straight, above, below, side)
+- Subject position in frame (center, left, right)
+- Overall lighting mood and color grading
+
+<scene_variety_rule>
+IMPORTANT: Create a DIFFERENT scene within the SAME content category.
+
+Think like a content creator with 200 photos from a week-long photoshoot:
+- ALL photos share the same vibe and aesthetic
+- But each shows a DIFFERENT moment, location, or setting
+
+Match the CATEGORY (wellness, lifestyle, skincare routine, etc.)
+but vary the SPECIFIC location and setting details.
+
+Example: Reference shows "woman at frozen lake"
+- Generate: "woman at forest cabin porch" (same nordic vibe, DIFFERENT scene)
+- Not: exact copy of frozen lake scene
+</scene_variety_rule>
 
 {scene_instruction}
 
@@ -2632,6 +2679,16 @@ def generate_all_images(
 
             scene_description = scene_var.get('scene_description', '')
             text_variations = scene_var.get('text_variations', [''])
+
+            # Physical consistency validation (coat in water, etc.)
+            if USE_PHYSICAL_CONSISTENCY and scene_description:
+                is_valid, enhanced_scene = validate_scene_consistency(
+                    scene_description,
+                    slide_info=f"{slide_key}_p{p_idx+1}"
+                )
+                if not is_valid:
+                    logger.warning(f"Scene validation issue for {slide_key}: using enhanced scene with attire instructions")
+                scene_description = enhanced_scene
 
             for t_idx, text_content in enumerate(text_variations):
                 photo_ver = p_idx + 1  # 1-indexed
@@ -3216,6 +3273,16 @@ def submit_to_queue(
 
             scene_description = scene_var.get('scene_description', '')
             text_variations = scene_var.get('text_variations', [''])
+
+            # Physical consistency validation (coat in water, etc.)
+            if USE_PHYSICAL_CONSISTENCY and scene_description:
+                is_valid, enhanced_scene = validate_scene_consistency(
+                    scene_description,
+                    slide_info=f"{slide_key}_p{p_idx+1}"
+                )
+                if not is_valid:
+                    logger.warning(f"Scene validation issue for {slide_key}: using enhanced scene with attire instructions")
+                scene_description = enhanced_scene
 
             for t_idx, text_content in enumerate(text_variations):
                 photo_ver = p_idx + 1
