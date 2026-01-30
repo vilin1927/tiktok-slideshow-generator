@@ -1838,6 +1838,13 @@ DO NOT GENERATE:
 - ANY black/dark bars or frames at edges (ESPECIALLY at bottom!)
 - Phone screenshots with visible UI elements
 - Steam or vapor effects (tea steam, coffee steam, humidifier mist, candle smoke) - these look fake/AI-generated
+
+⚠️ CRITICAL - NO PRODUCT MIXING:
+- DO NOT copy any products from the reference images onto the persona
+- DO NOT show face patches, nose strips, under-eye patches, or ANY skincare products ON the persona's face
+- The persona's face must be CLEAN - no products attached to skin
+- If the reference shows someone wearing patches/products, IGNORE those products entirely
+- Only the PRODUCT SLIDE should show the user's actual product
 """
 
     if slide_type == 'product':
@@ -1924,12 +1931,13 @@ LAYOUT: {text_position_hint}
         if has_persona and persona_reference_path:
             # With persona - need consistency
             # Check if we should show face tape on this persona (per-slide detection)
-            # Use hardcoded face tape reference image
-            face_tape_ref_path = PRODUCT_IN_USE_REFERENCES.get('face_tape', '')
-            show_face_tape = shows_product_on_face and face_tape_ref_path and os.path.exists(face_tape_ref_path)
+            # DISABLED: Face tape on personas causes product mixing issues
+            # When original shows competitor patches, we were adding our patches = confusing
+            # Now: personas always have CLEAN faces, only product slide shows our product
+            show_face_tape = False
 
             # DEBUG: Log face tape decision
-            logger.info(f"FACE_TAPE_DEBUG (existing persona): slide_type={slide_type}, shows_product_on_face={shows_product_on_face}, show_face_tape={show_face_tape}")
+            logger.info(f"FACE_TAPE_DEBUG (existing persona): slide_type={slide_type}, shows_product_on_face={shows_product_on_face}, show_face_tape={show_face_tape} (DISABLED)")
 
             if show_face_tape:
                 # ===== FACE TAPE SLIDE =====
@@ -2179,12 +2187,13 @@ Use different hair color and style, different clothes from the reference.
 Only match: lighting mood, camera angle, setting vibe."""
 
             # Check if we should show face tape on this new persona (per-slide detection)
-            # Use hardcoded face tape reference image (not product_image_path which is empty for non-product slides)
-            face_tape_ref_path = PRODUCT_IN_USE_REFERENCES.get('face_tape', '')
-            show_face_tape = shows_product_on_face and face_tape_ref_path and os.path.exists(face_tape_ref_path)
+            # DISABLED: Face tape on personas causes product mixing issues
+            # When original shows competitor patches, we were adding our patches = confusing
+            # Now: personas always have CLEAN faces, only product slide shows our product
+            show_face_tape = False
 
             # DEBUG: Log face tape decision
-            logger.info(f"FACE_TAPE_DEBUG: slide_type={slide_type}, shows_product_on_face={shows_product_on_face}, show_face_tape={show_face_tape}")
+            logger.info(f"FACE_TAPE_DEBUG: slide_type={slide_type}, shows_product_on_face={shows_product_on_face}, show_face_tape={show_face_tape} (DISABLED)")
 
             # Build face tape instruction using markdown format
             face_tape_instruction = ""
