@@ -82,9 +82,11 @@ class ImageTask:
         data['text_style'] = json.dumps(data['text_style'])
         data['visual_style'] = json.dumps(data['visual_style'])
         data['persona_info'] = json.dumps(data['persona_info'])
-        # Convert booleans to strings (Redis doesn't accept booleans)
+        # Convert booleans to strings and None to empty strings (Redis doesn't accept booleans or None)
         for key, value in data.items():
-            if isinstance(value, bool):
+            if value is None:
+                data[key] = ''  # Redis can't store None
+            elif isinstance(value, bool):
                 data[key] = 'true' if value else 'false'
         return data
 
