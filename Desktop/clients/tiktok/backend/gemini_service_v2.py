@@ -1576,16 +1576,19 @@ CRITICAL RULES:
 10. Include "role_in_story" for each slide describing its narrative purpose
 11. scene_description MUST end with "COMPOSITION: framing=X, angle=Y, position=Z, background=W"
 12. shows_product_on_face: CRITICAL - LOOK AT EACH ORIGINAL SLIDE IMAGE! Set true for EVERY slide where the original shows a person with face tape/patches ON their face (forehead, under eyes). Set false if the slide shows product packaging only, or person WITHOUT tape on face. If original has tape in 3 slides, set true for all 3!
-13. persona.cultural_context: ONLY set when the slideshow content EXPLICITLY mentions a specific culture's beauty/skincare practices:
-    - "Japanese" → for J-beauty, Japanese skincare, Japanese routines
-    - "Korean" → for K-beauty, Korean glass skin, Korean skincare
-    - "Chinese" → for Chinese beauty secrets, TCM skincare
-    - "African" → for African beauty, shea butter traditions, African skincare
-    - "Indian" → for Ayurvedic beauty, Indian skincare
-    - "French" → for French pharmacy, French girl beauty
-    - "Scandinavian" → for Nordic beauty, Scandinavian skincare
-    - null → for MOST content with broad/general audience (DEFAULT)
-    The persona diversity system handles ethnicity variation automatically - cultural_context is ONLY for when the STORY is explicitly about a specific culture.
+13. persona.cultural_context: ALMOST ALWAYS null! Only set when content is SPECIFICALLY TEACHING a cultural beauty METHOD:
+    ✅ SET cultural_context ONLY for these patterns:
+    - "Japanese skincare routine" / "J-beauty method" / "why Japanese women have glass skin" → "Japanese"
+    - "Korean glass skin routine" / "K-beauty secrets" / "10-step Korean routine" → "Korean"
+    - "French pharmacy skincare" / "French girl beauty secrets" → "French"
+
+    ❌ DO NOT set cultural_context for:
+    - "Japanese women eat carbs" → null (just mentions nationality, NOT about Japanese skincare)
+    - "Asian women have great skin" → null (general statement, not teaching a method)
+    - "Women in Japan use this" → null (location mention, not cultural beauty practice)
+    - Any product promotion that just MENTIONS a country → null
+
+    DEFAULT TO null - 99% of content should be null. Only use when the ENTIRE slideshow is teaching a specific culture's beauty method/routine.
 14. transformation_role: Analyze the storyline to detect before/after transformation:
     - "before" → slide shows the PROBLEM state (wrinkles, dull skin, issues)
     - "after" → slide shows the RESULT/IMPROVED state (smooth skin, glowing, transformed)
@@ -1979,13 +1982,22 @@ LAYOUT: {text_position_hint}
         if has_persona and persona_reference_path:
             # With persona - need consistency
             # Check if we should show face tape on this persona (per-slide detection)
-            # DISABLED: Face tape on personas causes product mixing issues
-            # When original shows competitor patches, we were adding our patches = confusing
-            # Now: personas always have CLEAN faces, only product slide shows our product
-            show_face_tape = False
+            # RE-ENABLED: Show LumiDew patches on persona faces when shows_product_on_face=True
+            # The shows_product_on_face flag is set per-slide based on analysis detection
+            show_face_tape = shows_product_on_face
+
+            # Get face tape reference path for product-on-face slides
+            face_tape_ref_path = None
+            if show_face_tape:
+                face_tape_ref_path = PRODUCT_IN_USE_REFERENCES.get('face_tape')
+                # Safety: if reference doesn't exist, disable face tape
+                if not face_tape_ref_path or not os.path.exists(face_tape_ref_path):
+                    logger.warning(f"Face tape reference not found, disabling face tape for this slide")
+                    show_face_tape = False
+                    face_tape_ref_path = None
 
             # DEBUG: Log face tape decision
-            logger.info(f"FACE_TAPE_DEBUG (existing persona): slide_type={slide_type}, shows_product_on_face={shows_product_on_face}, show_face_tape={show_face_tape} (DISABLED)")
+            logger.info(f"FACE_TAPE_DEBUG (existing persona): slide_type={slide_type}, shows_product_on_face={shows_product_on_face}, show_face_tape={show_face_tape}, ref_path={face_tape_ref_path}")
 
             if show_face_tape:
                 # ===== FACE TAPE SLIDE =====
@@ -2236,13 +2248,22 @@ Use different hair color and style, different clothes from the reference.
 Only match: lighting mood, camera angle, setting vibe."""
 
             # Check if we should show face tape on this new persona (per-slide detection)
-            # DISABLED: Face tape on personas causes product mixing issues
-            # When original shows competitor patches, we were adding our patches = confusing
-            # Now: personas always have CLEAN faces, only product slide shows our product
-            show_face_tape = False
+            # RE-ENABLED: Show LumiDew patches on persona faces when shows_product_on_face=True
+            # The shows_product_on_face flag is set per-slide based on analysis detection
+            show_face_tape = shows_product_on_face
+
+            # Get face tape reference path for product-on-face slides
+            face_tape_ref_path = None
+            if show_face_tape:
+                face_tape_ref_path = PRODUCT_IN_USE_REFERENCES.get('face_tape')
+                # Safety: if reference doesn't exist, disable face tape
+                if not face_tape_ref_path or not os.path.exists(face_tape_ref_path):
+                    logger.warning(f"Face tape reference not found, disabling face tape for this slide")
+                    show_face_tape = False
+                    face_tape_ref_path = None
 
             # DEBUG: Log face tape decision
-            logger.info(f"FACE_TAPE_DEBUG: slide_type={slide_type}, shows_product_on_face={shows_product_on_face}, show_face_tape={show_face_tape} (DISABLED)")
+            logger.info(f"FACE_TAPE_DEBUG: slide_type={slide_type}, shows_product_on_face={shows_product_on_face}, show_face_tape={show_face_tape}, ref_path={face_tape_ref_path}")
 
             # Build face tape instruction using markdown format
             face_tape_instruction = ""
