@@ -228,6 +228,15 @@ def process_link(self, batch_link_id: str, parent_drive_folder_id: str):
             )
             logger.info(f"[Link {batch_link_id[:8]}] Uploaded {uploaded_count} images to Drive")
 
+            # Upload audio file to Drive (so user has access to original TikTok audio)
+            audio_path = scrape_result.get('audio')
+            if audio_path and os.path.exists(audio_path):
+                try:
+                    upload_file(audio_path, link_folder_id)
+                    logger.info(f"[Link {batch_link_id[:8]}] Uploaded audio to Drive")
+                except Exception as e:
+                    logger.warning(f"[Link {batch_link_id[:8]}] Failed to upload audio: {e}")
+
             # Step 5: Generate videos for each variation (same as single run)
             video_created = False
             if generate_video and generated_images:
