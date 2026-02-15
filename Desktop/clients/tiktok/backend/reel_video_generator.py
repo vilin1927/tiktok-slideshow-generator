@@ -519,13 +519,29 @@ def generate_combinations(
     if not all_combos:
         raise ReelVideoError("No valid combinations could be generated")
 
+    # Deduplicate by what's actually visible (assets used by clip types + text)
+    clip_types_used = set(c.get('type', 'before') for c in format_clips)
+    seen = set()
+    unique_combos = []
+    for combo in all_combos:
+        # Build a key from only the assets/text that will appear in the video
+        key_parts = [combo['character_id'], combo['hook_text'], combo['cta_text']]
+        if 'before' in clip_types_used or 'transition' in clip_types_used:
+            key_parts.append(combo['before_asset'].get('id', ''))
+        if 'after' in clip_types_used or 'cta' in clip_types_used:
+            key_parts.append(combo['after_asset'].get('id', ''))
+        key = tuple(key_parts)
+        if key not in seen:
+            seen.add(key)
+            unique_combos.append(combo)
+
     # Shuffle and limit to requested number
-    random.shuffle(all_combos)
+    random.shuffle(unique_combos)
 
-    if len(all_combos) < num_videos:
-        logger.warning(f"Only {len(all_combos)} unique combos available (requested {num_videos})")
+    if len(unique_combos) < num_videos:
+        logger.warning(f"Only {len(unique_combos)} unique combos available (requested {num_videos})")
 
-    selected = all_combos[:num_videos]
+    selected = unique_combos[:num_videos]
 
     # Build full video configs with clip assignments
     video_configs = []

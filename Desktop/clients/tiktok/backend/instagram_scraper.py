@@ -442,6 +442,19 @@ def scrape_and_create_format(url: str, format_name: str, output_base_dir: str, a
             'text_position': analysis.get('text_position', 'bottom')
         })
 
+    # Auto-split: if only 1 clip detected, create before/after/cta structure
+    if len(clips) == 1:
+        d = total_duration
+        clips = [
+            {'index': 0, 'duration': round(d * 0.40, 2), 'type': 'before',
+             'detected_text': None, 'text_position': 'bottom'},
+            {'index': 1, 'duration': round(d * 0.40, 2), 'type': 'after',
+             'detected_text': None, 'text_position': 'bottom'},
+            {'index': 2, 'duration': round(d * 0.20, 2), 'type': 'cta',
+             'detected_text': None, 'text_position': 'center'},
+        ]
+        logger.info(f"Auto-split single clip into before/after/cta: {[c['duration'] for c in clips]}")
+
     # Clean up downloaded video (keep only audio)
     try:
         os.remove(video_path)
@@ -518,6 +531,19 @@ def create_format_from_upload(video_path: str, format_name: str, output_base_dir
             'detected_text': analysis.get('detected_text'),
             'text_position': analysis.get('text_position', 'bottom')
         })
+
+    # Auto-split: if only 1 clip detected, create before/after/cta structure
+    if len(clips) == 1:
+        d = total_duration
+        clips = [
+            {'index': 0, 'duration': round(d * 0.40, 2), 'type': 'before',
+             'detected_text': None, 'text_position': 'bottom'},
+            {'index': 1, 'duration': round(d * 0.40, 2), 'type': 'after',
+             'detected_text': None, 'text_position': 'bottom'},
+            {'index': 2, 'duration': round(d * 0.20, 2), 'type': 'cta',
+             'detected_text': None, 'text_position': 'center'},
+        ]
+        logger.info(f"Auto-split single clip into before/after/cta: {[c['duration'] for c in clips]}")
 
     # Clean up video and screenshots
     try:
