@@ -231,48 +231,59 @@ def _process_single_video(
     logger.info(f"[Job {job_id[:8]}] Processing video {video_num}")
 
     # Apply image transforms for uniqueness (photo assets only)
+    # IMPORTANT: Work on copies so original assets are never modified
     variation_key = f"ig_{job_id[:8]}_{video_num}"
     clips_config = video_config['clips_config']
+    transform_dir = tempfile.mkdtemp(prefix=f'ig_transform_{video_num}_')
 
-    for i, clip in enumerate(clips_config):
-        if clip['asset_type'] == 'photo':
-            transform_single_image_file(clip['asset_path'], variation_key, i)
-
-    # Assemble video
-    output_filename = f"reel_{video_num:03d}.mp4"
-    output_path = os.path.join(output_dir, output_filename)
-
-    assemble_reel_video(
-        clips_config=clips_config,
-        audio_path=audio_path,
-        output_path=output_path,
-        request_id=f"{job_id[:8]}_v{video_num}"
-    )
-
-    # Upload to Google Drive
     try:
-        file_id = upload_file(output_path, drive_folder_id)
-        drive_url = f"https://drive.google.com/file/d/{file_id}/view"
+        for i, clip in enumerate(clips_config):
+            if clip['asset_type'] == 'photo' and clip['asset_path']:
+                ext = os.path.splitext(clip['asset_path'])[1]
+                copy_path = os.path.join(transform_dir, f'clip_{i:02d}{ext}')
+                shutil.copy2(clip['asset_path'], copy_path)
+                transform_single_image_file(copy_path, variation_key, i)
+                clip['asset_path'] = copy_path
 
-        update_ig_video_status(
-            video_id, 'completed',
+        # Assemble video
+        output_filename = f"reel_{video_num:03d}.mp4"
+        output_path = os.path.join(output_dir, output_filename)
+
+        assemble_reel_video(
+            clips_config=clips_config,
+            audio_path=audio_path,
             output_path=output_path,
-            drive_url=drive_url
+            request_id=f"{job_id[:8]}_v{video_num}"
         )
 
-        logger.info(f"[Job {job_id[:8]}] Video {video_num} uploaded to Drive")
+        # Upload to Google Drive
+        try:
+            file_id = upload_file(output_path, drive_folder_id)
+            drive_url = f"https://drive.google.com/file/d/{file_id}/view"
 
-    except GoogleDriveError as e:
-        # Video was created but upload failed — still mark as completed with local path
-        logger.warning(f"[Job {job_id[:8]}] Drive upload failed for video {video_num}: {e}")
-        update_ig_video_status(
-            video_id, 'completed',
-            output_path=output_path,
-            error_message=f"Drive upload failed: {e}"
-        )
+            update_ig_video_status(
+                video_id, 'completed',
+                output_path=output_path,
+                drive_url=drive_url
+            )
 
-    # Cleanup local file after upload
-    try:
-        os.remove(output_path)
-    except Exception:
-        pass
+            logger.info(f"[Job {job_id[:8]}] Video {video_num} uploaded to Drive")
+
+        except GoogleDriveError as e:
+            # Video was created but upload failed — still mark as completed with local path
+            logger.warning(f"[Job {job_id[:8]}] Drive upload failed for video {video_num}: {e}")
+            update_ig_video_status(
+                video_id, 'completed',
+                output_path=output_path,
+                error_message=f"Drive upload failed: {e}"
+            )
+
+        # Cleanup local file after upload
+        try:
+            os.remove(output_path)
+        except Exception:
+            pass
+
+    finally:
+        # Always cleanup transform temp directory
+        shutil.rmtree(transform_dir, ignore_errors=True)
