@@ -49,62 +49,101 @@ def _get_font(size: int) -> ImageFont.FreeTypeFont:
     return ImageFont.load_default()
 
 
-def render_text_on_image(
-    image_path: str,
+# Lazy-loaded emoji font
+_emoji_font_cache = None
+_emoji_font_loaded = False
+
+
+def _get_emoji_font():
+    """Lazy-load emoji font for Apple-style emoji rendering."""
+    global _emoji_font_cache, _emoji_font_loaded
+    if not _emoji_font_loaded:
+        try:
+            from text_renderer import load_emoji_font
+            _emoji_font_cache = load_emoji_font()
+            if _emoji_font_cache:
+                logger.info("Loaded emoji font for IG Reel text rendering")
+            else:
+                logger.warning("No emoji font available — emoji will be skipped")
+        except Exception as e:
+            logger.warning(f"Could not load emoji font: {e}")
+            _emoji_font_cache = None
+        _emoji_font_loaded = True
+    return _emoji_font_cache
+
+
+def _render_text_overlay(
     text: str,
     style: str,
-    output_path: str,
+    width: int = OUTPUT_WIDTH,
+    height: int = OUTPUT_HEIGHT,
     position: str = 'bottom'
-) -> str:
+) -> Image.Image:
     """
-    Render text overlay on an image using Pillow.
+    Render text overlay as transparent RGBA image with Apple emoji support.
+
+    Used by both photo clips (PIL composite) and video clips (FFmpeg overlay).
 
     Args:
-        image_path: Path to source image (1080x1920)
-        text: Text to render
+        text: Text to render (may contain emoji)
         style: 'hook' (white on black semi-transparent) or 'cta' (black on white)
-        output_path: Path for output image
+        width: Canvas width
+        height: Canvas height
         position: 'top', 'center', or 'bottom'
 
     Returns:
-        Path to output image
+        RGBA PIL Image with text on transparent background
     """
-    img = Image.open(image_path).convert('RGBA')
-    overlay = Image.new('RGBA', img.size, (0, 0, 0, 0))
+    from text_renderer import (
+        render_text_with_emojis, wrap_text,
+        get_text_width_with_emojis
+    )
+
+    overlay = Image.new('RGBA', (width, height), (0, 0, 0, 0))
+
+    if not text or not text.strip():
+        return overlay
+
     draw = ImageDraw.Draw(overlay)
 
-    # Scale font size based on image height
-    font_size = int(img.height * 0.035)
+    font_size = int(height * 0.035)
     font = _get_font(font_size)
+    emoji_font = _get_emoji_font()
+    target_emoji_size = font_size
 
-    # Word wrap text
-    max_width = int(img.width * 0.85)
-    lines = _wrap_text(draw, text, font, max_width)
-    rendered_text = '\n'.join(lines)
+    # Word wrap with emoji-aware width calculation
+    max_width = int(width * 0.85)
+    lines = wrap_text(text, font, max_width, emoji_font=emoji_font, font_size=target_emoji_size)
 
     # Measure text block
-    bbox = draw.multiline_textbbox((0, 0), rendered_text, font=font, spacing=8)
-    text_w = bbox[2] - bbox[0]
-    text_h = bbox[3] - bbox[1]
+    line_spacing = 8
+    line_height = font_size + line_spacing
+    text_h = len(lines) * line_height - line_spacing
+
+    # Calculate widest line
+    temp_img = Image.new('RGB', (1, 1))
+    temp_draw = ImageDraw.Draw(temp_img)
+    text_w = 0
+    for line in lines:
+        lw = get_text_width_with_emojis(line, font, emoji_font, temp_draw, target_emoji_size)
+        text_w = max(text_w, lw)
 
     padding_x = 30
     padding_y = 20
-
-    # Calculate position
     bg_w = text_w + padding_x * 2
     bg_h = text_h + padding_y * 2
-    bg_x = (img.width - bg_w) // 2
+    bg_x = (width - bg_w) // 2
 
     if position == 'top':
-        bg_y = int(img.height * 0.12)
+        bg_y = int(height * 0.12)
     elif position == 'center':
-        bg_y = (img.height - bg_h) // 2
+        bg_y = (height - bg_h) // 2
     else:  # bottom
-        bg_y = int(img.height * 0.75)
+        bg_y = int(height * 0.75) + 40
 
     # Draw background
     if style == 'hook':
-        bg_color = (0, 0, 0, 180)  # Black semi-transparent
+        bg_color = (0, 0, 0, 180)
         text_color = (255, 255, 255, 255)
     else:  # cta
         bg_color = (255, 255, 255, 240)
@@ -116,22 +155,47 @@ def render_text_on_image(
         fill=bg_color
     )
 
-    # Draw text
-    text_x = bg_x + padding_x
-    text_y = bg_y + padding_y
-    draw.multiline_text(
-        (text_x, text_y),
-        rendered_text,
-        font=font,
-        fill=text_color,
-        spacing=8
-    )
+    # Draw text line by line with emoji support
+    y_cursor = bg_y + padding_y
+    for line in lines:
+        line_w = get_text_width_with_emojis(line, font, emoji_font, temp_draw, target_emoji_size)
+        line_x = bg_x + padding_x + (text_w - line_w) // 2
 
-    # Composite
+        render_text_with_emojis(
+            draw, line, (line_x, y_cursor),
+            font, emoji_font, text_color,
+            target_image=overlay,
+            target_emoji_size=target_emoji_size
+        )
+        y_cursor += line_height
+
+    return overlay
+
+
+def render_text_on_image(
+    image_path: str,
+    text: str,
+    style: str,
+    output_path: str,
+    position: str = 'bottom'
+) -> str:
+    """
+    Render text overlay on an image using Pillow with Apple emoji support.
+
+    Args:
+        image_path: Path to source image (1080x1920)
+        text: Text to render (may contain emoji)
+        style: 'hook' (white on black semi-transparent) or 'cta' (black on white)
+        output_path: Path for output image
+        position: 'top', 'center', or 'bottom'
+
+    Returns:
+        Path to output image
+    """
+    img = Image.open(image_path).convert('RGBA')
+    overlay = _render_text_overlay(text, style, img.width, img.height, position)
     result = Image.alpha_composite(img, overlay)
-    result = result.convert('RGB')
-    result.save(output_path, quality=95)
-
+    result.convert('RGB').save(output_path, quality=95)
     return output_path
 
 
@@ -277,62 +341,75 @@ def prepare_video_clip(
     """
     Scale and trim/loop a video clip to target duration and 9:16 aspect ratio.
 
+    Text is rendered as a transparent PNG overlay (with Apple emoji support)
+    and composited via FFmpeg overlay filter.
+
     Args:
         video_path: Path to source video
         target_duration: Target clip duration
         output_path: Output video path
-        text: Optional text overlay
+        text: Optional text overlay (may contain emoji)
         text_style: 'hook' or 'cta'
         text_position: 'top', 'center', or 'bottom'
 
     Returns:
         Path to output video clip
     """
-    # Build filter chain
-    filters = [
-        f'scale={OUTPUT_WIDTH}:{OUTPUT_HEIGHT}:force_original_aspect_ratio=decrease',
+    scale_chain = (
+        f'scale={OUTPUT_WIDTH}:{OUTPUT_HEIGHT}:force_original_aspect_ratio=decrease,'
         f'pad={OUTPUT_WIDTH}:{OUTPUT_HEIGHT}:(ow-iw)/2:(oh-ih)/2:black'
-    ]
+    )
 
-    # Add text overlay via FFmpeg drawtext if needed
-    if text and text_style:
-        escaped_text = text.replace("'", "\\'").replace(":", "\\:")
-        if text_style == 'hook':
-            # White text on black semi-transparent box
-            filters.append(
-                f"drawtext=text='{escaped_text}':fontsize=38:fontcolor=white:"
-                f"box=1:boxcolor=black@0.7:boxborderw=15:"
-                f"x=(w-text_w)/2:y=h*0.75"
+    overlay_path = None
+    try:
+        if text and text_style:
+            # Render text overlay as transparent PNG (with emoji support)
+            overlay_img = _render_text_overlay(text, text_style, position=text_position)
+            overlay_path = os.path.join(
+                tempfile.gettempdir(), f'text_overlay_{uuid.uuid4().hex[:8]}.png'
             )
-        else:  # cta
-            filters.append(
-                f"drawtext=text='{escaped_text}':fontsize=38:fontcolor=black:"
-                f"box=1:boxcolor=white@0.95:boxborderw=15:"
-                f"x=(w-text_w)/2:y=h*0.75"
-            )
+            overlay_img.save(overlay_path, 'PNG')
 
-    filter_chain = ','.join(filters)
+            cmd = [
+                'ffmpeg', '-y',
+                '-stream_loop', '-1',
+                '-i', video_path,
+                '-i', overlay_path,
+                '-t', str(target_duration),
+                '-filter_complex',
+                f'[0:v]{scale_chain}[bg];[bg][1:v]overlay=0:0',
+                '-c:v', 'libx264',
+                '-preset', 'medium',
+                '-crf', '23',
+                '-pix_fmt', 'yuv420p',
+                '-an',
+                '-r', '30',
+                output_path
+            ]
+        else:
+            cmd = [
+                'ffmpeg', '-y',
+                '-stream_loop', '-1',
+                '-i', video_path,
+                '-t', str(target_duration),
+                '-vf', scale_chain,
+                '-c:v', 'libx264',
+                '-preset', 'medium',
+                '-crf', '23',
+                '-pix_fmt', 'yuv420p',
+                '-an',
+                '-r', '30',
+                output_path
+            ]
 
-    cmd = [
-        'ffmpeg', '-y',
-        '-stream_loop', '-1',  # Loop if shorter than target
-        '-i', video_path,
-        '-t', str(target_duration),
-        '-vf', filter_chain,
-        '-c:v', 'libx264',
-        '-preset', 'medium',
-        '-crf', '23',
-        '-pix_fmt', 'yuv420p',
-        '-an',  # Strip audio (we'll add format audio later)
-        '-r', '30',
-        output_path
-    ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        if result.returncode != 0:
+            raise ReelVideoError(f"Video clip preparation failed: {result.stderr[-200:]}")
 
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
-    if result.returncode != 0:
-        raise ReelVideoError(f"Video clip preparation failed: {result.stderr[-200:]}")
-
-    return output_path
+        return output_path
+    finally:
+        if overlay_path and os.path.exists(overlay_path):
+            os.remove(overlay_path)
 
 
 # ============ Video Assembly ============
