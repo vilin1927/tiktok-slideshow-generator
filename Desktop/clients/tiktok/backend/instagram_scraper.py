@@ -1,7 +1,7 @@
 """
 Instagram Reel Scraper
 
-Downloads IG reels via yt-dlp, extracts audio + scene cuts via FFmpeg,
+Downloads IG reels via RapidAPI, extracts audio + scene cuts via FFmpeg,
 and uses Gemini to analyze clip structure (before/after/CTA).
 """
 import json
@@ -11,9 +11,16 @@ import subprocess
 import tempfile
 import uuid
 
+import requests
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from logging_config import get_logger
 
 logger = get_logger('instagram_scraper')
+
+RAPIDAPI_HOST = 'instagram-reels-downloader-api.p.rapidapi.com'
 
 
 class InstagramScraperError(Exception):
@@ -23,7 +30,7 @@ class InstagramScraperError(Exception):
 
 def download_reel(url: str, output_dir: str) -> str:
     """
-    Download an Instagram reel video using yt-dlp.
+    Download an Instagram reel video using RapidAPI Instagram Reels Downloader.
 
     Args:
         url: Instagram reel URL
@@ -36,57 +43,65 @@ def download_reel(url: str, output_dir: str) -> str:
         InstagramScraperError: If download fails
     """
     os.makedirs(output_dir, exist_ok=True)
-    output_template = os.path.join(output_dir, 'reel_%(id)s.%(ext)s')
 
-    # Look for cookies file for Instagram authentication
-    cookies_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'instagram_cookies.txt')
+    api_key = os.getenv('RAPIDAPI_KEY', '').strip()
+    if not api_key:
+        raise InstagramScraperError("RAPIDAPI_KEY not set in environment")
 
-    cmd = [
-        'yt-dlp',
-        '--no-playlist',
-        '-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best',
-        '--merge-output-format', 'mp4',
-        '-o', output_template,
-        '--no-check-certificates',
-    ]
+    logger.info(f"Downloading reel via RapidAPI: {url[:60]}...")
 
-    if os.path.exists(cookies_path):
-        cmd.extend(['--cookies', cookies_path])
-        logger.info(f"Using cookies from: {cookies_path}")
-    else:
-        logger.warning("No cookies file found - Instagram may block the download")
+    # Step 1: Get video download URL from RapidAPI
+    try:
+        resp = requests.get(
+            f"https://{RAPIDAPI_HOST}/download",
+            params={"url": url},
+            headers={
+                "x-rapidapi-key": api_key,
+                "x-rapidapi-host": RAPIDAPI_HOST,
+            },
+            timeout=30,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+    except requests.exceptions.Timeout:
+        raise InstagramScraperError("RapidAPI request timed out (30s)")
+    except requests.exceptions.HTTPError as e:
+        status = e.response.status_code if e.response is not None else 'unknown'
+        raise InstagramScraperError(f"RapidAPI error (HTTP {status}): {e}")
+    except Exception as e:
+        raise InstagramScraperError(f"RapidAPI request failed: {e}")
 
-    cmd.append(url)
+    # Step 2: Extract video URL from response
+    medias = data.get('medias', [])
+    video_url = None
+    for media in medias:
+        if media.get('type') == 'video' or media.get('url', '').endswith('.mp4'):
+            video_url = media['url']
+            break
+    if not video_url and medias:
+        video_url = medias[0].get('url')
+    if not video_url:
+        raise InstagramScraperError(f"No video URL in API response: {json.dumps(data)[:300]}")
 
-    logger.info(f"Downloading reel: {url[:60]}...")
+    # Step 3: Download the actual video file
+    reel_id = data.get('url', '').split('/')[-2] if data.get('url') else uuid.uuid4().hex[:10]
+    video_path = os.path.join(output_dir, f'reel_{reel_id}.mp4')
 
     try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=120
-        )
+        video_resp = requests.get(video_url, timeout=120, stream=True)
+        video_resp.raise_for_status()
+        with open(video_path, 'wb') as f:
+            for chunk in video_resp.iter_content(chunk_size=8192):
+                f.write(chunk)
+    except Exception as e:
+        raise InstagramScraperError(f"Failed to download video file: {e}")
 
-        if result.returncode != 0:
-            error = result.stderr[-300:] if len(result.stderr) > 300 else result.stderr
-            logger.error(f"yt-dlp failed: {error}")
-            raise InstagramScraperError(f"Download failed: {error}")
+    if not os.path.exists(video_path) or os.path.getsize(video_path) < 1000:
+        raise InstagramScraperError("Download completed but video file is empty or too small")
 
-    except subprocess.TimeoutExpired:
-        raise InstagramScraperError("Download timed out (120s)")
-    except FileNotFoundError:
-        raise InstagramScraperError("yt-dlp is not installed")
-
-    # Find the downloaded file
-    for f in os.listdir(output_dir):
-        if f.startswith('reel_') and f.endswith(('.mp4', '.webm', '.mkv')):
-            video_path = os.path.join(output_dir, f)
-            size_mb = os.path.getsize(video_path) / 1024 / 1024
-            logger.info(f"Downloaded: {f} ({size_mb:.1f}MB)")
-            return video_path
-
-    raise InstagramScraperError("Download completed but no video file found")
+    size_mb = os.path.getsize(video_path) / 1024 / 1024
+    logger.info(f"Downloaded: reel_{reel_id}.mp4 ({size_mb:.1f}MB)")
+    return video_path
 
 
 def get_video_duration(video_path: str) -> float:
