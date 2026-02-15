@@ -16,7 +16,7 @@ from logging_config import get_logger
 from database import (
     list_video_jobs, get_video_jobs_count,
     list_tiktok_copy_batches, get_tiktok_copy_batches_count,
-    list_ig_jobs, get_ig_jobs_count, get_ig_videos_by_job
+    list_ig_jobs, get_ig_jobs_count, get_ig_videos_by_job, get_ig_job, delete_ig_job
 )
 
 logger = get_logger('admin')
@@ -391,6 +391,35 @@ def list_ig_reel_jobs_api():
         return jsonify({'error': str(e)}), 500
 
 
+@admin_bp.route('/ig-reel-jobs/<job_id>', methods=['DELETE'])
+@require_auth
+def delete_ig_reel_job(job_id):
+    """Delete an IG Reel job and revoke its Celery task."""
+    try:
+        job = get_ig_job(job_id)
+        if not job:
+            return jsonify({'error': 'Job not found'}), 404
+
+        # Revoke Celery task if running
+        task_ids = [job['celery_task_id']] if job.get('celery_task_id') else []
+        revoked = 0
+        if task_ids:
+            try:
+                from celery_utils import revoke_tasks
+                revoked = revoke_tasks(task_ids)
+            except Exception as e:
+                logger.warning(f"Failed to revoke Celery task: {e}")
+
+        if delete_ig_job(job_id):
+            logger.info(f"Deleted IG Reel job {job_id[:8]}, revoked {revoked} tasks")
+            return jsonify({'status': 'deleted', 'job_id': job_id, 'tasks_revoked': revoked})
+        return jsonify({'error': 'Failed to delete'}), 500
+
+    except Exception as e:
+        logger.error(f"Failed to delete IG Reel job: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
 # ============ Product Photos Management ============
 
 PRODUCT_CATEGORIES = {
@@ -716,9 +745,18 @@ def cleanup_stuck_jobs():
             """, (threshold_str, threshold_str))
             stuck_batches = [dict(row) for row in cursor.fetchall()]
 
-            cleaned = {'jobs': 0, 'links': 0, 'batches': 0}
+            # Find stuck IG Reel jobs
+            cursor.execute("""
+                SELECT id, status, num_videos, created_at, started_at
+                FROM ig_jobs
+                WHERE status = 'processing'
+                AND (started_at < ? OR (started_at IS NULL AND created_at < ?))
+            """, (threshold_str, threshold_str))
+            stuck_ig_jobs = [dict(row) for row in cursor.fetchall()]
 
-            if not dry_run and (stuck_jobs or stuck_links or stuck_batches):
+            cleaned = {'jobs': 0, 'links': 0, 'batches': 0, 'ig_jobs': 0}
+
+            if not dry_run and (stuck_jobs or stuck_links or stuck_batches or stuck_ig_jobs):
                 now_str = datetime.utcnow().isoformat()
 
                 if action == 'fail':
@@ -749,6 +787,15 @@ def cleanup_stuck_jobs():
                     """, (now_str, threshold_str, threshold_str))
                     cleaned['batches'] = cursor.rowcount
 
+                    cursor.execute("""
+                        UPDATE ig_jobs SET status = 'failed',
+                            error_message = 'Auto-cleaned: stuck in processing',
+                            completed_at = ?
+                        WHERE status = 'processing'
+                        AND (started_at < ? OR (started_at IS NULL AND created_at < ?))
+                    """, (now_str, threshold_str, threshold_str))
+                    cleaned['ig_jobs'] = cursor.rowcount
+
                 elif action == 'reset':
                     cursor.execute("""
                         UPDATE jobs SET status = 'pending', started_at = NULL
@@ -771,11 +818,19 @@ def cleanup_stuck_jobs():
                     """, (threshold_str, threshold_str))
                     cleaned['batches'] = cursor.rowcount
 
+                    cursor.execute("""
+                        UPDATE ig_jobs SET status = 'pending', started_at = NULL
+                        WHERE status = 'processing'
+                        AND (started_at < ? OR (started_at IS NULL AND created_at < ?))
+                    """, (threshold_str, threshold_str))
+                    cleaned['ig_jobs'] = cursor.rowcount
+
         return jsonify({
             'stuck_jobs': stuck_jobs,
             'stuck_links': stuck_links,
             'stuck_batches': stuck_batches,
-            'total_stuck': len(stuck_jobs) + len(stuck_links) + len(stuck_batches),
+            'stuck_ig_jobs': stuck_ig_jobs,
+            'total_stuck': len(stuck_jobs) + len(stuck_links) + len(stuck_batches) + len(stuck_ig_jobs),
             'dry_run': dry_run,
             'action': action,
             'threshold_minutes': threshold,

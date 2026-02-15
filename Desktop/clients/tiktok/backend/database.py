@@ -1646,6 +1646,15 @@ def get_ig_jobs_count(status: str = None) -> int:
         return cursor.fetchone()['count']
 
 
+def delete_ig_job(job_id: str) -> bool:
+    """Delete an IG reel job and all related videos. Returns True if deleted."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM ig_videos WHERE job_id = ?', (job_id,))
+        cursor.execute('DELETE FROM ig_jobs WHERE id = ?', (job_id,))
+        return cursor.rowcount > 0
+
+
 def update_ig_job_status(
     job_id: str,
     status: str,
