@@ -1,6 +1,6 @@
 """
 Celery Application Configuration
-Batch processing queue for TikTok slideshow generation
+Batch processing queue for slideshow generation
 """
 import os
 from celery import Celery

@@ -1,5 +1,5 @@
 """
-Configuration module for TikTok Slideshow Generator.
+Configuration module for Viral Slideshow Generator.
 Centralizes all configurable values with environment variable overrides.
 """
 import os

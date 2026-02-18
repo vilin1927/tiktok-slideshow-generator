@@ -55,7 +55,7 @@ def validate_tiktok_url(url: str) -> tuple[bool, str]:
         if re.match(pattern, url):
             return True, ""
 
-    return False, "Invalid TikTok URL format"
+    return False, "Invalid URL format"
 
 
 def parse_links(text: str) -> list[str]:

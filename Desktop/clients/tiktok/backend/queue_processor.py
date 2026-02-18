@@ -677,7 +677,7 @@ def validate_startup() -> bool:
 def main():
     """Main entry point for queue processor."""
     logger.info("=" * 60)
-    logger.info("TikTok Image Queue Processor Starting")
+    logger.info("Image Queue Processor Starting")
     logger.info("=" * 60)
 
     # Validate dependencies

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TikTok Slideshow Generator v2</title>
+    <title>Viral Slideshow Generator v2</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <style>
@@ -43,13 +43,13 @@
     <div class="container mx-auto px-4 py-8 max-w-3xl" x-data="slideshowGenerator()" x-init="$el.style.display = window.pageAuthenticated ? '' : 'none'">
         <!-- Header -->
         <div class="text-center mb-8 relative">
-            <a href="/tiktok-copy" class="absolute top-0 left-0 text-purple-400 hover:text-purple-300 text-sm transition-colors">
+            <a href="/video-copy" class="absolute top-0 left-0 text-purple-400 hover:text-purple-300 text-sm transition-colors">
                 Copy Tool
             </a>
             <a href="admin.html" class="absolute top-0 right-0 text-gray-500 hover:text-gray-300 text-sm transition-colors">
                 Settings
             </a>
-            <h1 class="text-3xl font-bold text-white mb-2">TikTok Slideshow Generator</h1>
+            <h1 class="text-3xl font-bold text-white mb-2">Viral Slideshow Generator</h1>
             <p class="text-gray-400">Generate viral-style slideshows for your products</p>
             <p class="text-purple-400 text-sm mt-1">v2 - AI-powered story adaptation</p>
         </div>
@@ -84,14 +84,14 @@
         <!-- ==================== SINGLE MODE ==================== -->
         <template x-if="mode === 'single'">
             <form @submit.prevent="submitSingleForm" class="bg-gray-800 rounded-xl p-6 shadow-xl">
-                <!-- TikTok URL -->
+                <!-- Slideshow URL -->
                 <div class="mb-6">
                     <label class="block text-gray-300 text-sm font-medium mb-2">
-                        Viral TikTok Slideshow URL
+                        Viral Slideshow URL
                     </label>
                     <input
                         type="url"
-                        x-model="formData.tiktok_url"
+                        x-model="formData.source_url"
                         placeholder="https://www.tiktok.com/@user/photo/..."
                         class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
                         required
@@ -291,7 +291,7 @@
                         <span class="ml-3 text-gray-300 font-medium">Also generate video</span>
                     </label>
                     <p class="text-gray-500 text-xs mt-2 ml-8">
-                        Combine slides + TikTok audio into MP4 videos (one per variation set)
+                        Combine slides + audio into MP4 videos (one per variation set)
                     </p>
                 </div>
 
@@ -339,7 +339,7 @@
                     <!-- Links Textarea -->
                     <div class="mb-4">
                         <label class="block text-gray-300 text-sm font-medium mb-2">
-                            Paste TikTok URLs (one per line, max 100)
+                            Paste URLs (one per line, max 100)
                         </label>
                         <textarea
                             x-model="batchData.linksText"
@@ -592,7 +592,7 @@ https://vm.tiktok.com/abc..."
                             <span class="ml-3 text-gray-300 font-medium">Also generate videos</span>
                         </label>
                         <p class="text-gray-500 text-xs mt-2 ml-8">
-                            Create MP4 video for each link using scraped TikTok audio
+                            Create MP4 video for each link using scraped audio
                         </p>
                     </div>
 
@@ -1026,7 +1026,7 @@ https://vm.tiktok.com/abc..."
 
                 // Single mode data
                 formData: {
-                    tiktok_url: '',
+                    source_url: '',
                     folder_name: '',
                     product_context: '',
                     hook_photo_var: 1,
@@ -1293,7 +1293,7 @@ INSPIRED BY JAPANESE SKIN CARE: Delivers a lifted, contoured look without silico
                     this.statusDetail = 'Preparing request...';
 
                     const formData = new FormData();
-                    formData.append('tiktok_url', this.formData.tiktok_url);
+                    formData.append('source_url', this.formData.source_url);
                     formData.append('folder_name', this.formData.folder_name);
                     formData.append('product_context', this.formData.product_context);
 
@@ -1355,7 +1355,7 @@ INSPIRED BY JAPANESE SKIN CARE: Delivers a lifted, contoured look without silico
                     }
 
                     const lines = text.split(/[\n\r]+/).map(l => l.trim()).filter(l => l);
-                    const tiktokPatterns = [
+                    const urlPatterns = [
                         /^https?:\/\/(www\.)?tiktok\.com\/@[\w.-]+\/(video|photo)\/\d+/,
                         /^https?:\/\/vm\.tiktok\.com\/[\w]+/,
                         /^https?:\/\/(www\.)?tiktok\.com\/t\/[\w]+/,
@@ -1365,7 +1365,7 @@ INSPIRED BY JAPANESE SKIN CARE: Delivers a lifted, contoured look without silico
                     const invalidLinks = [];
 
                     lines.forEach((url, index) => {
-                        const isValid = tiktokPatterns.some(p => p.test(url));
+                        const isValid = urlPatterns.some(p => p.test(url));
                         if (isValid) {
                             validLinks.push({ index, url });
                         } else {

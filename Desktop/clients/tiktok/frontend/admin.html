@@ -376,7 +376,7 @@
                 <div class="bg-gray-800/50 backdrop-blur rounded-xl p-6 shadow-xl">
                     <div class="flex justify-between items-center mb-4">
                         <h2 class="text-xl font-semibold">Job Queue</h2>
-                        <button @click="queueTab === 'slideshow' ? refreshJobs() : (queueTab === 'video' ? fetchVideoJobs() : (queueTab === 'tiktok-copy' ? fetchTikTokCopyJobs() : fetchIgReelJobs()))" class="text-sm px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded">
+                        <button @click="queueTab === 'slideshow' ? refreshJobs() : (queueTab === 'video' ? fetchVideoJobs() : (queueTab === 'video-copy' ? fetchVideoCopyJobs() : fetchIgReelJobs()))" class="text-sm px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded">
                             Refresh
                         </button>
                     </div>
@@ -398,11 +398,11 @@
                             Video Jobs
                         </button>
                         <button
-                            @click="queueTab = 'tiktok-copy'; fetchTikTokCopyJobs()"
+                            @click="queueTab = 'video-copy'; fetchVideoCopyJobs()"
                             class="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-                            :class="queueTab === 'tiktok-copy' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'"
+                            :class="queueTab === 'video-copy' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'"
                         >
-                            TikTok Copy
+                            Video Copy
                         </button>
                         <button
                             @click="queueTab = 'ig-reels'; fetchIgReelJobs()"
@@ -453,22 +453,22 @@
                         </div>
                     </div>
 
-                    <!-- TikTok Copy Queue Stats -->
-                    <div x-show="queueTab === 'tiktok-copy'" class="grid grid-cols-4 gap-2 mb-4 text-center text-xs">
+                    <!-- Video Copy Queue Stats -->
+                    <div x-show="queueTab === 'video-copy'" class="grid grid-cols-4 gap-2 mb-4 text-center text-xs">
                         <div class="bg-yellow-500/20 rounded p-2">
-                            <div class="text-yellow-400 font-bold" x-text="tiktokCopyStats.pending">0</div>
+                            <div class="text-yellow-400 font-bold" x-text="videoCopyStats.pending">0</div>
                             <div class="text-gray-400">Pending</div>
                         </div>
                         <div class="bg-blue-500/20 rounded p-2">
-                            <div class="text-blue-400 font-bold" x-text="tiktokCopyStats.processing">0</div>
+                            <div class="text-blue-400 font-bold" x-text="videoCopyStats.processing">0</div>
                             <div class="text-gray-400">Processing</div>
                         </div>
                         <div class="bg-green-500/20 rounded p-2">
-                            <div class="text-green-400 font-bold" x-text="tiktokCopyStats.completed">0</div>
+                            <div class="text-green-400 font-bold" x-text="videoCopyStats.completed">0</div>
                             <div class="text-gray-400">Completed</div>
                         </div>
                         <div class="bg-red-500/20 rounded p-2">
-                            <div class="text-red-400 font-bold" x-text="tiktokCopyStats.failed">0</div>
+                            <div class="text-red-400 font-bold" x-text="videoCopyStats.failed">0</div>
                             <div class="text-gray-400">Failed</div>
                         </div>
                     </div>
@@ -581,9 +581,9 @@
                         </div>
                     </div>
 
-                    <!-- TikTok Copy Batches List -->
-                    <div x-show="queueTab === 'tiktok-copy'" class="space-y-3 mb-4">
-                        <template x-for="batch in tiktokCopyBatches" :key="batch.id">
+                    <!-- Video Copy Batches List -->
+                    <div x-show="queueTab === 'video-copy'" class="space-y-3 mb-4">
+                        <template x-for="batch in videoCopyBatches" :key="batch.id">
                             <div class="bg-gray-700/50 rounded p-3 text-sm">
                                 <!-- Batch Header -->
                                 <div class="flex justify-between items-start mb-2">
@@ -657,8 +657,8 @@
                                 </div>
                             </div>
                         </template>
-                        <div x-show="tiktokCopyBatches.length === 0" class="text-center text-gray-500 py-8">
-                            No TikTok Copy batches found
+                        <div x-show="videoCopyBatches.length === 0" class="text-center text-gray-500 py-8">
+                            No Video Copy batches found
                         </div>
                     </div>
 
@@ -798,22 +798,22 @@
                         </div>
                     </div>
 
-                    <!-- TikTok Copy Pagination -->
-                    <div x-show="queueTab === 'tiktok-copy' && totalTikTokCopyBatches > perPage" class="flex items-center justify-between pt-4 border-t border-gray-700">
+                    <!-- Video Copy Pagination -->
+                    <div x-show="queueTab === 'video-copy' && totalVideoCopyBatches > perPage" class="flex items-center justify-between pt-4 border-t border-gray-700">
                         <div class="text-sm text-gray-400">
-                            Showing <span x-text="((tiktokCopyPage - 1) * perPage) + 1"></span>-<span x-text="Math.min(tiktokCopyPage * perPage, totalTikTokCopyBatches)"></span> of <span x-text="totalTikTokCopyBatches"></span>
+                            Showing <span x-text="((videoCopyPage - 1) * perPage) + 1"></span>-<span x-text="Math.min(videoCopyPage * perPage, totalVideoCopyBatches)"></span> of <span x-text="totalVideoCopyBatches"></span>
                         </div>
                         <div class="flex space-x-2">
                             <button
-                                @click="tiktokCopyPrevPage"
-                                :disabled="tiktokCopyPage === 1"
+                                @click="videoCopyPrevPage"
+                                :disabled="videoCopyPage === 1"
                                 class="px-3 py-1 bg-gray-700 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-600"
                             >
                                 Previous
                             </button>
                             <button
-                                @click="tiktokCopyNextPage"
-                                :disabled="tiktokCopyPage * perPage >= totalTikTokCopyBatches"
+                                @click="videoCopyNextPage"
+                                :disabled="videoCopyPage * perPage >= totalVideoCopyBatches"
                                 class="px-3 py-1 bg-gray-700 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-600"
                             >
                                 Next
@@ -857,7 +857,7 @@
                     </div>
 
                     <p class="text-sm text-gray-400 mb-6">
-                        Upload product photos by category. These are used by TikTok Copy auto-detect to replace product slides.
+                        Upload product photos by category. These are used by Video Copy auto-detect to replace product slides.
                     </p>
 
                     <!-- Photo upload success/error message -->
@@ -973,17 +973,17 @@
                 totalJobs: 0,
 
                 // Video jobs state
-                queueTab: 'slideshow', // 'slideshow', 'video', or 'tiktok-copy'
+                queueTab: 'slideshow', // 'slideshow', 'video', or 'video-copy'
                 videoJobs: [],
                 videoQueueStats: { pending: 0, processing: 0, completed: 0, failed: 0 },
                 videoPage: 1,
                 totalVideoJobs: 0,
 
-                // TikTok Copy state
-                tiktokCopyBatches: [],
-                tiktokCopyStats: { pending: 0, processing: 0, completed: 0, failed: 0 },
-                tiktokCopyPage: 1,
-                totalTikTokCopyBatches: 0,
+                // Video Copy state
+                videoCopyBatches: [],
+                videoCopyStats: { pending: 0, processing: 0, completed: 0, failed: 0 },
+                videoCopyPage: 1,
+                totalVideoCopyBatches: 0,
 
                 // IG Reels state
                 igReelJobs: [],
@@ -1358,34 +1358,34 @@
                     }
                 },
 
-                // TikTok Copy Jobs methods
-                async fetchTikTokCopyJobs() {
+                // Video Copy Jobs methods
+                async fetchVideoCopyJobs() {
                     try {
-                        const offset = (this.tiktokCopyPage - 1) * this.perPage;
-                        const res = await fetch(`${API_BASE}/api/admin/tiktok-copy-jobs?limit=${this.perPage}&offset=${offset}`, {
+                        const offset = (this.videoCopyPage - 1) * this.perPage;
+                        const res = await fetch(`${API_BASE}/api/admin/video-copy-jobs?limit=${this.perPage}&offset=${offset}`, {
                             headers: { 'X-Admin-Token': this.token }
                         });
                         if (res.ok) {
                             const data = await res.json();
                             // Add expanded state to each batch
-                            this.tiktokCopyBatches = (data.batches || []).map(b => ({ ...b, expanded: false }));
-                            this.totalTikTokCopyBatches = data.total || 0;
+                            this.videoCopyBatches = (data.batches || []).map(b => ({ ...b, expanded: false }));
+                            this.totalVideoCopyBatches = data.total || 0;
                         }
                     } catch (e) {
-                        console.error('Failed to fetch TikTok Copy jobs:', e);
+                        console.error('Failed to fetch Video Copy jobs:', e);
                     }
-                    this.fetchTikTokCopyStats();
+                    this.fetchVideoCopyStats();
                 },
 
-                async fetchTikTokCopyStats() {
+                async fetchVideoCopyStats() {
                     try {
-                        const res = await fetch(`${API_BASE}/api/admin/tiktok-copy-jobs?limit=1000`, {
+                        const res = await fetch(`${API_BASE}/api/admin/video-copy-jobs?limit=1000`, {
                             headers: { 'X-Admin-Token': this.token }
                         });
                         if (res.ok) {
                             const data = await res.json();
                             const allBatches = data.batches || [];
-                            this.tiktokCopyStats = {
+                            this.videoCopyStats = {
                                 pending: allBatches.filter(b => b.status === 'pending').length,
                                 processing: allBatches.filter(b => b.status === 'processing').length,
                                 completed: allBatches.filter(b => b.status === 'completed').length,
@@ -1393,21 +1393,21 @@
                             };
                         }
                     } catch (e) {
-                        console.error('Failed to fetch TikTok Copy stats:', e);
+                        console.error('Failed to fetch Video Copy stats:', e);
                     }
                 },
 
-                tiktokCopyPrevPage() {
-                    if (this.tiktokCopyPage > 1) {
-                        this.tiktokCopyPage--;
-                        this.fetchTikTokCopyJobs();
+                videoCopyPrevPage() {
+                    if (this.videoCopyPage > 1) {
+                        this.videoCopyPage--;
+                        this.fetchVideoCopyJobs();
                     }
                 },
 
-                tiktokCopyNextPage() {
-                    if (this.tiktokCopyPage * this.perPage < this.totalTikTokCopyBatches) {
-                        this.tiktokCopyPage++;
-                        this.fetchTikTokCopyJobs();
+                videoCopyNextPage() {
+                    if (this.videoCopyPage * this.perPage < this.totalVideoCopyBatches) {
+                        this.videoCopyPage++;
+                        this.fetchVideoCopyJobs();
                     }
                 },
 

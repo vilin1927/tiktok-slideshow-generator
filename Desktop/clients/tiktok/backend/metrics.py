@@ -1,5 +1,5 @@
 """
-Prometheus Metrics for TikTok Slideshow Generator.
+Prometheus Metrics for Viral Slideshow Generator.
 Exposes metrics at /metrics endpoint for monitoring.
 """
 import time
@@ -43,24 +43,24 @@ logger = get_logger('metrics')
 
 # Counters (only go up)
 images_generated_total = Counter(
-    'tiktok_images_generated_total',
+    'slideshow_images_generated_total',
     'Total number of images successfully generated',
     ['slide_type']  # hook, body, product
 )
 
 images_failed_total = Counter(
-    'tiktok_images_failed_total',
+    'slideshow_images_failed_total',
     'Total number of image generation failures',
     ['error_type']  # rate_limit, timeout, api_error, file_missing
 )
 
 batches_processed_total = Counter(
-    'tiktok_batches_processed_total',
+    'slideshow_batches_processed_total',
     'Total number of batches processed'
 )
 
 api_requests_total = Counter(
-    'tiktok_api_requests_total',
+    'slideshow_api_requests_total',
     'Total API requests made',
     ['model', 'status']  # model: text/image, status: success/failure
 )
@@ -68,43 +68,43 @@ api_requests_total = Counter(
 
 # Gauges (can go up or down)
 queue_size = Gauge(
-    'tiktok_queue_size',
+    'slideshow_queue_size',
     'Current queue size',
     ['queue']  # pending, processing, retry, failed
 )
 
 api_keys_available = Gauge(
-    'tiktok_api_keys_available',
+    'slideshow_api_keys_available',
     'Number of available API keys',
     ['model']  # text, image
 )
 
 api_keys_total = Gauge(
-    'tiktok_api_keys_total',
+    'slideshow_api_keys_total',
     'Total number of API keys configured'
 )
 
 circuit_breaker_open = Gauge(
-    'tiktok_circuit_breaker_open',
+    'slideshow_circuit_breaker_open',
     'Whether circuit breaker is open (1) or closed (0)'
 )
 
 processor_running = Gauge(
-    'tiktok_processor_running',
+    'slideshow_processor_running',
     'Whether the queue processor is running (1) or stopped (0)'
 )
 
 
 # Histograms (for timing)
 image_generation_duration = Histogram(
-    'tiktok_image_generation_seconds',
+    'slideshow_image_generation_seconds',
     'Time spent generating an image',
     ['slide_type'],
     buckets=[5, 10, 20, 30, 45, 60, 90, 120, 180]  # seconds
 )
 
 batch_processing_duration = Histogram(
-    'tiktok_batch_processing_seconds',
+    'slideshow_batch_processing_seconds',
     'Time spent processing a batch',
     buckets=[10, 30, 60, 90, 120, 180, 300]  # seconds
 )
@@ -112,7 +112,7 @@ batch_processing_duration = Histogram(
 
 # Info (static metadata)
 app_info = Info(
-    'tiktok_app',
+    'slideshow_app',
     'Application information'
 )
 

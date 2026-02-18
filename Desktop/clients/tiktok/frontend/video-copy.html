@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TikTok Copy Tool</title>
+    <title>Video Copy Tool</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <style>
@@ -40,14 +40,14 @@
         </div>
     </div>
 
-    <div class="container mx-auto px-4 py-8 max-w-4xl" x-data="tiktokCopyTool()" x-init="$el.style.display = window.pageAuthenticated ? '' : 'none'">
+    <div class="container mx-auto px-4 py-8 max-w-4xl" x-data="videoCopyTool()" x-init="$el.style.display = window.pageAuthenticated ? '' : 'none'">
         <!-- Header -->
         <div class="text-center mb-8">
             <a href="/" class="absolute top-4 left-4 text-gray-500 hover:text-gray-300 text-sm transition-colors">
                 &larr; Back to Generator
             </a>
-            <h1 class="text-3xl font-bold text-white mb-2">TikTok Copy Tool</h1>
-            <p class="text-gray-400">Convert TikTok slideshows to MP4 videos with auto product replacement</p>
+            <h1 class="text-3xl font-bold text-white mb-2">Video Copy Tool</h1>
+            <p class="text-gray-400">Convert slideshows to MP4 videos with auto product replacement</p>
         </div>
 
         <!-- Main Form (hidden when batch is active) -->
@@ -55,7 +55,7 @@
             <!-- Step 1: Paste Links -->
             <div class="mb-6">
                 <label class="block text-gray-300 text-sm font-medium mb-2">
-                    Paste TikTok Links <span class="text-gray-500">(one per line)</span>
+                    Paste Links <span class="text-gray-500">(one per line)</span>
                 </label>
                 <textarea
                     x-model="rawLinks"
@@ -315,7 +315,7 @@ https://vm.tiktok.com/ABC123/"
             };
         }
 
-        function tiktokCopyTool() {
+        function videoCopyTool() {
             return {
                 // Form state
                 rawLinks: '',
@@ -346,15 +346,15 @@ https://vm.tiktok.com/ABC123/"
                 get validLinkCount() {
                     if (!this.rawLinks.trim()) return 0;
                     const lines = this.rawLinks.trim().split('\n');
-                    const tiktokPattern = /https?:\/\/(www\.|vm\.)?tiktok\.com\//;
-                    return lines.filter(line => tiktokPattern.test(line.trim())).length;
+                    const urlPattern = /https?:\/\/(www\.|vm\.)?tiktok\.com\//;
+                    return lines.filter(line => urlPattern.test(line.trim())).length;
                 },
 
                 get validLinks() {
                     if (!this.rawLinks.trim()) return [];
                     const lines = this.rawLinks.trim().split('\n');
-                    const tiktokPattern = /https?:\/\/(www\.|vm\.)?tiktok\.com\/[^\s]+/;
-                    return lines.map(l => l.trim()).filter(l => l && tiktokPattern.test(l));
+                    const urlPattern = /https?:\/\/(www\.|vm\.)?tiktok\.com\/[^\s]+/;
+                    return lines.map(l => l.trim()).filter(l => l && urlPattern.test(l));
                 },
 
                 get canSubmit() {
@@ -370,7 +370,7 @@ https://vm.tiktok.com/ABC123/"
 
                 async fetchCategories() {
                     try {
-                        const res = await fetch('/api/tiktok-copy/product-photos');
+                        const res = await fetch('/api/video-copy/product-photos');
                         if (res.ok) {
                             const data = await res.json();
                             this.categories = data.categories || [];
@@ -416,7 +416,7 @@ https://vm.tiktok.com/ABC123/"
                             product_photo_path: this.mode === 'auto-replace' ? this.selectedPhotoPath : null
                         };
 
-                        const response = await fetch('/api/tiktok-copy/convert', {
+                        const response = await fetch('/api/video-copy/convert', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(payload)
@@ -473,7 +473,7 @@ https://vm.tiktok.com/ABC123/"
                     if (!this.batchId) return;
 
                     try {
-                        const response = await fetch(`/api/tiktok-copy/status/${this.batchId}`);
+                        const response = await fetch(`/api/video-copy/status/${this.batchId}`);
                         const data = await response.json();
 
                         if (response.ok) {

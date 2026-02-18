@@ -1,5 +1,5 @@
 """
-TikTok Slideshow Generator - Flask Backend
+Viral Slideshow Generator - Flask Backend
 """
 import os
 import uuid
@@ -57,7 +57,7 @@ app.register_blueprint(video_bp)
 # Register preset blueprint
 app.register_blueprint(preset_bp)
 
-# Register TikTok Copy blueprint
+# Register Video Copy blueprint
 app.register_blueprint(tiktok_copy_bp)
 
 # Register Instagram Reel blueprint
@@ -112,11 +112,19 @@ def serve_admin():
     return send_from_directory(FRONTEND_DIR, 'admin.html')
 
 
+@app.route('/video-copy')
+@app.route('/video-copy.html')
+def serve_video_copy():
+    """Serve Video Copy tool page"""
+    return send_from_directory(FRONTEND_DIR, 'video-copy.html')
+
+
 @app.route('/tiktok-copy')
 @app.route('/tiktok-copy.html')
-def serve_tiktok_copy():
-    """Serve TikTok Copy tool page"""
-    return send_from_directory(FRONTEND_DIR, 'tiktok-copy.html')
+def redirect_tiktok_copy():
+    """301 redirect from old TikTok Copy URL to new Video Copy URL"""
+    from flask import redirect
+    return redirect('/video-copy', code=301)
 
 
 @app.route('/instagram-reel')
@@ -133,7 +141,7 @@ def health_check():
     health = {
         'status': 'healthy',
         'timestamp': datetime.utcnow().isoformat(),
-        'service': 'TikTok Slideshow Generator API',
+        'service': 'Viral Slideshow Generator API',
         'checks': {}
     }
 
@@ -294,7 +302,7 @@ def run_generation(session_id, job_id, tiktok_url, folder_name, product_context,
     try:
         # ===== STEP 1: Scrape TikTok =====
         log.info("Step 1/4: Scraping TikTok slideshow")
-        update_progress(session_id, 'scraping', 'Downloading TikTok images...', 10,
+        update_progress(session_id, 'scraping', 'Downloading slideshow images...', 10,
                        {'detail': 'Downloading via proxy'})
         try:
             scraped = scrape_tiktok_slideshow(tiktok_url, session_scraped, session_id)
@@ -440,7 +448,7 @@ def run_generation(session_id, job_id, tiktok_url, folder_name, product_context,
 @app.route('/api/generate', methods=['POST'])
 def generate_slideshow():
     """
-    Main endpoint to generate TikTok slideshow images (async)
+    Main endpoint to generate slideshow images (async)
 
     Returns session_id immediately, then runs generation in background.
     Poll /api/status/<session_id> for progress.
@@ -454,7 +462,7 @@ def generate_slideshow():
 
     try:
         # Validate required fields
-        tiktok_url = request.form.get('tiktok_url')
+        tiktok_url = request.form.get('source_url') or request.form.get('tiktok_url')
         folder_name = request.form.get('folder_name')
         product_context = request.form.get('product_context', 'Product')
 
@@ -484,8 +492,8 @@ def generate_slideshow():
         log.debug(f"Generate video: {generate_video}")
 
         if not tiktok_url:
-            log.warning("Validation failed: missing TikTok URL")
-            return jsonify({'error': 'TikTok URL is required'}), 400
+            log.warning("Validation failed: missing URL")
+            return jsonify({'error': 'Slideshow URL is required'}), 400
         if not folder_name:
             log.warning("Validation failed: missing folder name")
             return jsonify({'error': 'Folder name is required'}), 400
@@ -567,14 +575,14 @@ def generate_slideshow():
 
 @app.route('/api/test-scrape', methods=['POST'])
 def test_scrape():
-    """Test endpoint to verify TikTok scraping works"""
+    """Test endpoint to verify scraping works"""
     session_id = str(uuid.uuid4())[:8]
     log = get_request_logger('app', session_id)
 
     try:
-        tiktok_url = request.json.get('tiktok_url')
+        tiktok_url = request.json.get('source_url') or request.json.get('tiktok_url')
         if not tiktok_url:
-            return jsonify({'error': 'TikTok URL is required'}), 400
+            return jsonify({'error': 'URL is required'}), 400
 
         log.info(f"Test scrape: {tiktok_url[:50]}...")
         output_dir = os.path.join(SCRAPED_FOLDER, f'test_{session_id}')

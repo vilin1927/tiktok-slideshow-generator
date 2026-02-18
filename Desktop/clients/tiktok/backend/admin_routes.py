@@ -315,11 +315,11 @@ def list_video_jobs_api():
         return jsonify({'error': str(e)}), 500
 
 
-@admin_bp.route('/tiktok-copy-jobs', methods=['GET'])
+@admin_bp.route('/video-copy-jobs', methods=['GET'])
 @require_auth
-def list_tiktok_copy_jobs_api():
+def list_video_copy_jobs_api():
     """
-    List TikTok Copy batches with their jobs for admin panel.
+    List Video Copy batches with their jobs for admin panel.
 
     Query params:
     - limit: Max batches to return (default 50)
@@ -359,7 +359,7 @@ def list_tiktok_copy_jobs_api():
         })
 
     except Exception as e:
-        logger.error(f"Failed to list TikTok Copy batches: {e}")
+        logger.error(f"Failed to list Video Copy batches: {e}")
         return jsonify({'error': str(e)}), 500
 
 

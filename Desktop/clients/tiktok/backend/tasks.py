@@ -545,7 +545,7 @@ def process_tiktok_copy_batch(self, batch_id: str):
 
         # Create main Google Drive folder for batch
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        folder_name = f"TikTok_Copy_{timestamp}"
+        folder_name = f"Video_Copy_{timestamp}"
 
         try:
             drive_folder_id = create_folder(folder_name)

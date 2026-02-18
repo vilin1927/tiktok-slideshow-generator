@@ -1,6 +1,6 @@
 """
-TikTok Copy Routes
-Flask API endpoints for TikTok slideshow to video conversion.
+Video Copy Routes
+Flask API endpoints for slideshow to video conversion.
 """
 import os
 import re
@@ -13,7 +13,7 @@ from logging_config import get_logger
 logger = get_logger('tiktok_copy_routes')
 
 # Create blueprint
-tiktok_copy_bp = Blueprint('tiktok_copy', __name__, url_prefix='/api/tiktok-copy')
+tiktok_copy_bp = Blueprint('tiktok_copy', __name__, url_prefix='/api/video-copy')
 
 # Import database functions
 from database import (
@@ -71,7 +71,7 @@ def extract_links(text: str) -> list[str]:
 def list_product_photos_public():
     """
     List available product photos by category (public, no auth required).
-    Used by TikTok Copy page to show photo selection grid.
+    Used by Video Copy page to show photo selection grid.
     """
     from admin_routes import PRODUCT_CATEGORIES, _ensure_product_photo_dirs, _get_category_photos
 
@@ -149,8 +149,8 @@ def _handle_json_convert(data):
 
     if not valid_links:
         return jsonify({
-            'error': 'No valid TikTok links provided',
-            'hint': 'Check your URLs are valid TikTok slideshow links'
+            'error': 'No valid links provided',
+            'hint': 'Check your URLs are valid slideshow links'
         }), 400
 
     logger.info(f"Valid links: {len(valid_links)}, mode: {mode}")
@@ -230,15 +230,15 @@ def _handle_legacy_convert():
             continue
         if not validate_tiktok_url(url):
             return jsonify({
-                'error': f'Invalid TikTok URL at index {idx}',
+                'error': f'Invalid URL at index {idx}',
                 'url': url
             }), 400
         valid_configs.append(cfg)
 
     if not valid_configs:
         return jsonify({
-            'error': 'No valid TikTok links provided',
-            'hint': 'Check your URLs are valid TikTok slideshow links'
+            'error': 'No valid links provided',
+            'hint': 'Check your URLs are valid slideshow links'
         }), 400
 
     logger.info(f"Valid links (legacy): {len(valid_configs)}")

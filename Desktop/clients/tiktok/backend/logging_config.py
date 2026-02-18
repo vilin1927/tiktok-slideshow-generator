@@ -1,6 +1,6 @@
 """
 Logging Configuration Module
-Centralized logging setup for the TikTok Slideshow Generator
+Centralized logging setup for the Viral Slideshow Generator
 """
 import os
 import logging
