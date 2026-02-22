@@ -82,6 +82,29 @@ def _check_rate_limit():
     _rate_limit_cache[ip] = timestamps
     return False
 
+# Deduplication: prevent same URL being submitted twice within 5 minutes
+_recent_submissions = {}  # {url_hash: (session_id, timestamp)}
+DEDUP_WINDOW = 300  # 5 minutes
+
+def _check_duplicate(url: str):
+    """Returns existing session_id if this URL was submitted recently, else None."""
+    import hashlib
+    url_hash = hashlib.md5(url.strip().lower().encode()).hexdigest()
+    now = time.time()
+    # Clean old entries
+    expired = [k for k, v in _recent_submissions.items() if now - v[1] > DEDUP_WINDOW]
+    for k in expired:
+        del _recent_submissions[k]
+    if url_hash in _recent_submissions:
+        return _recent_submissions[url_hash][0]
+    return None
+
+def _record_submission(url: str, session_id: str):
+    """Record a URL submission for dedup tracking."""
+    import hashlib
+    url_hash = hashlib.md5(url.strip().lower().encode()).hexdigest()
+    _recent_submissions[url_hash] = (session_id, time.time())
+
 app = Flask(__name__)
 CORS(app)
 
@@ -554,6 +577,16 @@ def generate_slideshow():
             log.warning("Validation failed: missing folder name")
             return jsonify({'error': 'Folder name is required'}), 400
 
+        # Check for duplicate submission (same URL within 5 minutes)
+        existing_session = _check_duplicate(tiktok_url)
+        if existing_session:
+            log.info(f"Duplicate URL detected, returning existing session {existing_session}")
+            return jsonify({
+                'message': 'This URL is already being processed. Returning existing job.',
+                'session_id': existing_session,
+                'status': 'duplicate'
+            }), 200
+
         log.info(f"New request: url={tiktok_url[:50]}... folder={folder_name}")
 
         # Get product images (multiple allowed for photo variations)
@@ -612,6 +645,9 @@ def generate_slideshow():
         ))
         thread.start()
         log.info("Background thread started")
+
+        # Record submission for dedup
+        _record_submission(tiktok_url, session_id)
 
         # Return immediately with session_id for polling
         return jsonify({

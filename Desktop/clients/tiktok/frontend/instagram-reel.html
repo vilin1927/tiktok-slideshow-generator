@@ -526,6 +526,23 @@
                 await this.loadFormats();
                 await this.loadCharacters();
 
+                // Restore step from URL hash (e.g. #step=3)
+                const hash = window.location.hash;
+                const match = hash.match(/step=(\d)/);
+                if (match) {
+                    const step = parseInt(match[1]);
+                    if (step >= 1 && step <= 4) this.currentStep = step;
+                }
+
+                // Sync step changes to URL hash for browser back/forward
+                window.addEventListener('popstate', () => {
+                    const h = window.location.hash.match(/step=(\d)/);
+                    if (h) {
+                        const s = parseInt(h[1]);
+                        if (s >= 1 && s <= 5) this.currentStep = s;
+                    }
+                });
+
                 // Warn before leaving if wizard has unsaved state
                 window.addEventListener('beforeunload', (e) => {
                     if (this.currentStep > 1 && this.currentStep < 5) {
@@ -535,13 +552,23 @@
                 });
             },
 
+            _pushStep(step) {
+                history.pushState(null, '', `#step=${step}`);
+            },
+
             nextStep() {
                 if (this.currentStep < 5) {
                     if (this.currentStep === 2) this.buildClipTexts();
                     this.currentStep++;
+                    this._pushStep(this.currentStep);
                 }
             },
-            prevStep() { if (this.currentStep > 1) this.currentStep--; },
+            prevStep() {
+                if (this.currentStep > 1) {
+                    this.currentStep--;
+                    this._pushStep(this.currentStep);
+                }
+            },
             resetToStep(n) {
                 this.currentStep = n;
                 this.jobId = null;
