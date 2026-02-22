@@ -16,8 +16,10 @@ DB_PATH = os.path.join(os.path.dirname(__file__), 'batch_processing.db')
 @contextmanager
 def get_db():
     """Context manager for database connections."""
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30)  # 30s lock wait (default was 5s)
     conn.row_factory = sqlite3.Row  # Enable dict-like access
+    conn.execute('PRAGMA journal_mode=WAL')  # Allow concurrent reads during writes
+    conn.execute('PRAGMA foreign_keys=ON')   # Enforce foreign key constraints
     try:
         yield conn
         conn.commit()
@@ -29,9 +31,15 @@ def get_db():
 
 
 def init_db():
-    """Initialize database tables."""
+    """Initialize database tables and validate integrity."""
     with get_db() as conn:
         cursor = conn.cursor()
+
+        # Check database integrity on startup
+        result = cursor.execute('PRAGMA integrity_check').fetchone()
+        if result[0] != 'ok':
+            import logging
+            logging.getLogger('database').critical(f"DATABASE INTEGRITY CHECK FAILED: {result[0]}")
 
         # Unified Jobs table - tracks ALL jobs (single and batch)
         cursor.execute('''

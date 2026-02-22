@@ -10,7 +10,7 @@ import tempfile
 import shutil
 from datetime import datetime
 from celery import chain, group
-from celery.exceptions import MaxRetriesExceededError
+from celery.exceptions import MaxRetriesExceededError, SoftTimeLimitExceeded
 
 from celery_app import celery_app
 from database import (

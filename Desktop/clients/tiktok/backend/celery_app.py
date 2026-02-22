@@ -50,12 +50,29 @@ celery_app.conf.update(
     task_acks_late=True,  # Acknowledge after task completes (safer)
     task_reject_on_worker_lost=True,  # Requeue if worker dies
 
+    # Task timeouts (prevent infinite hangs)
+    task_soft_time_limit=600,   # 10 min soft limit — raises SoftTimeLimitExceeded
+    task_time_limit=660,        # 11 min hard kill — prevents zombie tasks
+
     # Retry settings (no rate_limit - Gemini handles API quota internally)
     task_annotations={
         'tasks.generate_variation': {
             'max_retries': 3,
             'default_retry_delay': 60,
-        }
+        },
+        # Per-task timeout overrides
+        'tasks.process_link': {
+            'soft_time_limit': 900,   # 15 min (scrape + analyze + generate + upload)
+            'time_limit': 960,
+        },
+        'tasks.process_batch': {
+            'soft_time_limit': 60,    # 1 min (just dispatches sub-tasks)
+            'time_limit': 120,
+        },
+        'instagram_reel_tasks.generate_reel_batch': {
+            'soft_time_limit': 1200,  # 20 min (video assembly is slow)
+            'time_limit': 1260,
+        },
     },
 
     # Beat scheduler (if needed for scheduled tasks)

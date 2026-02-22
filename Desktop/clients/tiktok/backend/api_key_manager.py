@@ -76,6 +76,19 @@ class ApiKeyManager:
         if not self.keys:
             raise ValueError("No Gemini API keys configured. Set GEMINI_API_KEYS or GEMINI_API_KEY")
 
+        # Validate keys: reject non-ASCII characters (e.g. Cyrillic lookalikes)
+        valid_keys = []
+        for key in self.keys:
+            try:
+                key.encode('ascii')
+                valid_keys.append(key)
+            except UnicodeEncodeError:
+                logger.error(f"REJECTED key {key[:8]}... — contains non-ASCII characters (likely Cyrillic). Fix in .env file.")
+        if valid_keys:
+            self.keys = valid_keys
+        else:
+            raise ValueError("All Gemini API keys contain non-ASCII characters. Fix GEMINI_API_KEYS in .env")
+
         # Redis connection
         if redis_client:
             self.redis = redis_client
