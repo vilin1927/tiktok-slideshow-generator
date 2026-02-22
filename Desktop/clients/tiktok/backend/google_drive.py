@@ -54,8 +54,12 @@ def _get_credentials():
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             logger.info("OAuth token expired, refreshing...")
-            creds.refresh(Request())
-            logger.debug("OAuth token refreshed")
+            try:
+                creds.refresh(Request())
+                logger.debug("OAuth token refreshed")
+            except Exception as e:
+                logger.error(f"OAuth token refresh failed: {e}")
+                raise GoogleDriveError(f"Failed to refresh OAuth token: {e}. May need to re-authorize.")
         else:
             if not CLIENT_ID or not CLIENT_SECRET:
                 logger.error("Missing OAuth credentials in .env")
@@ -171,23 +175,37 @@ def upload_file(file_path: str, folder_id: str, file_name: Optional[str] = None)
         'parents': [folder_id]
     }
 
-    try:
-        media = MediaFileUpload(
-            file_path,
-            mimetype=mime_type,
-            resumable=True
-        )
+    last_error = None
+    for attempt in range(1, 4):  # 3 attempts with backoff
+        try:
+            media = MediaFileUpload(
+                file_path,
+                mimetype=mime_type,
+                resumable=True
+            )
 
-        file = service.files().create(
-            body=file_metadata,
-            media_body=media,
-            fields='id'
-        ).execute()
+            file = service.files().create(
+                body=file_metadata,
+                media_body=media,
+                fields='id'
+            ).execute()
 
-        return file.get('id')
+            return file.get('id')
 
-    except Exception as e:
-        raise GoogleDriveError(f'Failed to upload file: {str(e)}')
+        except Exception as e:
+            last_error = e
+            error_str = str(e).lower()
+            # Retry on transient errors (rate limit, server error, timeout)
+            if any(k in error_str for k in ('rate', 'quota', '429', '500', '503', 'timeout', 'broken pipe')):
+                backoff = 5 * attempt
+                logger.warning(f"Drive upload attempt {attempt}/3 failed ({e}), retrying in {backoff}s...")
+                time.sleep(backoff)
+                service = _get_service()  # Refresh service in case token expired
+                continue
+            # Non-retryable error
+            raise GoogleDriveError(f'Failed to upload file: {str(e)}')
+
+    raise GoogleDriveError(f'Failed to upload file after 3 attempts: {str(last_error)}')
 
 
 def upload_files_parallel(

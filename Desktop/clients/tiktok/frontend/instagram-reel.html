@@ -525,6 +525,14 @@
             async init() {
                 await this.loadFormats();
                 await this.loadCharacters();
+
+                // Warn before leaving if wizard has unsaved state
+                window.addEventListener('beforeunload', (e) => {
+                    if (this.currentStep > 1 && this.currentStep < 5) {
+                        e.preventDefault();
+                        e.returnValue = '';
+                    }
+                });
             },
 
             nextStep() {
@@ -798,8 +806,16 @@
                             clearInterval(this.pollInterval);
                             this.pollInterval = null;
                         }
-                    } catch (e) { console.error('Poll failed', e); }
-                }, 1500);
+                    } catch (e) {
+                        this._pollErrors = (this._pollErrors || 0) + 1;
+                        console.error('Poll failed', e);
+                        if (this._pollErrors >= 10) {
+                            clearInterval(this.pollInterval);
+                            this.pollInterval = null;
+                            this.jobStatus = {status: 'failed', error_message: 'Connection lost. Check network and refresh.'};
+                        }
+                    }
+                }, 2000);
             }
         }
     }

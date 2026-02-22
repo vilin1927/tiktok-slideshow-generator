@@ -1261,8 +1261,17 @@ INSPIRED BY JAPANESE SKIN CARE: Delivers a lifted, contoured look without silico
                                 this.isLoading = false;
                                 this.error = status.message;
                             }
-                        } catch (e) {}
-                    }, 1000);
+                        } catch (e) {
+                            this._pollErrors = (this._pollErrors || 0) + 1;
+                            if (this._pollErrors >= 10) {
+                                this.stopPolling();
+                                this.isLoading = false;
+                                this.error = 'Connection lost. Check your network and refresh the page.';
+                            } else if (this._pollErrors >= 3) {
+                                this.statusDetail = 'Connection unstable, retrying...';
+                            }
+                        }
+                    }, 2000);
                 },
 
                 stopPolling() {

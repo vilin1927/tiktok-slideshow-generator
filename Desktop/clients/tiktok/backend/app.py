@@ -39,8 +39,48 @@ from database import create_job, update_job_status
 # Log queue mode status
 logger.info(f"Queue mode: {'ENABLED' if USE_QUEUE_MODE else 'DISABLED'}")
 
+# Startup health check — validate external APIs
+def _run_startup_health_check():
+    """Non-blocking startup validation of external APIs."""
+    try:
+        import redis as _redis
+        import requests as _req
+        r = _redis.Redis(host='localhost', port=6379, db=0)
+        r.ping()
+        logger.info("Startup health: Redis OK")
+    except Exception as e:
+        logger.error(f"Startup health: Redis FAILED — {e}")
+
+    # Validate Gemini keys (non-ASCII check happens in ApiKeyManager.__init__)
+    try:
+        from api_key_manager import get_api_key_manager
+        mgr = get_api_key_manager()
+        logger.info(f"Startup health: Gemini keys OK ({len(mgr.keys)} loaded)")
+    except Exception as e:
+        logger.error(f"Startup health: Gemini keys FAILED — {e}")
+
+_run_startup_health_check()
+
 # Global progress tracking
 progress_status = {}
+
+# Simple in-memory per-IP rate limiter for generation endpoints
+_rate_limit_cache = {}  # {ip: [timestamp, timestamp, ...]}
+RATE_LIMIT_MAX = 10  # Max 10 generation requests per minute per IP
+RATE_LIMIT_WINDOW = 60  # seconds
+
+def _check_rate_limit():
+    """Returns True if request should be rate-limited."""
+    ip = request.remote_addr or 'unknown'
+    now = time.time()
+    timestamps = _rate_limit_cache.get(ip, [])
+    # Remove old timestamps
+    timestamps = [t for t in timestamps if now - t < RATE_LIMIT_WINDOW]
+    if len(timestamps) >= RATE_LIMIT_MAX:
+        return True
+    timestamps.append(now)
+    _rate_limit_cache[ip] = timestamps
+    return False
 
 app = Flask(__name__)
 CORS(app)
@@ -458,6 +498,9 @@ def generate_slideshow():
     Returns session_id immediately, then runs generation in background.
     Poll /api/status/<session_id> for progress.
     """
+    if _check_rate_limit():
+        return jsonify({'error': 'Too many requests. Please wait a moment before generating again.'}), 429
+
     # Create unique session ID for this generation
     session_id = str(uuid.uuid4())[:8]
     log = get_request_logger('app', session_id)
@@ -470,6 +513,12 @@ def generate_slideshow():
         tiktok_url = request.form.get('source_url') or request.form.get('tiktok_url')
         folder_name = request.form.get('folder_name')
         product_context = request.form.get('product_context', 'Product')
+
+        # Sanitize inputs
+        if product_context and not product_context.strip():
+            product_context = 'Product'  # Default if whitespace-only
+        if folder_name:
+            folder_name = folder_name.strip()[:200]  # Cap length, strip whitespace
 
         # Photo × Text variation params (default to 1 if not provided)
         hook_photo_var = int(request.form.get('hook_photo_var', 1))
@@ -491,17 +540,21 @@ def generate_slideshow():
         body_text_var = max(1, min(5, body_text_var))
         product_text_var = max(1, min(5, product_text_var))
 
-        log.info(f"New request: url={tiktok_url[:50]}... folder={folder_name}")
-        log.debug(f"Photo vars: hook={hook_photo_var}, body={body_photo_var}")
-        log.debug(f"Text vars: hook={hook_text_var}, body={body_text_var}, product={product_text_var}")
-        log.debug(f"Generate video: {generate_video}")
-
         if not tiktok_url:
             log.warning("Validation failed: missing URL")
             return jsonify({'error': 'Slideshow URL is required'}), 400
+
+        # Validate URL format
+        tiktok_url = tiktok_url.strip()
+        if not tiktok_url.startswith(('https://www.tiktok.com/', 'https://tiktok.com/', 'https://vm.tiktok.com/', 'http://www.tiktok.com/', 'http://tiktok.com/')):
+            log.warning(f"Validation failed: invalid URL format: {tiktok_url[:80]}")
+            return jsonify({'error': 'Invalid URL. Must be a TikTok link (https://www.tiktok.com/...)'}), 400
+
         if not folder_name:
             log.warning("Validation failed: missing folder name")
             return jsonify({'error': 'Folder name is required'}), 400
+
+        log.info(f"New request: url={tiktok_url[:50]}... folder={folder_name}")
 
         # Get product images (multiple allowed for photo variations)
         product_images = request.files.getlist('product_images')
