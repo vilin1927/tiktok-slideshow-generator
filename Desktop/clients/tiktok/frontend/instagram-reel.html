@@ -255,7 +255,17 @@
                                         class="hidden">
                                 </div>
                                 <!-- Upload progress -->
-                                <div x-show="uploadingKey === char.id+'_'+assetType" class="text-purple-400 text-xs mt-1">Uploading...</div>
+                                <div x-show="uploadingKey === char.id+'_'+assetType" class="mt-1">
+                                    <div class="flex items-center gap-2">
+                                        <div class="flex-1 bg-gray-700 rounded-full h-2">
+                                            <div class="bg-purple-500 h-2 rounded-full transition-all duration-300"
+                                                 :style="'width:' + uploadProgress + '%'"></div>
+                                        </div>
+                                        <span class="text-purple-400 text-xs" x-text="uploadProgress + '%'"></span>
+                                    </div>
+                                    <p class="text-gray-400 text-xs mt-1" x-text="uploadStatusText"></p>
+                                </div>
+                                <div x-show="uploadError && uploadErrorKey === char.id+'_'+assetType" class="text-red-400 text-xs mt-1" x-text="uploadError"></div>
                             </div>
                         </template>
                     </div>
@@ -519,6 +529,10 @@
             characterError: '',
             expandedCharacter: null,
             uploadingKey: null,
+            uploadProgress: 0,
+            uploadStatusText: '',
+            uploadError: '',
+            uploadErrorKey: '',
 
             // Step 3: Text (per-clip)
             clipTexts: [],  // [{clipIndex, clipType, style, text}, ...]
@@ -812,33 +826,62 @@
             },
 
             async uploadAssetFiles(charId, assetType, files) {
+                this.uploadError = '';
+                this.uploadErrorKey = '';
+                this.uploadProgress = 0;
+                this.uploadStatusText = '';
                 this.uploadingKey = charId + '_' + assetType;
 
-                // Client-side size check (500MB total)
+                // Client-side size check
                 let totalSize = 0;
                 for (const f of files) totalSize += f.size;
-                if (totalSize > 500 * 1024 * 1024) {
-                    alert(`Files too large (${(totalSize / 1024 / 1024).toFixed(0)}MB). Maximum is 500MB total.`);
+                const sizeMB = (totalSize / 1024 / 1024).toFixed(0);
+
+                if (totalSize > 200 * 1024 * 1024) {
+                    this.uploadError = `Files too large (${sizeMB}MB). Upload max 200MB at a time — select fewer files per batch.`;
+                    this.uploadErrorKey = charId + '_' + assetType;
                     this.uploadingKey = null;
                     return;
                 }
+
+                this.uploadStatusText = `Uploading ${files.length} file${files.length > 1 ? 's' : ''} (${sizeMB}MB)...`;
 
                 const formData = new FormData();
                 formData.append('asset_type', assetType);
                 for (const f of files) formData.append('files', f);
 
                 try {
-                    const resp = await fetch(`/api/instagram-reel/characters/${charId}/assets`, {
-                        method: 'POST', body: formData
+                    // Use XMLHttpRequest for upload progress
+                    const result = await new Promise((resolve, reject) => {
+                        const xhr = new XMLHttpRequest();
+                        xhr.open('POST', `/api/instagram-reel/characters/${charId}/assets`);
+                        xhr.timeout = 600000; // 10 min timeout for large uploads
+                        xhr.upload.onprogress = (e) => {
+                            if (e.lengthComputable) {
+                                this.uploadProgress = Math.round((e.loaded / e.total) * 100);
+                                if (this.uploadProgress < 100) {
+                                    this.uploadStatusText = `Uploading ${files.length} file${files.length > 1 ? 's' : ''} — ${this.uploadProgress}%`;
+                                } else {
+                                    this.uploadStatusText = 'Processing files on server...';
+                                }
+                            }
+                        };
+                        xhr.onload = () => resolve({status: xhr.status, body: xhr.responseText});
+                        xhr.onerror = () => reject(new Error('Network error — check your connection'));
+                        xhr.ontimeout = () => reject(new Error('Upload timed out — try uploading fewer files'));
+                        xhr.send(formData);
                     });
-                    if (!resp.ok) {
-                        const data = await resp.json().catch(() => ({}));
-                        alert(data.error || `Upload failed (HTTP ${resp.status})`);
+
+                    if (result.status >= 400) {
+                        const data = JSON.parse(result.body || '{}');
+                        this.uploadError = data.error || `Upload failed (HTTP ${result.status})`;
+                        this.uploadErrorKey = charId + '_' + assetType;
                     }
                     await this.loadCharacters();
                 } catch (e) {
                     console.error('Upload failed', e);
-                    alert('Upload failed: connection error or file too large');
+                    this.uploadError = e.message || 'Upload failed — connection error or file too large';
+                    this.uploadErrorKey = charId + '_' + assetType;
                 }
                 this.uploadingKey = null;
             },
