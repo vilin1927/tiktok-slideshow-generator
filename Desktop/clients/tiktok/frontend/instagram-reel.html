@@ -495,6 +495,7 @@
                     if (data.valid) {
                         this.isAuthenticated = true;
                         Alpine.store('auth').authenticated = true;
+                        Alpine.store('auth').password = this.accessPassword;
                     } else {
                         this.accessError = 'Invalid password';
                     }
@@ -551,10 +552,42 @@
             jobStatus: null,
             pollInterval: null,
 
+            _pw() { return Alpine.store('auth')?.password || ''; },
+
             get progressPercent() {
                 if (!this.jobStatus || !this.jobStatus.num_videos) return 0;
                 const done = (this.jobStatus.videos_completed || 0) + (this.jobStatus.videos_failed || 0);
                 return Math.round((done / this.jobStatus.num_videos) * 100);
+            },
+
+            _saveState() {
+                try {
+                    sessionStorage.setItem('ig_reel_state', JSON.stringify({
+                        selectedFormatId: this.selectedFormat?.id || null,
+                        clipTexts: this.clipTexts,
+                        assetType: this.assetType,
+                        numVideos: this.numVideos,
+                        textVariations: this.textVariations,
+                        selectedCharacters: this.selectedCharacters,
+                    }));
+                } catch {}
+            },
+
+            _restoreState() {
+                try {
+                    const raw = sessionStorage.getItem('ig_reel_state');
+                    if (!raw) return;
+                    const s = JSON.parse(raw);
+                    if (s.selectedFormatId && this.formats.length) {
+                        const fmt = this.formats.find(f => f.id === s.selectedFormatId);
+                        if (fmt && !this.selectedFormat) this.selectFormat(fmt);
+                    }
+                    if (s.clipTexts?.length) this.clipTexts = s.clipTexts;
+                    if (s.assetType) this.assetType = s.assetType;
+                    if (s.numVideos) this.numVideos = s.numVideos;
+                    if (s.textVariations) this.textVariations = s.textVariations;
+                    if (s.selectedCharacters?.length) this.selectedCharacters = s.selectedCharacters;
+                } catch {}
             },
 
             async init() {
@@ -569,6 +602,9 @@
                     if (step >= 1 && step <= 4) this.currentStep = step;
                 }
 
+                // Restore form state from sessionStorage
+                this._restoreState();
+
                 // Sync step changes to URL hash for browser back/forward
                 window.addEventListener('popstate', () => {
                     const h = window.location.hash.match(/step=(\d)/);
@@ -580,8 +616,12 @@
                     }
                 });
 
-                // Warn before leaving if wizard has unsaved state
+                // Clean up polling and warn before leaving
                 window.addEventListener('beforeunload', (e) => {
+                    if (this.pollInterval) {
+                        clearInterval(this.pollInterval);
+                        this.pollInterval = null;
+                    }
                     if (this.currentStep > 1 && this.currentStep < 5) {
                         e.preventDefault();
                         e.returnValue = '';
@@ -598,12 +638,14 @@
                     if (this.currentStep === 2) this.buildClipTexts();
                     this.currentStep++;
                     this._pushStep(this.currentStep);
+                    this._saveState();
                 }
             },
             prevStep() {
                 if (this.currentStep > 1) {
                     this.currentStep--;
                     this._pushStep(this.currentStep);
+                    this._saveState();
                 }
             },
             resetToStep(n) {
@@ -623,7 +665,8 @@
             },
 
             selectFormat(fmt) {
-                this.selectedFormat = JSON.parse(JSON.stringify(fmt));
+                try { this.selectedFormat = JSON.parse(JSON.stringify(fmt)); }
+                catch { this.selectedFormat = {...fmt, clips: [...(fmt.clips || [])]}; }
                 // Ensure has_text and text_style defaults exist on all clips
                 for (const clip of (this.selectedFormat.clips || [])) {
                     if (clip.has_text === undefined || clip.has_text === null) {
@@ -639,7 +682,7 @@
             async deleteFormat(fmt) {
                 if (!confirm(`Delete template "${fmt.format_name}"?`)) return;
                 try {
-                    const r = await fetch(`/api/instagram-reel/formats/${fmt.id}`, {method: 'DELETE'});
+                    const r = await fetch(`/api/instagram-reel/formats/${fmt.id}`, {method: 'DELETE', headers: {'X-Page-Password': this._pw()}});
                     if (r.ok) {
                         this.formats = this.formats.filter(f => f.id !== fmt.id);
                         if (this.selectedFormat?.id === fmt.id) this.selectedFormat = null;
@@ -690,6 +733,7 @@
                     fd.append('format_name', this.uploadFormatName);
                     const r = await fetch('/api/instagram-reel/formats/upload', {
                         method: 'POST',
+                        headers: {'X-Page-Password': this._pw()},
                         body: fd
                     });
                     const data = await r.json();
@@ -719,7 +763,7 @@
                 try {
                     const r = await fetch('/api/instagram-reel/formats/scrape', {
                         method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
+                        headers: {'Content-Type': 'application/json', 'X-Page-Password': this._pw()},
                         body: JSON.stringify({url: this.scrapeUrl, format_name: this.scrapeFormatName})
                     });
                     const data = await r.json();
@@ -744,7 +788,7 @@
                 try {
                     const r = await fetch(`/api/instagram-reel/formats/${this.selectedFormat.id}`, {
                         method: 'PUT',
-                        headers: {'Content-Type': 'application/json'},
+                        headers: {'Content-Type': 'application/json', 'X-Page-Password': this._pw()},
                         body: JSON.stringify({clips: this.selectedFormat.clips})
                     });
                     if (r.ok) {
@@ -781,7 +825,7 @@
                 try {
                     const r = await fetch('/api/instagram-reel/characters', {
                         method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
+                        headers: {'Content-Type': 'application/json', 'X-Page-Password': this._pw()},
                         body: JSON.stringify({name})
                     });
                     const data = await r.json().catch(() => ({}));
@@ -804,7 +848,7 @@
             async deleteCharacter(id) {
                 if (!confirm('Delete this character and all its assets?')) return;
                 try {
-                    await fetch(`/api/instagram-reel/characters/${id}`, {method: 'DELETE'});
+                    await fetch(`/api/instagram-reel/characters/${id}`, {method: 'DELETE', headers: {'X-Page-Password': this._pw()}});
                     await this.loadCharacters();
                 } catch (e) { console.error('Delete failed', e); }
             },
@@ -855,6 +899,7 @@
                     const result = await new Promise((resolve, reject) => {
                         const xhr = new XMLHttpRequest();
                         xhr.open('POST', `/api/instagram-reel/characters/${charId}/assets`);
+                        xhr.setRequestHeader('X-Page-Password', this._pw());
                         xhr.timeout = 600000; // 10 min timeout for large uploads
                         xhr.upload.onprogress = (e) => {
                             if (e.lengthComputable) {
@@ -873,7 +918,8 @@
                     });
 
                     if (result.status >= 400) {
-                        const data = JSON.parse(result.body || '{}');
+                        let data = {};
+                        try { data = JSON.parse(result.body || '{}'); } catch {}
                         this.uploadError = data.error || `Upload failed (HTTP ${result.status})`;
                         this.uploadErrorKey = charId + '_' + assetType;
                     }
@@ -906,7 +952,7 @@
 
                     const r = await fetch('/api/instagram-reel/generate', {
                         method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
+                        headers: {'Content-Type': 'application/json', 'X-Page-Password': this._pw()},
                         body: JSON.stringify({
                             format_id: this.selectedFormat.id,
                             num_videos: parseInt(this.numVideos),

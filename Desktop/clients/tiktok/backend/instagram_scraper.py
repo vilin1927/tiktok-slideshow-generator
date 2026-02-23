@@ -399,92 +399,105 @@ def scrape_and_create_format(url: str, format_name: str, output_base_dir: str, a
     format_dir = os.path.join(output_base_dir, format_name.replace(' ', '_'))
     os.makedirs(format_dir, exist_ok=True)
 
-    # Step 1: Download reel
-    video_path = download_reel(url, format_dir)
+    # Track files for cleanup
+    video_path = None
+    screenshots = []
 
-    # Step 2: Get duration
-    total_duration = get_video_duration(video_path)
-    if total_duration <= 0:
-        raise InstagramScraperError("Could not determine video duration")
-
-    logger.info(f"Video duration: {total_duration:.2f}s")
-
-    # Step 3: Extract audio
-    audio_path = os.path.join(format_dir, 'audio.mp3')
-    extract_audio(video_path, audio_path)
-
-    # Step 4: Detect scene cuts
-    cuts = detect_scene_cuts(video_path)
-
-    # Step 5: Extract screenshots for analysis
-    screenshots = extract_clip_screenshots(video_path, cuts, total_duration)
-
-    # Step 6: Analyze clips with Gemini
-    clip_analysis = analyze_clips_with_gemini(screenshots, api_key_manager)
-
-    # Step 7: Build clip structure
-    boundaries = [0.0] + cuts + [total_duration]
-    clips = []
-
-    for i in range(len(boundaries) - 1):
-        duration = round(boundaries[i + 1] - boundaries[i], 2)
-
-        # Get Gemini analysis for this clip (if available)
-        analysis = {}
-        if i < len(clip_analysis):
-            analysis = clip_analysis[i]
-
-        clip_type = analysis.get('type', 'before' if i == 0 else 'after')
-        detected_text = analysis.get('detected_text')
-        clips.append({
-            'index': i,
-            'duration': duration,
-            'type': clip_type,
-            'detected_text': detected_text,
-            'text_position': analysis.get('text_position', 'bottom'),
-            'has_text': bool(detected_text),
-            'text_style': 'cta' if clip_type == 'cta' else 'hook',
-        })
-
-    # Auto-split: if only 1 clip detected, create before/after/cta structure
-    if len(clips) == 1:
-        d = total_duration
-        clips = [
-            {'index': 0, 'duration': round(d * 0.40, 2), 'type': 'before',
-             'detected_text': None, 'text_position': 'bottom',
-             'has_text': True, 'text_style': 'hook'},
-            {'index': 1, 'duration': round(d * 0.40, 2), 'type': 'after',
-             'detected_text': None, 'text_position': 'bottom',
-             'has_text': False, 'text_style': 'hook'},
-            {'index': 2, 'duration': round(d * 0.20, 2), 'type': 'cta',
-             'detected_text': None, 'text_position': 'center',
-             'has_text': True, 'text_style': 'cta'},
-        ]
-        logger.info(f"Auto-split single clip into before/after/cta: {[c['duration'] for c in clips]}")
-
-    # Clean up downloaded video (keep only audio)
     try:
-        os.remove(video_path)
-    except Exception:
-        pass
+        # Step 1: Download reel
+        video_path = download_reel(url, format_dir)
 
-    # Clean up screenshots
-    for s in screenshots:
-        try:
-            os.remove(s)
-        except Exception:
-            pass
+        # Step 2: Get duration
+        total_duration = get_video_duration(video_path)
+        if total_duration <= 0:
+            raise InstagramScraperError("Could not determine video duration")
 
-    template = {
-        'format_name': format_name,
-        'instagram_url': url,
-        'audio_path': audio_path,
-        'total_duration': total_duration,
-        'clips': clips
-    }
+        logger.info(f"Video duration: {total_duration:.2f}s")
 
-    logger.info(f"Format template created: {format_name} ({len(clips)} clips, {total_duration:.1f}s)")
-    return template
+        # Step 3: Extract audio
+        audio_path = os.path.join(format_dir, 'audio.mp3')
+        extract_audio(video_path, audio_path)
+
+        # Step 4: Detect scene cuts
+        cuts = detect_scene_cuts(video_path)
+
+        # Step 5: Extract screenshots for analysis
+        screenshots = extract_clip_screenshots(video_path, cuts, total_duration)
+
+        # Step 6: Analyze clips with Gemini
+        clip_analysis = analyze_clips_with_gemini(screenshots, api_key_manager)
+
+        # Step 7: Build clip structure
+        boundaries = [0.0] + cuts + [total_duration]
+        clips = []
+
+        for i in range(len(boundaries) - 1):
+            duration = round(boundaries[i + 1] - boundaries[i], 2)
+
+            # Get Gemini analysis for this clip (if available)
+            analysis = {}
+            if i < len(clip_analysis):
+                analysis = clip_analysis[i]
+
+            clip_type = analysis.get('type', 'before' if i == 0 else 'after')
+            detected_text = analysis.get('detected_text')
+            clips.append({
+                'index': i,
+                'duration': duration,
+                'type': clip_type,
+                'detected_text': detected_text,
+                'text_position': analysis.get('text_position', 'bottom'),
+                'has_text': bool(detected_text),
+                'text_style': 'cta' if clip_type == 'cta' else 'hook',
+            })
+
+        # Auto-split: if only 1 clip detected, create before/after/cta structure
+        if len(clips) == 1:
+            d = total_duration
+            clips = [
+                {'index': 0, 'duration': round(d * 0.40, 2), 'type': 'before',
+                 'detected_text': None, 'text_position': 'bottom',
+                 'has_text': True, 'text_style': 'hook'},
+                {'index': 1, 'duration': round(d * 0.40, 2), 'type': 'after',
+                 'detected_text': None, 'text_position': 'bottom',
+                 'has_text': False, 'text_style': 'hook'},
+                {'index': 2, 'duration': round(d * 0.20, 2), 'type': 'cta',
+                 'detected_text': None, 'text_position': 'center',
+                 'has_text': True, 'text_style': 'cta'},
+            ]
+            logger.info(f"Auto-split single clip into before/after/cta: {[c['duration'] for c in clips]}")
+
+        template = {
+            'format_name': format_name,
+            'instagram_url': url,
+            'audio_path': audio_path,
+            'total_duration': total_duration,
+            'clips': clips
+        }
+
+        logger.info(f"Format template created: {format_name} ({len(clips)} clips, {total_duration:.1f}s)")
+        return template
+
+    finally:
+        # Always clean up video and screenshots, even on error
+        if video_path:
+            try:
+                os.remove(video_path)
+            except Exception:
+                pass
+        # Clean up screenshot files and their temp directory
+        screenshot_dirs = set()
+        for s in screenshots:
+            try:
+                screenshot_dirs.add(os.path.dirname(s))
+                os.remove(s)
+            except Exception:
+                pass
+        for d in screenshot_dirs:
+            try:
+                os.rmdir(d)
+            except Exception:
+                pass
 
 
 def create_format_from_upload(video_path: str, format_name: str, output_base_dir: str, api_key_manager=None) -> dict:
@@ -502,81 +515,92 @@ def create_format_from_upload(video_path: str, format_name: str, output_base_dir
         shutil.copy2(video_path, dest_video)
     video_path = dest_video
 
-    total_duration = get_video_duration(video_path)
-    if total_duration <= 0:
-        raise InstagramScraperError("Could not determine video duration")
+    screenshots = []
 
-    logger.info(f"Uploaded video duration: {total_duration:.2f}s")
-
-    # Extract audio
-    audio_path = os.path.join(format_dir, 'audio.mp3')
     try:
-        extract_audio(video_path, audio_path)
-    except InstagramScraperError:
-        logger.warning("No audio in uploaded video - format will have no audio")
-        audio_path = None
+        total_duration = get_video_duration(video_path)
+        if total_duration <= 0:
+            raise InstagramScraperError("Could not determine video duration")
 
-    # Detect scene cuts
-    cuts = detect_scene_cuts(video_path)
+        logger.info(f"Uploaded video duration: {total_duration:.2f}s")
 
-    # Extract screenshots for analysis
-    screenshots = extract_clip_screenshots(video_path, cuts, total_duration)
-
-    # Analyze clips with Gemini
-    clip_analysis = analyze_clips_with_gemini(screenshots, api_key_manager)
-
-    # Build clip structure
-    boundaries = [0.0] + cuts + [total_duration]
-    clips = []
-    for i in range(len(boundaries) - 1):
-        duration = round(boundaries[i + 1] - boundaries[i], 2)
-        analysis = clip_analysis[i] if i < len(clip_analysis) else {}
-        clip_type = analysis.get('type', 'before' if i == 0 else 'after')
-        detected_text = analysis.get('detected_text')
-        clips.append({
-            'index': i,
-            'duration': duration,
-            'type': clip_type,
-            'detected_text': detected_text,
-            'text_position': analysis.get('text_position', 'bottom'),
-            'has_text': bool(detected_text),
-            'text_style': 'cta' if clip_type == 'cta' else 'hook',
-        })
-
-    # Auto-split: if only 1 clip detected, create before/after/cta structure
-    if len(clips) == 1:
-        d = total_duration
-        clips = [
-            {'index': 0, 'duration': round(d * 0.40, 2), 'type': 'before',
-             'detected_text': None, 'text_position': 'bottom',
-             'has_text': True, 'text_style': 'hook'},
-            {'index': 1, 'duration': round(d * 0.40, 2), 'type': 'after',
-             'detected_text': None, 'text_position': 'bottom',
-             'has_text': False, 'text_style': 'hook'},
-            {'index': 2, 'duration': round(d * 0.20, 2), 'type': 'cta',
-             'detected_text': None, 'text_position': 'center',
-             'has_text': True, 'text_style': 'cta'},
-        ]
-        logger.info(f"Auto-split single clip into before/after/cta: {[c['duration'] for c in clips]}")
-
-    # Clean up video and screenshots
-    try:
-        os.remove(video_path)
-    except Exception:
-        pass
-    for s in screenshots:
+        # Extract audio
+        audio_path = os.path.join(format_dir, 'audio.mp3')
         try:
-            os.remove(s)
+            extract_audio(video_path, audio_path)
+        except InstagramScraperError:
+            logger.warning("No audio in uploaded video - format will have no audio")
+            audio_path = None
+
+        # Detect scene cuts
+        cuts = detect_scene_cuts(video_path)
+
+        # Extract screenshots for analysis
+        screenshots = extract_clip_screenshots(video_path, cuts, total_duration)
+
+        # Analyze clips with Gemini
+        clip_analysis = analyze_clips_with_gemini(screenshots, api_key_manager)
+
+        # Build clip structure
+        boundaries = [0.0] + cuts + [total_duration]
+        clips = []
+        for i in range(len(boundaries) - 1):
+            duration = round(boundaries[i + 1] - boundaries[i], 2)
+            analysis = clip_analysis[i] if i < len(clip_analysis) else {}
+            clip_type = analysis.get('type', 'before' if i == 0 else 'after')
+            detected_text = analysis.get('detected_text')
+            clips.append({
+                'index': i,
+                'duration': duration,
+                'type': clip_type,
+                'detected_text': detected_text,
+                'text_position': analysis.get('text_position', 'bottom'),
+                'has_text': bool(detected_text),
+                'text_style': 'cta' if clip_type == 'cta' else 'hook',
+            })
+
+        # Auto-split: if only 1 clip detected, create before/after/cta structure
+        if len(clips) == 1:
+            d = total_duration
+            clips = [
+                {'index': 0, 'duration': round(d * 0.40, 2), 'type': 'before',
+                 'detected_text': None, 'text_position': 'bottom',
+                 'has_text': True, 'text_style': 'hook'},
+                {'index': 1, 'duration': round(d * 0.40, 2), 'type': 'after',
+                 'detected_text': None, 'text_position': 'bottom',
+                 'has_text': False, 'text_style': 'hook'},
+                {'index': 2, 'duration': round(d * 0.20, 2), 'type': 'cta',
+                 'detected_text': None, 'text_position': 'center',
+                 'has_text': True, 'text_style': 'cta'},
+            ]
+            logger.info(f"Auto-split single clip into before/after/cta: {[c['duration'] for c in clips]}")
+
+        template = {
+            'format_name': format_name,
+            'instagram_url': 'uploaded',
+            'audio_path': audio_path,
+            'total_duration': total_duration,
+            'clips': clips
+        }
+
+        logger.info(f"Format from upload: {format_name} ({len(clips)} clips, {total_duration:.1f}s)")
+        return template
+
+    finally:
+        # Always clean up video and screenshots, even on error
+        try:
+            os.remove(video_path)
         except Exception:
             pass
-
-    template = {
-        'format_name': format_name,
-        'instagram_url': 'uploaded',
-        'audio_path': audio_path,
-        'total_duration': total_duration,
-        'clips': clips
-    }
-
-    logger.info(f"Format from upload: {format_name} ({len(clips)} clips, {total_duration:.1f}s)")
-    return template
+        screenshot_dirs = set()
+        for s in screenshots:
+            try:
+                screenshot_dirs.add(os.path.dirname(s))
+                os.remove(s)
+            except Exception:
+                pass
+        for d in screenshot_dirs:
+            try:
+                os.rmdir(d)
+            except Exception:
+                pass

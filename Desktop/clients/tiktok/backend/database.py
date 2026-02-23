@@ -1368,6 +1368,9 @@ def init_ig_reel_tables():
         except sqlite3.OperationalError:
             pass  # Column already exists
 
+        # Migration: enforce unique format names
+        cursor.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_ig_formats_name ON ig_formats(format_name)')
+
 
 # --- ig_formats CRUD ---
 

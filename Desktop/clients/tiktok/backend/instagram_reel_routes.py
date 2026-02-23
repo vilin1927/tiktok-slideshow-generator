@@ -7,6 +7,7 @@ import os
 import shutil
 import subprocess
 import uuid
+from functools import wraps
 
 from flask import Blueprint, request, jsonify
 from werkzeug.utils import secure_filename
@@ -36,6 +37,20 @@ for d in [ASSETS_DIR, FORMATS_DIR]:
     os.makedirs(d, exist_ok=True)
 
 
+def require_page_password(f):
+    """Decorator to require PAGE_PASSWORD on write endpoints."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        page_password = os.environ.get('PAGE_PASSWORD')
+        if not page_password:
+            return f(*args, **kwargs)
+        token = request.headers.get('X-Page-Password', '')
+        if token != page_password:
+            return jsonify({'error': 'Authentication required'}), 401
+        return f(*args, **kwargs)
+    return decorated
+
+
 def _allowed_file(filename, extensions):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in extensions
 
@@ -43,6 +58,7 @@ def _allowed_file(filename, extensions):
 # ============ Character (Asset Group) Endpoints ============
 
 @ig_reel_bp.route('/characters', methods=['POST'])
+@require_page_password
 def create_character():
     """Create a new character (persona)."""
     data = request.get_json() or {}
@@ -80,6 +96,7 @@ def get_characters():
 
 
 @ig_reel_bp.route('/characters/<character_id>', methods=['DELETE'])
+@require_page_password
 def remove_character(character_id):
     """Delete a character and all its assets."""
     character = get_ig_character(character_id)
@@ -101,6 +118,7 @@ def remove_character(character_id):
 # ============ Asset Endpoints ============
 
 @ig_reel_bp.route('/characters/<character_id>/assets', methods=['POST'])
+@require_page_password
 def upload_assets(character_id):
     """
     Upload assets for a character.
@@ -205,6 +223,7 @@ def get_assets(character_id):
 
 
 @ig_reel_bp.route('/assets/<asset_id>', methods=['DELETE'])
+@require_page_password
 def remove_asset(asset_id):
     """Delete a single asset."""
     asset = get_ig_asset(asset_id)
@@ -225,6 +244,7 @@ def remove_asset(asset_id):
 # ============ Format Template Endpoints ============
 
 @ig_reel_bp.route('/formats/scrape', methods=['POST'])
+@require_page_password
 def scrape_format():
     """
     Scrape an Instagram reel and create a format template.
@@ -297,6 +317,7 @@ def scrape_format():
 
 
 @ig_reel_bp.route('/formats/upload', methods=['POST'])
+@require_page_password
 def upload_format():
     """
     Create a format template from an uploaded reel video file.
@@ -396,6 +417,7 @@ def get_format(format_id):
 
 
 @ig_reel_bp.route('/formats/<format_id>', methods=['PUT'])
+@require_page_password
 def edit_format(format_id):
     """
     Update a format template (edit clip durations, types, etc.).
@@ -434,6 +456,7 @@ def edit_format(format_id):
 
 
 @ig_reel_bp.route('/formats/<format_id>', methods=['DELETE'])
+@require_page_password
 def remove_format(format_id):
     """Delete a format template and its audio file."""
     fmt = get_ig_format(format_id)
@@ -453,6 +476,7 @@ def remove_format(format_id):
 
 
 @ig_reel_bp.route('/formats/<format_id>/audio', methods=['POST'])
+@require_page_password
 def upload_custom_audio(format_id):
     """Upload custom audio file for a format template."""
     fmt = get_ig_format(format_id)
@@ -490,6 +514,7 @@ def upload_custom_audio(format_id):
 # ============ Generation Endpoints ============
 
 @ig_reel_bp.route('/generate', methods=['POST'])
+@require_page_password
 def start_generation():
     """
     Start a reel generation job.
