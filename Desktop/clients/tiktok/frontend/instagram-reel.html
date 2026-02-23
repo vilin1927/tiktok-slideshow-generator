@@ -554,6 +554,8 @@
                     if (h) {
                         const s = parseInt(h[1]);
                         if (s >= 1 && s <= 5) this.currentStep = s;
+                    } else {
+                        this.currentStep = 1;
                     }
                 });
 
