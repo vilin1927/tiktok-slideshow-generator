@@ -44,7 +44,8 @@ def _get_font(size: int) -> ImageFont.FreeTypeFont:
         if os.path.exists(path):
             try:
                 return ImageFont.truetype(path, size)
-            except Exception:
+            except Exception as e:
+                logger.warning(f"Failed to load font {path}: {e}")
                 continue
     return ImageFont.load_default()
 

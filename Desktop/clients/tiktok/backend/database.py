@@ -5,9 +5,12 @@ SQLite database for tracking batches, links, and variations
 import sqlite3
 import os
 import uuid
+import logging
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from contextlib import contextmanager
+
+logger = logging.getLogger('database')
 
 # Database file path
 DB_PATH = os.path.join(os.path.dirname(__file__), 'batch_processing.db')
@@ -192,8 +195,8 @@ def get_job(job_id: str) -> Optional[Dict[str, Any]]:
             if job.get('variations_config'):
                 try:
                     job['variations_config'] = json.loads(job['variations_config'])
-                except:
-                    pass
+                except Exception as e:
+                    logger.warning(f"JSON parse failed for DB field: {e}")
             return job
         return None
 
@@ -278,8 +281,8 @@ def list_jobs(
             if job.get('variations_config'):
                 try:
                     job['variations_config'] = json.loads(job['variations_config'])
-                except:
-                    pass
+                except Exception as e:
+                    logger.warning(f"JSON parse failed for DB field: {e}")
             jobs.append(job)
         return jobs
 
@@ -723,8 +726,8 @@ def get_video_job(job_id: str) -> Optional[Dict[str, Any]]:
             if job.get('image_paths'):
                 try:
                     job['image_paths'] = json.loads(job['image_paths'])
-                except:
-                    pass
+                except Exception as e:
+                    logger.warning(f"JSON parse failed for DB field: {e}")
             return job
         return None
 
@@ -784,8 +787,8 @@ def get_next_pending_video_job() -> Optional[Dict[str, Any]]:
             if job.get('image_paths'):
                 try:
                     job['image_paths'] = json.loads(job['image_paths'])
-                except:
-                    pass
+                except Exception as e:
+                    logger.warning(f"JSON parse failed for DB field: {e}")
             return job
         return None
 
@@ -817,8 +820,8 @@ def list_video_jobs(
             if job.get('image_paths'):
                 try:
                     job['image_paths'] = json.loads(job['image_paths'])
-                except:
-                    pass
+                except Exception as e:
+                    logger.warning(f"JSON parse failed for DB field: {e}")
             jobs.append(job)
         return jobs
 
@@ -1404,7 +1407,8 @@ def get_ig_format(format_id: str) -> Optional[Dict[str, Any]]:
             if fmt.get('clips_json'):
                 try:
                     fmt['clips'] = json.loads(fmt['clips_json'])
-                except Exception:
+                except Exception as e:
+                    logger.warning(f"Failed to parse clips_json for format {fmt.get('id', '?')}: {e}")
                     fmt['clips'] = []
             else:
                 fmt['clips'] = []
@@ -1424,7 +1428,8 @@ def list_ig_formats() -> List[Dict[str, Any]]:
             if fmt.get('clips_json'):
                 try:
                     fmt['clips'] = json.loads(fmt['clips_json'])
-                except Exception:
+                except Exception as e:
+                    logger.warning(f"Failed to parse clips_json for format {fmt.get('id', '?')}: {e}")
                     fmt['clips'] = []
             else:
                 fmt['clips'] = []
@@ -1618,8 +1623,8 @@ def get_ig_job(job_id: str) -> Optional[Dict[str, Any]]:
                 if job.get(field):
                     try:
                         job[field.replace('_json', '')] = json.loads(job[field])
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.warning(f"JSON parse failed for job field {field}: {e}")
             return job
         return None
 
@@ -1647,8 +1652,8 @@ def list_ig_jobs(status: str = None, limit: int = 50, offset: int = 0) -> List[D
                 if job.get(field):
                     try:
                         job[field.replace('_json', '')] = json.loads(job[field])
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.warning(f"JSON parse failed for job field {field}: {e}")
             jobs.append(job)
         return jobs
 

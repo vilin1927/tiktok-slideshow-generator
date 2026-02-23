@@ -26,6 +26,9 @@ except ImportError:
 
 from presets import get_preset, get_font_path, get_font_size, TextPreset
 
+import logging
+logger = logging.getLogger('text_renderer')
+
 # Path to the Node.js rounded text box script
 ROUNDED_TEXT_BOX_SCRIPT = os.path.join(os.path.dirname(__file__), 'rounded_text_box.js')
 
@@ -191,8 +194,8 @@ def load_emoji_font(size: int = 160) -> Optional[ImageFont.FreeTypeFont]:
         try:
             EMOJI_NATIVE_SIZE = 160
             return ImageFont.truetype(APPLE_EMOJI_FONT_MACOS, 160)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Failed to load Apple Color Emoji (macOS): {e}")
 
     # Try Apple Color Emoji (Linux) - real iOS emojis!
     if os.path.exists(APPLE_EMOJI_FONT_LINUX):
@@ -200,24 +203,24 @@ def load_emoji_font(size: int = 160) -> Optional[ImageFont.FreeTypeFont]:
             # Apple Color Emoji on Linux works at size 137
             EMOJI_NATIVE_SIZE = 137
             return ImageFont.truetype(APPLE_EMOJI_FONT_LINUX, 137)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Failed to load Apple Color Emoji (Linux): {e}")
 
     # Try Twemoji (Linux) - Twitter style
     if os.path.exists(TWEMOJI_FONT):
         try:
             EMOJI_NATIVE_SIZE = 61
             return ImageFont.truetype(TWEMOJI_FONT, 61)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Failed to load Twemoji font: {e}")
 
     # Fallback to Noto Color Emoji (Linux) - Android style
     if os.path.exists(NOTO_EMOJI_FONT):
         try:
             EMOJI_NATIVE_SIZE = 109
             return ImageFont.truetype(NOTO_EMOJI_FONT, 109)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Failed to load Noto Color Emoji font: {e}")
 
     return None
 
@@ -247,7 +250,8 @@ def load_font(font_file: str, size: int) -> ImageFont.FreeTypeFont:
         # Fallback to default font
         try:
             return ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", size)
-        except:
+        except Exception as e:
+            logger.warning(f"Failed to load DejaVu fallback font: {e}")
             return ImageFont.load_default()
 
 
@@ -855,7 +859,7 @@ def render_multiline_box_text(
 
     except Exception as e:
         # Fallback to simple unified box if Remotion fails
-        print(f"Remotion fallback: {e}")
+        logger.warning(f"Remotion rounded box failed, using simple fallback: {e}")
         max_line_width = max(line_widths)
         box_width = max_line_width + 2 * box_padding_h
         box_height = len(lines) * line_box_height

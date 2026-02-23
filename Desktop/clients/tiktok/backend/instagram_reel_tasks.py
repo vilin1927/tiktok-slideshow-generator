@@ -80,8 +80,8 @@ def generate_reel_batch(self, job_id: str):
         if clip_texts_raw is None and job.get('clip_texts_json'):
             try:
                 clip_texts_raw = json.loads(job['clip_texts_json'])
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"[Job {job_id[:8]}] Failed to parse clip_texts_json: {e}")
 
         clip_variations = None
         clip_texts = None
@@ -119,8 +119,8 @@ def generate_reel_batch(self, job_id: str):
         if job.get('character_ids_json'):
             try:
                 character_ids = json.loads(job['character_ids_json'])
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"[Job {job_id[:8]}] Failed to parse character_ids_json: {e}")
 
         if not character_ids:
             raise ReelVideoError("No characters selected")
@@ -229,8 +229,8 @@ def generate_reel_batch(self, job_id: str):
         # Cleanup output directory
         try:
             shutil.rmtree(job_output_dir, ignore_errors=True)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"[Job {job_id[:8]}] Failed to cleanup output dir {job_output_dir}: {e}")
 
     except ReelVideoError as e:
         logger.error(f"[Job {job_id[:8]}] Batch failed: {e}")
@@ -314,8 +314,8 @@ def _process_single_video(
         # Cleanup local file after upload
         try:
             os.remove(output_path)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"[Job {job_id[:8]}] Failed to cleanup output file {output_path}: {e}")
 
     finally:
         # Always cleanup transform temp directory

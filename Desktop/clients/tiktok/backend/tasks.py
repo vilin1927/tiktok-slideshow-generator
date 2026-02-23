@@ -171,8 +171,8 @@ def process_link(self, batch_link_id: str, parent_drive_folder_id: str):
             if batch and batch.get('variations_config'):
                 try:
                     variations_config = json.loads(batch['variations_config']) if isinstance(batch['variations_config'], str) else batch['variations_config']
-                except (json.JSONDecodeError, TypeError):
-                    pass
+                except (json.JSONDecodeError, TypeError) as e:
+                    logger.warning(f"[Link {batch_link_id[:8]}] Failed to parse variations_config: {e}")
 
             # Extract individual variation settings (default to 1)
             hook_photo_var = variations_config.get('hook_photo_var', 1)
@@ -315,7 +315,7 @@ def process_link(self, batch_link_id: str, parent_drive_folder_id: str):
                 logger.info(f"[Link {batch_link_id[:8]}] Retrying due to rate limit...")
                 raise self.retry(exc=e, countdown=120)  # Wait 2 minutes before retry
             except MaxRetriesExceededError:
-                pass
+                logger.error(f"[Link {batch_link_id[:8]}] Max retries exceeded for rate limit")
 
         update_batch_link_status(batch_link_id, 'failed', error_message=f"Pipeline error: {e}")
         return {'status': 'error', 'link_id': batch_link_id, 'message': str(e)}
@@ -438,7 +438,7 @@ def generate_variation(self, variation_id: str, slide_paths: list, product_image
             try:
                 raise self.retry(exc=e, countdown=120)
             except MaxRetriesExceededError:
-                pass
+                logger.error(f"[Variation {variation_id[:8]}] Max retries exceeded for rate limit")
 
         update_variation_status(variation_id, 'failed', error_message=str(e))
         return {'status': 'error', 'variation_id': variation_id, 'message': str(e)}
@@ -736,7 +736,7 @@ def process_tiktok_copy_job(
                 logger.info(f"[TikTokCopy Job {job_id[:8]}] Retrying due to rate limit (attempt {self.request.retries + 1}, backoff {backoff}s)...")
                 raise self.retry(exc=e, countdown=backoff)
             except MaxRetriesExceededError:
-                pass
+                logger.error(f"[TikTokCopy Job {job_id[:8]}] Max retries exceeded for rate limit")
 
         update_tiktok_copy_job(job_id, 'failed', error_message=f"Scrape error: {e}")
         return {'status': 'error', 'job_id': job_id, 'message': str(e)}

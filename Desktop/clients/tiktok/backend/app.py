@@ -291,8 +291,8 @@ def prometheus_metrics():
             queue = get_global_queue()
             stats = queue.get_queue_stats()
             update_queue_metrics(stats)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Failed to update queue metrics: {e}")
 
         # Update API key availability
         try:
@@ -305,8 +305,8 @@ def prometheus_metrics():
                 image_available=image_summary['image']['available_keys'],
                 total=manager.get_summary()['total_keys']
             )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Failed to update API key metrics: {e}")
 
         from flask import Response
         return Response(get_metrics(), mimetype=get_content_type())
