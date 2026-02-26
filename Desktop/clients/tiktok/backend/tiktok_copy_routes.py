@@ -5,6 +5,7 @@ Flask API endpoints for slideshow to video conversion.
 import os
 import re
 import uuid
+from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify
 from werkzeug.utils import secure_filename
 
@@ -361,6 +362,28 @@ def get_status(batch_id: str):
         return jsonify({'error': 'Batch not found'}), 404
 
     jobs = get_tiktok_copy_jobs(batch_id)
+
+    # Auto-fail stale jobs: if a job has been pending/processing for >10 min,
+    # it's a zombie (Celery task crashed without updating DB). Mark it failed.
+    stale_cutoff = datetime.utcnow() - timedelta(minutes=10)
+    for j in jobs:
+        if j['status'] in ('pending', 'processing'):
+            created = j.get('created_at')
+            if created:
+                if isinstance(created, str):
+                    try:
+                        created = datetime.fromisoformat(created)
+                    except ValueError:
+                        continue
+                if created < stale_cutoff:
+                    from database import update_tiktok_copy_job
+                    update_tiktok_copy_job(
+                        j['id'], 'failed',
+                        error_message=f"Auto-timeout: job stuck in '{j['status']}' for >10 min"
+                    )
+                    j['status'] = 'failed'
+                    j['error_message'] = f"Auto-timeout: job stuck in '{j['status']}' for >10 min"
+                    logger.warning(f"Auto-failed stale job {j['id'][:8]} (was '{j['status']}' since {created})")
 
     # Calculate status from jobs
     completed = sum(1 for j in jobs if j['status'] == 'completed')

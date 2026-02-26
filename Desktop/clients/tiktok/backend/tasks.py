@@ -385,13 +385,13 @@ def finalize_batch(self, link_results: list, batch_id: str):
 
         logger.info(f"[Batch {batch_id[:8]}] Results: {completed}/{total} completed, {failed} failed")
 
-        # Determine final status
+        # Determine final status — honest reporting
         if completed == 0:
             final_status = 'failed'
             error_msg = 'All links failed to process'
         elif failed > 0:
-            final_status = 'completed'  # Partial success
-            error_msg = f'{failed}/{total} links failed'
+            final_status = 'partial'
+            error_msg = f'Generated {completed}/{total} links, {failed} failed'
         else:
             final_status = 'completed'
             error_msg = None
@@ -832,13 +832,13 @@ def finalize_tiktok_copy_batch(self, job_results: list, batch_id: str):
 
         logger.info(f"[TikTokCopy {batch_id[:8]}] Results: {completed}/{total} completed, {failed} failed (zombies: {zombie_count})")
 
-        # Determine final status
+        # Determine final status — honest reporting
         if completed == 0:
             final_status = 'failed'
         elif completed == total:
             final_status = 'completed'
         else:
-            final_status = 'completed'  # Partial success
+            final_status = 'partial'
 
         update_tiktok_copy_batch(batch_id, status=final_status)
 
