@@ -18,6 +18,95 @@ from logging_config import get_logger, get_request_logger
 
 logger = get_logger('tiktok_copy')
 
+
+def crop_blur_borders(image_path: str, request_id: str = None) -> str:
+    """
+    Detect and crop blurry/gradient borders from TikTok scraped images.
+
+    TikTok often bakes blurry padding into slideshow images for non-9:16 content.
+    This function detects the actual content area using FFmpeg cropdetect and
+    crops the image to remove blur borders, so our black padding looks clean.
+
+    Args:
+        image_path: Path to the image file
+        request_id: Optional request ID for logging
+
+    Returns:
+        Path to cropped image (same path, overwritten in place)
+    """
+    log = get_request_logger('tiktok_copy', request_id) if request_id else logger
+
+    try:
+        # Use FFmpeg cropdetect to find actual content boundaries
+        # round=2 for pixel-level precision, limit=24 to detect subtle blur
+        result = subprocess.run(
+            [
+                'ffmpeg', '-i', image_path,
+                '-vf', 'cropdetect=limit=24:round=2:reset=0',
+                '-frames:v', '1',
+                '-f', 'null', '-'
+            ],
+            capture_output=True, text=True, timeout=10
+        )
+
+        # Parse cropdetect output from stderr
+        crop_line = None
+        for line in result.stderr.split('\n'):
+            if 'crop=' in line:
+                crop_line = line
+
+        if not crop_line:
+            return image_path  # No crop detected, return as-is
+
+        # Extract crop parameters: crop=W:H:X:Y
+        import re
+        match = re.search(r'crop=(\d+):(\d+):(\d+):(\d+)', crop_line)
+        if not match:
+            return image_path
+
+        crop_w, crop_h, crop_x, crop_y = (int(x) for x in match.groups())
+
+        # Get original dimensions
+        probe = subprocess.run(
+            ['ffprobe', '-v', 'error', '-select_streams', 'v:0',
+             '-show_entries', 'stream=width,height',
+             '-of', 'csv=p=0', image_path],
+            capture_output=True, text=True, timeout=10
+        )
+        orig_w, orig_h = (int(x) for x in probe.stdout.strip().split(','))
+
+        # Only crop if we're removing significant borders (> 5% of each dimension)
+        w_margin = (orig_w - crop_w) / orig_w if orig_w > 0 else 0
+        h_margin = (orig_h - crop_h) / orig_h if orig_h > 0 else 0
+
+        if w_margin < 0.05 and h_margin < 0.05:
+            return image_path  # Borders too small to be blur padding
+
+        log.info(f"Cropping blur borders: {orig_w}x{orig_h} -> {crop_w}x{crop_h} "
+                 f"(removed {w_margin:.0%}W, {h_margin:.0%}H)")
+
+        # Crop the image in-place
+        temp_out = image_path + '.cropped.jpg'
+        subprocess.run(
+            ['ffmpeg', '-y', '-i', image_path,
+             '-vf', f'crop={crop_w}:{crop_h}:{crop_x}:{crop_y}',
+             '-q:v', '2', temp_out],
+            capture_output=True, timeout=10
+        )
+
+        if os.path.exists(temp_out) and os.path.getsize(temp_out) > 0:
+            os.replace(temp_out, image_path)
+        else:
+            # Crop failed, keep original
+            if os.path.exists(temp_out):
+                os.remove(temp_out)
+
+        return image_path
+
+    except (subprocess.TimeoutExpired, subprocess.CalledProcessError, ValueError) as e:
+        log.warning(f"Blur border detection failed for {os.path.basename(image_path)}: {e}")
+        return image_path
+
 # Video settings (from PRD)
 VIDEO_WIDTH = 1080
 VIDEO_HEIGHT = 1920
@@ -125,6 +214,9 @@ def assemble_video(
                     )
                 else:
                     shutil.copy2(img, temp_img)
+
+                # Crop blur borders from TikTok images (replace blurry padding with clean black bars)
+                crop_blur_borders(temp_img, request_id=request_id)
 
                 # Apply uniqueness transforms to defeat TikTok fingerprinting
                 transform_single_image_file(temp_img, variation_key=var_key, image_index=i)

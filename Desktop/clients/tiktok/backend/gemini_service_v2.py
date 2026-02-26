@@ -4520,8 +4520,9 @@ def _copy_product_image(src_path: str, dst_path: str, log):
 def wait_for_job_completion(
     job_id: str,
     progress_callback: Optional[Callable] = None,
-    timeout: int = 3600,  # 1 hour max
-    poll_interval: float = 2.0
+    timeout: int = 780,  # Must be < Celery soft_time_limit (900s)
+    poll_interval: float = 2.0,
+    stall_timeout: int = 180  # Bail out if no progress for 3 minutes
 ) -> dict:
     """
     Wait for all tasks in a job to complete.
@@ -4529,8 +4530,9 @@ def wait_for_job_completion(
     Args:
         job_id: Job identifier
         progress_callback: Optional callback(current, total, message)
-        timeout: Maximum wait time in seconds
+        timeout: Maximum wait time in seconds (< Celery soft_time_limit)
         poll_interval: Seconds between status checks
+        stall_timeout: Return partial results if no progress for this many seconds
 
     Returns:
         dict with:
@@ -4540,12 +4542,14 @@ def wait_for_job_completion(
             - is_complete: Whether job fully completed
 
     Raises:
-        GeminiServiceError: If job times out or has critical failures
+        GeminiServiceError: If job times out with ZERO completed images
     """
     from image_queue import get_global_queue
 
     queue = get_global_queue()
     start_time = time.time()
+    last_progress_count = 0
+    last_progress_time = time.time()
 
     while True:
         status = queue.get_job_status(job_id)
@@ -4569,9 +4573,42 @@ def wait_for_job_completion(
                 'is_complete': True
             }
 
+        # Track progress for stall detection
+        current_done = status['completed'] + status['failed']
+        if current_done > last_progress_count:
+            last_progress_count = current_done
+            last_progress_time = time.time()
+
+        # Check stall: no progress for stall_timeout seconds and some tasks are stuck
+        stall_elapsed = time.time() - last_progress_time
+        if stall_elapsed > stall_timeout and status['completed'] > 0:
+            logger.warning(
+                f"Job {job_id} stalled for {stall_elapsed:.0f}s with "
+                f"{status['completed']}/{status['total']} completed. "
+                f"Returning partial results."
+            )
+            return {
+                'images': status['results'],
+                'completed': status['completed'],
+                'failed': status['failed'] + status['pending'] + status['retry'],
+                'is_complete': False
+            }
+
         # Check timeout
         elapsed = time.time() - start_time
         if elapsed > timeout:
+            # If we have SOME results, return them instead of crashing
+            if status['completed'] > 0:
+                logger.warning(
+                    f"Job {job_id} timed out after {timeout}s but has "
+                    f"{status['completed']}/{status['total']} completed. Returning partial results."
+                )
+                return {
+                    'images': status['results'],
+                    'completed': status['completed'],
+                    'failed': status['failed'] + status['pending'] + status['retry'],
+                    'is_complete': False
+                }
             raise GeminiServiceError(f"Job {job_id} timed out after {timeout}s. "
                                     f"Status: {status['completed']}/{status['total']} completed")
 

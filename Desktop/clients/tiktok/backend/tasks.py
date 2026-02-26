@@ -300,6 +300,41 @@ def process_link(self, batch_link_id: str, parent_drive_folder_id: str):
             except Exception as e:
                 logger.warning(f"[Link {batch_link_id[:8]}] Failed to cleanup {work_dir}: {e}")
 
+    except SoftTimeLimitExceeded:
+        # Celery killed us (900s limit). Try to salvage partial results from queue.
+        logger.warning(f"[Link {batch_link_id[:8]}] SoftTimeLimitExceeded — attempting partial result recovery")
+        try:
+            if USE_QUEUE_MODE:
+                from image_queue import get_global_queue
+                queue = get_global_queue()
+                status = queue.get_job_status(batch_link_id)
+                partial_images = status.get('results', [])
+                if partial_images:
+                    logger.info(f"[Link {batch_link_id[:8]}] Recovered {len(partial_images)} partial images, uploading...")
+                    link = get_batch_link(batch_link_id)
+                    if link:
+                        batch = get_batch(link['batch_id'])
+                        drive_url = batch.get('drive_folder_url', '') if batch else ''
+                        drive_folder_id = drive_url.split('/')[-1] if drive_url else None
+                        if drive_folder_id:
+                            link_folder_name = f"Link_{link['link_index'] + 1}_partial"
+                            link_folder_id = create_folder(link_folder_name, drive_folder_id)
+                            set_folder_public(link_folder_id)
+                            link_folder_url = get_folder_link(link_folder_id)
+                            uploaded, _ = upload_files_parallel(partial_images, link_folder_id, max_workers=3)
+                            logger.info(f"[Link {batch_link_id[:8]}] Uploaded {uploaded} partial images to Drive")
+                            update_batch_link_status(
+                                batch_link_id, 'failed',
+                                error_message=f"Timeout: {len(partial_images)} of images saved (partial)",
+                                drive_folder_url=link_folder_url
+                            )
+                            return {'status': 'partial', 'link_id': batch_link_id, 'images_uploaded': uploaded}
+        except Exception as recovery_err:
+            logger.error(f"[Link {batch_link_id[:8]}] Partial recovery failed: {recovery_err}")
+
+        update_batch_link_status(batch_link_id, 'failed', error_message='SoftTimeLimitExceeded (Celery 900s limit)')
+        return {'status': 'error', 'link_id': batch_link_id, 'message': 'Task timed out (900s)'}
+
     except TikTokScraperError as e:
         logger.error(f"[Link {batch_link_id[:8]}] Scraping failed: {e}")
         update_batch_link_status(batch_link_id, 'failed', error_message=f"Scrape error: {e}")
@@ -724,6 +759,11 @@ def process_tiktok_copy_job(
                 shutil.rmtree(work_dir)
             except Exception as e:
                 logger.warning(f"[TikTokCopy Job {job_id[:8]}] Failed to cleanup {work_dir}: {e}")
+
+    except SoftTimeLimitExceeded:
+        logger.warning(f"[TikTokCopy Job {job_id[:8]}] SoftTimeLimitExceeded — task killed by Celery (900s)")
+        update_tiktok_copy_job(job_id, 'failed', error_message='Task timed out (Celery 900s limit)')
+        return {'status': 'error', 'job_id': job_id, 'message': 'Task timed out (900s)'}
 
     except TikTokScraperError as e:
         error_msg = str(e)

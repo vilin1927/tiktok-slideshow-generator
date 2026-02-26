@@ -299,10 +299,24 @@ class BatchProcessor:
                     if isinstance(e, RateLimitError):
                         self._handle_rate_limit(e)
                     else:
-                        # For ApiKeyExhaustedError, pause for default duration
-                        self._paused = True
-                        self._pause_until = time.time() + RATE_LIMIT_PAUSE_DEFAULT + 5
-                        logger.warning(f"All API keys exhausted! Pausing queue for {RATE_LIMIT_PAUSE_DEFAULT + 5}s")
+                        # Check if ALL keys are daily-exhausted (not just RPM)
+                        from api_key_manager import get_api_key_manager
+                        manager = get_api_key_manager()
+                        if manager.are_all_keys_daily_exhausted('image'):
+                            # All keys hit daily limit — pause until midnight PT
+                            seconds_until_reset = manager._get_seconds_until_midnight_pt()
+                            self._paused = True
+                            self._pause_until = time.time() + seconds_until_reset
+                            logger.error(
+                                f"ALL API keys daily-exhausted! "
+                                f"Pausing until midnight PT ({seconds_until_reset // 3600}h {(seconds_until_reset % 3600) // 60}m). "
+                                f"Add more keys or wait for reset."
+                            )
+                        else:
+                            # Just RPM exhaustion — short pause
+                            self._paused = True
+                            self._pause_until = time.time() + RATE_LIMIT_PAUSE_DEFAULT + 5
+                            logger.warning(f"API keys RPM-exhausted, pausing queue for {RATE_LIMIT_PAUSE_DEFAULT + 5}s")
                     record_image_failed('rate_limit')
                     # Record for circuit breaker
                     if "All" in str(e) and "exhausted" in str(e):

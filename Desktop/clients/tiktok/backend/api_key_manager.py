@@ -422,6 +422,24 @@ class ApiKeyManager:
 
         return result
 
+    def are_all_keys_daily_exhausted(self, model_type: str = 'image') -> bool:
+        """
+        Check if ALL keys are daily-exhausted for a given model type.
+        Used by queue processor to decide whether to pause until midnight PT
+        instead of retrying every 70 seconds.
+
+        Returns:
+            True if all keys are daily-exhausted, invalid, or free-tier
+        """
+        for key in self.keys:
+            usage = self.get_key_usage(key, model_type)
+            if usage.get('is_available'):
+                return False
+            # Key might be only RPM-exhausted (not daily) — still usable soon
+            if not usage.get('is_daily_exhausted') and not usage.get('is_free_tier') and not usage.get('is_invalid'):
+                return False
+        return True
+
     def reset_key(self, key_id: str, model_type: str = None):
         """
         Manually reset a key's counters (admin function).
