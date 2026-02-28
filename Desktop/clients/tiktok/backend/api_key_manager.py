@@ -4,7 +4,7 @@ Tracks both RPM (requests per minute) and daily limits per key, per model type.
 
 Model Types:
 - 'text': Gemini Flash for all text analysis
-- 'image': Gemini Pro Image for image generation
+- 'image': Gemini 3.1 Flash for image generation (1000 RPM, 1K RPD)
 """
 import os
 import time

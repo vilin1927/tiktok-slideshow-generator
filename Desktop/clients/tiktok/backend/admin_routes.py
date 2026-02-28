@@ -593,9 +593,9 @@ def get_api_keys_status():
             {
                 "key_id": "AIzaSyBY",
                 "rpm_used": 5,
-                "rpm_limit": 18,
+                "rpm_limit": 900,
                 "daily_used": 50,
-                "daily_limit": 250,
+                "daily_limit": 1000,
                 "is_available": true
             },
             ...
@@ -648,15 +648,15 @@ def get_api_keys_status():
         return jsonify({
             'total_keys': 1 if gemini_key else 0,
             'available_keys': 1 if gemini_key else 0,
-            'total_rpm_available': 18 if gemini_key else 0,
-            'total_daily_available': 250 if gemini_key else 0,
+            'total_rpm_available': 900 if gemini_key else 0,
+            'total_daily_available': 1000 if gemini_key else 0,
             'seconds_until_daily_reset': 0,
             'keys': [{
                 'key_id': mask_key(gemini_key) if gemini_key else 'N/A',
                 'rpm_used': 0,
-                'rpm_limit': 18,
+                'rpm_limit': 900,
                 'daily_used': 0,
-                'daily_limit': 250,
+                'daily_limit': 1000,
                 'is_available': bool(gemini_key)
             }] if gemini_key else []
         })

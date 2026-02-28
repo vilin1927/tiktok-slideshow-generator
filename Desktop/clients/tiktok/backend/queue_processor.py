@@ -100,7 +100,7 @@ class BatchProcessor:
     Processes image generation tasks in batches.
 
     Configuration is loaded from QueueConfig (config.py).
-    Default: pull up to 18 tasks every 60 seconds (4 keys × 18 RPM = 72/min capacity).
+    Default: pull up to 50 tasks every 60 seconds (3 keys × 900 RPM = 2700/min capacity).
     """
 
     # Circuit breaker settings (from config)
@@ -256,7 +256,7 @@ class BatchProcessor:
         failed = 0
 
         # Submit tasks to thread pool with staggered delays to avoid rate limit bursts
-        # 4 keys × 18 RPM each = 72 requests/minute capacity
+        # 3 keys × 900 RPM each = 2700 requests/minute capacity
         stagger_delay = QueueConfig.STAGGER_DELAY
 
         with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:

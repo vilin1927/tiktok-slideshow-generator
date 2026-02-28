@@ -41,9 +41,9 @@ from google.genai.types import HarmCategory, HarmBlockThreshold, SafetySetting
 
 # Model names - 2 models only for simplicity and rate limit management
 # TEXT_MODEL: All text analysis, grounding, scene generation (high capacity: 1000 RPM, 10K RPD)
-# IMAGE_MODEL: Image generation only (low capacity: 20 RPM, 250 RPD)
+# IMAGE_MODEL: Image generation (1000 RPM, 1K RPD per key)
 TEXT_MODEL = 'gemini-3-flash-preview'
-IMAGE_MODEL = 'gemini-3-pro-image-preview'
+IMAGE_MODEL = 'gemini-3.1-flash-image-preview'
 
 # Backwards compatibility aliases (deprecated, use TEXT_MODEL instead)
 ANALYSIS_MODEL = TEXT_MODEL

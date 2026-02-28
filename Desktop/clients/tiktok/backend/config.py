@@ -34,12 +34,12 @@ class QueueConfig:
     """Configuration for the image queue system."""
 
     # Batch processing
-    # 4 keys × 18 RPM = 72 requests/minute capacity
-    BATCH_SIZE = _get_int('QUEUE_BATCH_SIZE', 18)
+    # 3 keys × 900 RPM = 2700 requests/minute capacity (gemini-3.1-flash)
+    BATCH_SIZE = _get_int('QUEUE_BATCH_SIZE', 50)
     BATCH_INTERVAL = _get_int('QUEUE_BATCH_INTERVAL', 60)  # seconds
     BATCH_TIMEOUT = _get_int('QUEUE_BATCH_TIMEOUT', 120)  # seconds per image
     STAGGER_DELAY = _get_float('QUEUE_STAGGER_DELAY', 0.5)  # seconds between submissions
-    MAX_WORKERS = _get_int('QUEUE_MAX_WORKERS', 18)  # concurrent generation threads
+    MAX_WORKERS = _get_int('QUEUE_MAX_WORKERS', 50)  # concurrent generation threads
 
     # Retry settings
     MAX_RETRIES = _get_int('QUEUE_MAX_RETRIES', 3)
@@ -81,8 +81,8 @@ class ApiKeyConfig:
     # Per-model rate limits
     TEXT_RPM = _get_int('GEMINI_TEXT_RPM', 900)  # actual: 1000
     TEXT_DAILY = _get_int('GEMINI_TEXT_DAILY', 9000)  # actual: 10000
-    IMAGE_RPM = _get_int('GEMINI_IMAGE_RPM', 18)  # actual: 20 RPM per key, safe margin at 18
-    IMAGE_DAILY = _get_int('GEMINI_IMAGE_DAILY', 240)  # actual: 250
+    IMAGE_RPM = _get_int('GEMINI_IMAGE_RPM', 900)  # actual: 1000 RPM per key (gemini-3.1-flash)
+    IMAGE_DAILY = _get_int('GEMINI_IMAGE_DAILY', 900)  # actual: 1000 RPD per key
 
 
 class GeminiConfig:
@@ -90,7 +90,7 @@ class GeminiConfig:
 
     # Models
     TEXT_MODEL = os.getenv('GEMINI_TEXT_MODEL', 'gemini-2.0-flash')
-    IMAGE_MODEL = os.getenv('GEMINI_IMAGE_MODEL', 'gemini-2.0-flash-exp-image-generation')
+    IMAGE_MODEL = os.getenv('GEMINI_IMAGE_MODEL', 'gemini-3.1-flash-image-preview')
     GROUNDING_MODEL = os.getenv('GEMINI_GROUNDING_MODEL', 'gemini-2.0-flash')
 
     # Timeouts
