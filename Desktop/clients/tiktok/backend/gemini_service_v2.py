@@ -53,25 +53,26 @@ GROUNDING_MODEL = TEXT_MODEL
 MAX_RETRIES = 5       # Retries for direct generation mode
 REQUEST_TIMEOUT = 120 # 120 sec timeout per API call
 
-# Safety settings - use BLOCK_ONLY_HIGH to allow benign lifestyle content
-# This prevents false positives on scenes like "candlelit dinner", "slip dress", etc.
-# while still blocking truly harmful content
+# Safety settings - use BLOCK_NONE to prevent false positives on benign lifestyle content
+# gemini-3.1-flash-image-preview is stricter than gemini-3-pro-image-preview,
+# blocking scenes like "face tape patches", "skincare routine", etc.
+# Our content is benign (lifestyle/skincare photos) so we disable safety filtering.
 SAFETY_SETTINGS = [
     SafetySetting(
         category=HarmCategory.HARM_CATEGORY_HARASSMENT,
-        threshold=HarmBlockThreshold.BLOCK_ONLY_HIGH,
+        threshold=HarmBlockThreshold.BLOCK_NONE,
     ),
     SafetySetting(
         category=HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-        threshold=HarmBlockThreshold.BLOCK_ONLY_HIGH,
+        threshold=HarmBlockThreshold.BLOCK_NONE,
     ),
     SafetySetting(
         category=HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-        threshold=HarmBlockThreshold.BLOCK_ONLY_HIGH,
+        threshold=HarmBlockThreshold.BLOCK_NONE,
     ),
     SafetySetting(
         category=HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-        threshold=HarmBlockThreshold.BLOCK_ONLY_HIGH,
+        threshold=HarmBlockThreshold.BLOCK_NONE,
     ),
 ]
 
