@@ -36,9 +36,9 @@ class QueueConfig:
     # Batch processing
     # 3 keys × 900 RPM = 2700 requests/minute capacity (gemini-3.1-flash)
     BATCH_SIZE = _get_int('QUEUE_BATCH_SIZE', 50)
-    BATCH_INTERVAL = _get_int('QUEUE_BATCH_INTERVAL', 60)  # seconds
+    BATCH_INTERVAL = _get_int('QUEUE_BATCH_INTERVAL', 10)  # seconds (was 60s for 18 RPM)
     BATCH_TIMEOUT = _get_int('QUEUE_BATCH_TIMEOUT', 120)  # seconds per image
-    STAGGER_DELAY = _get_float('QUEUE_STAGGER_DELAY', 0.5)  # seconds between submissions
+    STAGGER_DELAY = _get_float('QUEUE_STAGGER_DELAY', 0.05)  # seconds between submissions (was 0.5s for 18 RPM)
     MAX_WORKERS = _get_int('QUEUE_MAX_WORKERS', 50)  # concurrent generation threads
 
     # Retry settings
