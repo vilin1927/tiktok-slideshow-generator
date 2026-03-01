@@ -148,26 +148,22 @@
                     </div>
                 </div>
 
-                <!-- Product Context -->
+                <!-- Product Selection -->
                 <div class="mb-6">
                     <label class="block text-gray-300 text-sm font-medium mb-2">
-                        Product Description
+                        Product
                     </label>
-                    <textarea
-                        x-model="formData.product_context"
-                        placeholder="Describe your product (e.g., 'Luxury skincare serum for anti-aging, reduces wrinkles in 2 weeks')"
-                        rows="3"
-                        class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 resize-none"
+                    <select
+                        x-model="formData.selected_product"
+                        @change="applyPreset(formData.selected_product)"
+                        class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
                         required
-                    ></textarea>
-                    <!-- Product Presets -->
-                    <div class="mt-2 flex gap-2">
-                        <button type="button"
-                                @click="applyPreset('face_tape')"
-                                class="text-xs px-3 py-1 bg-gray-600 hover:bg-gray-500 rounded text-gray-300 transition-colors">
-                            Face Tape
-                        </button>
-                    </div>
+                    >
+                        <option value="" disabled>Select a product...</option>
+                        <template x-for="opt in productPresetOptions" :key="opt.id">
+                            <option :value="opt.id" x-text="opt.name"></option>
+                        </template>
+                    </select>
                 </div>
 
                 <!-- Folder Name -->
@@ -439,25 +435,21 @@ https://vm.tiktok.com/abc..."
                         </div>
                     </div>
 
-                    <!-- Product Description (used for all links) -->
+                    <!-- Product Selection (used for all links) -->
                     <div class="mb-4">
                         <label class="block text-gray-300 text-sm font-medium mb-2">
-                            Product Description <span class="text-gray-500 font-normal">(used for all links)</span>
+                            Product <span class="text-gray-500 font-normal">(used for all links)</span>
                         </label>
-                        <textarea
-                            x-model="batchData.product_description"
-                            placeholder="Describe your product (e.g., 'Luxury skincare serum for anti-aging, reduces wrinkles in 2 weeks')"
-                            rows="3"
-                            class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
-                        ></textarea>
-                        <!-- Quick-fill button -->
-                        <button
-                            type="button"
-                            @click="batchData.product_description = presets.face_tape"
-                            class="mt-2 px-3 py-1 text-xs bg-gray-600 hover:bg-gray-500 text-gray-300 rounded transition-colors"
+                        <select
+                            x-model="batchData.selected_product"
+                            @change="batchData.product_description = presets[batchData.selected_product] || ''"
+                            class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
                         >
-                            Face Tape
-                        </button>
+                            <option value="" disabled>Select a product...</option>
+                            <template x-for="opt in productPresetOptions" :key="opt.id">
+                                <option :value="opt.id" x-text="opt.name"></option>
+                            </template>
+                        </select>
                     </div>
 
                     <!-- Variations Section (Photo × Text) - Same as single mode -->
@@ -1029,6 +1021,7 @@ https://vm.tiktok.com/abc..."
                     source_url: '',
                     folder_name: '',
                     product_context: '',
+                    selected_product: '',
                     hook_photo_var: 1,
                     hook_text_var: 1,
                     body_photo_var: 1,
@@ -1075,8 +1068,41 @@ OVERNIGHT FACE-LIFT EFFECT: Facial patches work while you sleep to firm loose sk
 
 GENTLE HOLD, STRONG RESULTS: Soft stretch fabric gently supports forehead and eye wrinkles. Comfortable to wear, easy to remove, effective for consistent overnight use.
 
-INSPIRED BY JAPANESE SKIN CARE: Delivers a lifted, contoured look without silicone or harsh ingredients. A minimalist skin tightening tape that enhances firmness and facial definition naturally.`
+INSPIRED BY JAPANESE SKIN CARE: Delivers a lifted, contoured look without silicone or harsh ingredients. A minimalist skin tightening tape that enhances firmness and facial definition naturally.`,
+
+                    gua_sha: `LumiDew 100% Ceramic Gua Sha Massage Tool - Ergonomic Multi-Angle Face & Body Massage
+
+LYMPHATIC SUPPORT: Promotes lymphatic drainage for a refreshed, less puffy look.
+
+TENSION RELIEF: Helps relieve facial and jaw tightness while easing overall muscle tension.
+
+SKIN REJUVENATION: Helps smooth the look of fine lines and improves circulation for a natural glow.
+
+ENHANCED ABSORPTION: Aids in the effective absorption of skincare products into the skin.
+
+6-POINT TARGETED MASSAGE ZONES: V-Shaped Zone for sculpting jawline and cheekbones. Large Arc Zone for face, waist, buttocks, legs, and abdomen. Acupressure Zone for temples, palms, soles of feet. C Zone for chin, neck, shoulders, and collarbone. Wave Zone for scalp, eyebrows, forehead, and limbs. Massage Point Zone for scalp, abdomen, and soles of feet.
+
+PROVEN RESULTS: 97% preferred this ceramic tool for ease of cleaning. 96% noticed improved circulation and a natural glow. 94% felt their skin looked healthier overall. 93% saw smoother-looking skin over time.`,
+
+                    steam_eye_mask: `LumiDew Self-Heating Steam Eye Mask (16-Pack) - Disposable Warm Compress for Dry Eye Relief & Sleep
+
+INSTANT SELF-HEATING TECHNOLOGY: No microwave, no boiling, no cords required. Each mask activates instantly upon opening, reaching a soothing 104-110F to provide a spa-like steam treatment anywhere.
+
+DEEP HYDRATION & DRY EYE RELIEF: Targets blocked Meibomian Glands. Consistent moist heat helps unclog glands and restore natural tear flow, offering lasting relief for chronic dry eyes and digital eye strain.
+
+REDUCE PUFFINESS & DARK CIRCLES: Gentle steam therapy promotes circulation around the delicate eye area, helping to soothe redness, reduce morning puffiness, and refresh tired eyes after long screen time.
+
+ULTIMATE RELAXATION & SLEEP AID: Weighted, contoured fit blocks out light while warmth melts away tension. Perfect for bedtime routine or a quick 15-minute reset during a stressful workday.
+
+ULTRA-SOFT & TRAVEL FRIENDLY: Breathable, skin-safe materials gentle on sensitive skin and eyelash extensions. Individually wrapped and lightweight - a must-have for long flights, hotel stays, or road trips.`
                 },
+
+                // Product preset options for dropdown
+                productPresetOptions: [
+                    { id: 'face_tape', name: 'Face Tape' },
+                    { id: 'gua_sha', name: 'Gua Sha' },
+                    { id: 'steam_eye_mask', name: 'Steam Eye Mask' }
+                ],
 
                 // Batch mode data
                 batchStep: 1,
@@ -1094,7 +1120,8 @@ INSPIRED BY JAPANESE SKIN CARE: Delivers a lifted, contoured look without silico
                     folder_name: '',
                     productFiles: [],
                     productPreviews: [],
-                    product_description: ''
+                    product_description: '',
+                    selected_product: ''
                 },
                 batchValidation: {
                     valid: 0,
@@ -1304,7 +1331,7 @@ INSPIRED BY JAPANESE SKIN CARE: Delivers a lifted, contoured look without silico
                     const formData = new FormData();
                     formData.append('source_url', this.formData.source_url);
                     formData.append('folder_name', this.formData.folder_name);
-                    formData.append('product_context', this.formData.product_context);
+                    formData.append('product_context', this.presets[this.formData.selected_product] || this.formData.product_context);
 
                     // Add all product images
                     this.productFiles.forEach(file => {
@@ -1429,8 +1456,8 @@ INSPIRED BY JAPANESE SKIN CARE: Delivers a lifted, contoured look without silico
                 },
 
                 canSubmitBatch() {
-                    // Check for product file and description (used for all links)
-                    return this.batchData.productFiles.length > 0 && this.batchData.product_description;
+                    // Check for product file and selected product (used for all links)
+                    return this.batchData.productFiles.length > 0 && this.batchData.selected_product;
                 },
 
                 async submitBatch() {
@@ -1463,7 +1490,7 @@ INSPIRED BY JAPANESE SKIN CARE: Delivers a lifted, contoured look without silico
                     this.batchData.productFiles.forEach((file, idx) => {
                         formData.append('product_photos', file);
                     });
-                    formData.append('product_description', this.batchData.product_description);
+                    formData.append('product_description', this.presets[this.batchData.selected_product] || this.batchData.product_description);
 
                     try {
                         const response = await fetch(`${API_BASE_URL}/api/batch`, {
