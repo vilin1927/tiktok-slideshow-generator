@@ -28,6 +28,9 @@ from video_generator import create_video, create_videos_for_variations, VideoGen
 
 from logging_config import get_logger
 
+# Fallback audio for when TikTok has no downloadable music
+FALLBACK_AUDIO = os.path.join(os.path.dirname(__file__), 'assets', 'fallback_audio.mp3')
+
 logger = get_logger('tasks')
 
 # Output directory for batch processing
@@ -154,7 +157,8 @@ def process_link(self, batch_link_id: str, parent_drive_folder_id: str):
             logger.info(f"[Link {batch_link_id[:8]}] Scraping: {link_url[:50]}...")
             scrape_result = scrape_tiktok_slideshow(link_url, scrape_dir, request_id=batch_link_id[:8])
             slide_paths = scrape_result['images']
-            logger.info(f"[Link {batch_link_id[:8]}] Scraped {len(slide_paths)} slides")
+            total_slides = len(slide_paths)
+            logger.info(f"[Link {batch_link_id[:8]}] Scraped {total_slides} slides")
 
             if len(slide_paths) < 3:
                 raise TikTokScraperError(f"Not enough slides: {len(slide_paths)} (need at least 3)")
@@ -220,7 +224,9 @@ def process_link(self, batch_link_id: str, parent_drive_folder_id: str):
                 )
 
             generated_images = pipeline_result.get('generated_images', [])
-            logger.info(f"[Link {batch_link_id[:8]}] Generated {len(generated_images)} images")
+            pipeline_is_complete = pipeline_result.get('is_complete', True)
+            queue_failed = pipeline_result.get('queue_failed', 0)
+            logger.info(f"[Link {batch_link_id[:8]}] Generated {len(generated_images)} images (complete={pipeline_is_complete}, failed={queue_failed})")
 
             # Step 4: Upload to Google Drive
             # Create subfolder for this link
@@ -252,9 +258,18 @@ def process_link(self, batch_link_id: str, parent_drive_folder_id: str):
             if generate_video and generated_images:
                 try:
                     audio_path = scrape_result.get('audio')
-                    if audio_path and os.path.exists(audio_path):
+                    if not audio_path or not os.path.exists(audio_path):
+                        # Use fallback audio when TikTok has no downloadable music
+                        if os.path.exists(FALLBACK_AUDIO):
+                            audio_path = FALLBACK_AUDIO
+                            logger.info(f"[Link {batch_link_id[:8]}] No TikTok audio found, using fallback audio")
+                        else:
+                            logger.warning(f"[Link {batch_link_id[:8]}] No audio found and fallback missing")
+                            audio_path = None
+
+                    if audio_path:
                         logger.info(f"[Link {batch_link_id[:8]}] Creating variation videos with {len(generated_images)} images")
-                        
+
                         # Use same video generation as single run - creates one video per variation set
                         video_paths = create_videos_for_variations(
                             generated_images=generated_images,
@@ -262,30 +277,40 @@ def process_link(self, batch_link_id: str, parent_drive_folder_id: str):
                             output_dir=output_dir,
                             request_id=batch_link_id[:8]
                         )
-                        
+
                         # Upload all videos to Drive
                         for video_path in video_paths:
                             if os.path.exists(video_path):
                                 upload_file(video_path, link_folder_id)
-                        
+
                         video_created = len(video_paths) > 0
                         logger.info(f"[Link {batch_link_id[:8]}] Created and uploaded {len(video_paths)} videos to Drive")
-                    else:
-                        logger.warning(f"[Link {batch_link_id[:8]}] No audio found for video generation")
                 except VideoGeneratorError as e:
                     logger.error(f"[Link {batch_link_id[:8]}] Video generation failed: {e}")
                 except Exception as e:
                     logger.error(f"[Link {batch_link_id[:8]}] Video error: {e}")
 
-            # Update link status to completed
-            update_batch_link_status(
-                batch_link_id,
-                'completed',
-                drive_folder_url=link_folder_url
-            )
+            # Determine final status — mark as partial if queue didn't complete fully
+            if not pipeline_is_complete and len(generated_images) < total_slides * 2:
+                link_status = 'partial'
+                error_msg = f"Queue timeout: only {len(generated_images)} images generated (expected ~{total_slides * 2}+), {queue_failed} tasks failed/pending"
+                logger.warning(f"[Link {batch_link_id[:8]}] Marking as PARTIAL: {error_msg}")
+                update_batch_link_status(
+                    batch_link_id,
+                    'partial',
+                    drive_folder_url=link_folder_url,
+                    error_message=error_msg
+                )
+            else:
+                link_status = 'completed'
+                update_batch_link_status(
+                    batch_link_id,
+                    'completed',
+                    drive_folder_url=link_folder_url
+                )
 
             return {
-                'status': 'completed',
+                'status': link_status,
                 'link_id': batch_link_id,
                 'images_generated': len(generated_images),
                 'images_uploaded': uploaded_count,

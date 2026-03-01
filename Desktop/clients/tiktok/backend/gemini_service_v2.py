@@ -4729,6 +4729,14 @@ def run_pipeline_queued(
 
     result = wait_for_job_completion(job_id, progress_callback=queue_progress)
 
+    # Log partial results warning
+    if not result.get('is_complete'):
+        log.warning(
+            f"Queue returned PARTIAL results: {result['completed']} completed, "
+            f"{result['failed']} failed/pending out of total tasks. "
+            f"Some images may be missing."
+        )
+
     # Build variations structure
     variations_structure = {}
     for img_path in result['images']:
@@ -4867,7 +4875,10 @@ def run_pipeline_queued(
         'analysis': analysis,
         'generated_images': generation_result['images'],
         'variations': generation_result['variations'],
-        'analysis_path': analysis_path
+        'analysis_path': analysis_path,
+        'is_complete': result.get('is_complete', True),
+        'queue_completed': result.get('completed', 0),
+        'queue_failed': result.get('failed', 0)
     }
 
 
