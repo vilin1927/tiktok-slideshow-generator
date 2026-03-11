@@ -15,6 +15,10 @@ from src.services import bot_brain, recall_service, transcript_manager, tts_serv
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/webhooks/recall", tags=["webhooks"])
 
+# Track last partial text per meeting to detect partial vs final events
+# and avoid storing every incremental partial as a separate DB segment.
+_last_partial_text: dict[str, str] = {}  # meeting_id -> last text
+
 
 def _extract_bot_id(body: dict) -> str | None:
     """Extract bot_id from Recall.ai webhook payload (supports multiple formats)."""
@@ -31,8 +35,10 @@ def _extract_bot_id(body: dict) -> str | None:
 async def handle_transcript_webhook(request: Request, db: AsyncSession = Depends(get_db)):
     """Handle real-time transcript data from Recall.ai.
 
-    Receives transcript via realtime_endpoints webhook, stores in DB,
-    broadcasts to dashboard, and triggers bot brain response if addressed.
+    Receives both transcript.data (final) and transcript.partial_data (interim).
+    Partial events are cumulative ("hey" → "hey bot" → "hey bot can you").
+    - Partials: broadcast to dashboard only (live display), check bot brain
+    - Finals: store in DB, broadcast, check bot brain
     """
     body = await request.json()
     bot_id = _extract_bot_id(body)
@@ -52,7 +58,6 @@ async def handle_transcript_webhook(request: Request, db: AsyncSession = Depends
     event_data = body.get("data", {})
     transcript_data = event_data.get("data", {})
     if not transcript_data:
-        # Legacy format fallback
         transcript_data = event_data.get("transcript", event_data)
 
     participant = transcript_data.get("participant", {})
@@ -62,54 +67,82 @@ async def handle_transcript_webhook(request: Request, db: AsyncSession = Depends
     if not words:
         return {"status": "no_words"}
 
-    # Combine words into text
     text = " ".join(w.get("text", "") for w in words if w.get("text"))
     if not text.strip():
         return {"status": "empty"}
 
+    text = text.strip()
+    meeting_id_str = str(meeting.id)
+
+    # Detect partial vs final: partial_data has no language_code field
+    is_final = "language_code" in transcript_data
+
+    # Also detect partial by checking if text is a prefix of or extends previous
+    prev_text = _last_partial_text.get(meeting_id_str, "")
+    is_partial_by_text = text.startswith(prev_text) and text != prev_text
+    _last_partial_text[meeting_id_str] = text
+
     # Timestamps
     start_time = None
     end_time = None
-    if words:
-        first_ts = words[0].get("start_timestamp", {})
-        last_ts = words[-1].get("end_timestamp", {})
-        start_time = first_ts.get("relative")
-        end_time = last_ts.get("relative")
+    first_ts = words[0].get("start_timestamp", {})
+    last_ts = words[-1].get("end_timestamp", {})
+    start_time = first_ts.get("relative")
+    end_time = last_ts.get("relative")
 
-    # Store transcript segment
-    segment = await transcript_manager.add_transcript_segment(
-        db=db,
-        meeting_id=meeting.id,
-        speaker_name=speaker_name,
-        text=text.strip(),
-        start_time=start_time,
-        end_time=end_time,
-    )
-    await db.commit()
-
-    # Broadcast to WebSocket clients (dashboard live transcript)
-    await broadcast_to_meeting(
-        str(meeting.id),
-        {
-            "type": "transcript",
-            "speaker": speaker_name,
-            "text": text.strip(),
-            "start_time": start_time,
-            "end_time": end_time,
-            "segment_id": str(segment.id),
-        },
-    )
-
-    logger.info("Transcript: [%s] %s", speaker_name, text.strip()[:80])
-
-    # Bot brain: check if bot should respond
-    meeting_id_str = str(meeting.id)
-    if bot_brain.should_respond(meeting_id_str, text.strip()):
-        asyncio.create_task(
-            _bot_respond(meeting.recall_bot_id, meeting_id_str, text.strip(), speaker_name)
+    if is_final:
+        # FINAL event: store in DB
+        segment = await transcript_manager.add_transcript_segment(
+            db=db,
+            meeting_id=meeting.id,
+            speaker_name=speaker_name,
+            text=text,
+            start_time=start_time,
+            end_time=end_time,
         )
+        await db.commit()
+
+        # Broadcast final to dashboard
+        await broadcast_to_meeting(
+            meeting_id_str,
+            {
+                "type": "transcript",
+                "speaker": speaker_name,
+                "text": text,
+                "start_time": start_time,
+                "end_time": end_time,
+                "segment_id": str(segment.id),
+                "is_final": True,
+            },
+        )
+        logger.info("Transcript FINAL: [%s] %s", speaker_name, text[:80])
+
+        # Check bot brain on final text
+        if bot_brain.should_respond(meeting_id_str, text):
+            asyncio.create_task(
+                _bot_respond(meeting.recall_bot_id, meeting_id_str, text, speaker_name)
+            )
+        else:
+            bot_brain.add_context(meeting_id_str, speaker_name, text)
     else:
-        bot_brain.add_context(meeting_id_str, speaker_name, text.strip())
+        # PARTIAL event: broadcast for live display, check bot brain
+        await broadcast_to_meeting(
+            meeting_id_str,
+            {
+                "type": "transcript_partial",
+                "speaker": speaker_name,
+                "text": text,
+                "start_time": start_time,
+                "end_time": end_time,
+            },
+        )
+        logger.info("Transcript partial: [%s] %s", speaker_name, text[:80])
+
+        # Still check bot brain on partials — respond as soon as address detected
+        if bot_brain.should_respond(meeting_id_str, text):
+            asyncio.create_task(
+                _bot_respond(meeting.recall_bot_id, meeting_id_str, text, speaker_name)
+            )
 
     return {"status": "ok"}
 
