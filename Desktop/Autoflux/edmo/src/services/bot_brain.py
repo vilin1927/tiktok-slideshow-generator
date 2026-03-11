@@ -20,25 +20,25 @@ RESPONSE_COOLDOWN = 5.0
 # How many seconds of recent text to concatenate for pattern matching
 RECENT_WINDOW_SECONDS = 5.0
 
-# Bot addressing patterns — expanded for better detection
-# NOTE: recallai_streaming low-latency mode misrecognizes "bot" as
-# "but", "bought", "bart", "bar", "bud", "about" — all variants included.
-_BOT_VARIANTS = r"(?:bot|but|bought|bart|bar|bud|about|butt|pot|what)"
-_HEY_VARIANTS = r"(?:hey|they|day|hay|say|a)"
+# Wake word: "EDMO" — distinctive name, unlikely ASR false positives.
+# Possible misrecognitions: "ed mo", "at mo", "edmo", "edmow", "ed more"
+_EDMO_VARIANTS = r"(?:edmo|ed\s*mo|at\s*mo|edmow|ed\s*more|emo)"
+_HEY_VARIANTS = r"(?:hey|hi|ok|yo)"
 BOT_ADDRESS_REGEXES = [
-    # Direct address: "hey bot", "hey but", "they bought", "hey bart" etc.
-    re.compile(rf"\b{_HEY_VARIANTS}\s+{_BOT_VARIANTS}\b"),
-    re.compile(rf"\bhi\s+{_BOT_VARIANTS}\b"),
-    re.compile(rf"\bok\s+{_BOT_VARIANTS}\b"),
-    re.compile(rf"\byo\s+{_BOT_VARIANTS}\b"),
-    re.compile(rf"\b{_BOT_VARIANTS}\s*[,?]\s"),
-    re.compile(rf"\b{_BOT_VARIANTS}\s+can\s+you\b"),
-    re.compile(rf"\b{_BOT_VARIANTS}\s+could\s+you\b"),
-    re.compile(rf"\b{_BOT_VARIANTS}\s+please\b"),
+    # Direct address: "hey edmo", "hi edmo", "ok edmo"
+    re.compile(rf"\b{_HEY_VARIANTS}\s+{_EDMO_VARIANTS}\b"),
+    # Just the name: "edmo, can you..."
+    re.compile(rf"\b{_EDMO_VARIANTS}\s*[,?]\s"),
+    re.compile(rf"\b{_EDMO_VARIANTS}\s+can\s+you\b"),
+    re.compile(rf"\b{_EDMO_VARIANTS}\s+could\s+you\b"),
+    re.compile(rf"\b{_EDMO_VARIANTS}\s+please\b"),
+    re.compile(rf"\b{_EDMO_VARIANTS}\s+what\b"),
+    re.compile(rf"\b{_EDMO_VARIANTS}\s+tell\b"),
 ]
 BOT_ADDRESS_PATTERNS = [
-    # Named address
-    "meeting assistant", "hey assistant", "hey edmo", "ok edmo",
+    # Name variants
+    "edmo", "ed mo", "hey edmo", "ok edmo", "hi edmo",
+    "meeting assistant", "hey assistant",
     # Questions directed at bot
     "can you summarize", "can you recap", "what was discussed",
     "what did we talk about", "any action items", "what are the action items",
@@ -53,9 +53,9 @@ BOT_ADDRESS_PATTERNS = [
 ]
 
 GREETING_TEXT = (
-    "Hi everyone, I'm the EDMO Meeting Assistant. "
+    "Hi everyone, I'm EDMO, your meeting assistant. "
     "This call is being recorded and transcribed. "
-    "Say hey bot if you need me."
+    "Say hey EDMO if you need me."
 )
 
 # Sentence boundary regex — splits on ./?/! followed by space or end
@@ -163,7 +163,7 @@ async def generate_response_stream(
     )
 
     model = _configure_client()
-    prompt = f"""You are the EDMO Meeting Assistant in a live call. SHORT spoken reply only (2-3 sentences). No markdown, no bullets, no asterisks — this will be spoken aloud.
+    prompt = f"""You are EDMO, an AI meeting assistant in a live call. Your name is EDMO. SHORT spoken reply only (2-3 sentences). No markdown, no bullets, no asterisks — this will be spoken aloud.
 
 Conversation:
 {history}

@@ -16,7 +16,7 @@ RECALL_HEADERS = {
 
 async def create_bot(
     meeting_url: str,
-    bot_name: str = "Meeting Assistant",
+    bot_name: str = "EDMO",
     meeting_id: str | None = None,
 ) -> dict:
     """Create a Recall.ai bot that joins a meeting.
