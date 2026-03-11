@@ -12,9 +12,13 @@ logger = logging.getLogger(__name__)
 # Per-meeting conversation context
 _meeting_contexts: dict[str, list[dict]] = defaultdict(list)
 _last_response_time: dict[str, float] = {}
+# Sliding window: last N seconds of text per meeting for cross-webhook matching
+_recent_segments: dict[str, list[tuple[float, str]]] = defaultdict(list)
 
 # Minimum seconds between bot responses
 RESPONSE_COOLDOWN = 5.0
+# How many seconds of recent text to concatenate for pattern matching
+RECENT_WINDOW_SECONDS = 5.0
 
 # Bot addressing patterns — expanded for better detection
 # NOTE: recallai_streaming low-latency mode misrecognizes "bot" as
@@ -61,25 +65,69 @@ _SENTENCE_END = re.compile(r'(?<=[.!?])\s+')
 _STREAM_DONE = object()
 
 
-def should_respond(meeting_id: str, transcript_text: str) -> bool:
-    """Check if the bot should respond to the current transcript segment."""
-    text_lower = transcript_text.lower().strip()
+def _get_recent_text(meeting_id: str, new_text: str) -> str:
+    """Concatenate text from last RECENT_WINDOW_SECONDS including new_text.
 
-    # Check cooldown
+    Recall.ai low-latency mode splits speech into individual word-level
+    webhooks: "hey" arrives as one request, "bot" arrives 300ms later as
+    another. This window merges them so patterns like "hey bot" can match.
+    """
+    now = time.time()
+    _recent_segments[meeting_id].append((now, new_text))
+    # Remove segments older than window
+    _recent_segments[meeting_id] = [
+        (t, txt) for t, txt in _recent_segments[meeting_id]
+        if now - t < RECENT_WINDOW_SECONDS
+    ]
+    return " ".join(txt for _, txt in _recent_segments[meeting_id])
+
+
+def _claim_response(meeting_id: str):
+    """Lock cooldown and clear sliding window IMMEDIATELY on match.
+
+    This prevents the same trigger from firing multiple parallel responses.
+    Must be called inside should_respond() BEFORE returning True.
+    """
+    _last_response_time[meeting_id] = time.time()
+    _recent_segments[meeting_id].clear()
+
+
+def should_respond(meeting_id: str, transcript_text: str) -> bool:
+    """Check if the bot should respond to the current transcript segment.
+
+    Uses a sliding window of recent text to handle cases where "hey" and
+    "bot" arrive as separate webhooks from Recall.ai low-latency mode.
+    """
+    # Check cooldown first
     last = _last_response_time.get(meeting_id, 0)
     if time.time() - last < RESPONSE_COOLDOWN:
         return False
 
+    # Build sliding window text (last 5 seconds including this segment)
+    window_text = _get_recent_text(meeting_id, transcript_text).lower()
+    # Also check just this segment alone
+    text_lower = transcript_text.lower().strip()
+
     # Regex patterns (handle "bot" misrecognitions: but, bought, bart, etc.)
     for regex in BOT_ADDRESS_REGEXES:
+        if regex.search(window_text):
+            logger.info("Address match (regex/window): %s in '%s'", regex.pattern, window_text[:80])
+            _claim_response(meeting_id)
+            return True
         if regex.search(text_lower):
             logger.info("Address match (regex): %s in '%s'", regex.pattern, text_lower[:60])
+            _claim_response(meeting_id)
             return True
 
     # Exact substring patterns
     for pattern in BOT_ADDRESS_PATTERNS:
+        if pattern in window_text:
+            logger.info("Address match (exact/window): '%s' in '%s'", pattern, window_text[:80])
+            _claim_response(meeting_id)
+            return True
         if pattern in text_lower:
             logger.info("Address match (exact): '%s' in '%s'", pattern, text_lower[:60])
+            _claim_response(meeting_id)
             return True
 
     return False

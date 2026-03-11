@@ -19,6 +19,9 @@ router = APIRouter(prefix="/api/webhooks/recall", tags=["webhooks"])
 # and avoid storing every incremental partial as a separate DB segment.
 _last_partial_text: dict[str, str] = {}  # meeting_id -> last text
 
+# Prevent concurrent bot responses for the same meeting
+_responding: set[str] = set()  # meeting_ids currently generating a response
+
 
 def _extract_bot_id(body: dict) -> str | None:
     """Extract bot_id from Recall.ai webhook payload (supports multiple formats)."""
@@ -74,14 +77,6 @@ async def handle_transcript_webhook(request: Request, db: AsyncSession = Depends
     text = text.strip()
     meeting_id_str = str(meeting.id)
 
-    # Detect partial vs final: partial_data has no language_code field
-    is_final = "language_code" in transcript_data
-
-    # Also detect partial by checking if text is a prefix of or extends previous
-    prev_text = _last_partial_text.get(meeting_id_str, "")
-    is_partial_by_text = text.startswith(prev_text) and text != prev_text
-    _last_partial_text[meeting_id_str] = text
-
     # Timestamps
     start_time = None
     end_time = None
@@ -90,8 +85,28 @@ async def handle_transcript_webhook(request: Request, db: AsyncSession = Depends
     start_time = first_ts.get("relative")
     end_time = last_ts.get("relative")
 
-    if is_final:
-        # FINAL event: store in DB
+    # Dedup: low-latency mode sends cumulative text ("i" → "i need" → "i need you")
+    # and duplicate finals. Only store if text is NOT a prefix of previous text
+    # for the same meeting (i.e., only store the longest/final version).
+    prev_text = _last_partial_text.get(meeting_id_str, "")
+    is_extension = text.startswith(prev_text) and len(text) > len(prev_text)
+    is_duplicate = text == prev_text
+    _last_partial_text[meeting_id_str] = text
+
+    # Broadcast everything to dashboard for live display
+    await broadcast_to_meeting(
+        meeting_id_str,
+        {
+            "type": "transcript",
+            "speaker": speaker_name,
+            "text": text,
+            "start_time": start_time,
+            "end_time": end_time,
+        },
+    )
+
+    if is_duplicate:
+        # Exact duplicate — this is the final version. Store in DB.
         segment = await transcript_manager.add_transcript_segment(
             db=db,
             meeting_id=meeting.id,
@@ -101,48 +116,31 @@ async def handle_transcript_webhook(request: Request, db: AsyncSession = Depends
             end_time=end_time,
         )
         await db.commit()
-
-        # Broadcast final to dashboard
-        await broadcast_to_meeting(
-            meeting_id_str,
-            {
-                "type": "transcript",
-                "speaker": speaker_name,
-                "text": text,
-                "start_time": start_time,
-                "end_time": end_time,
-                "segment_id": str(segment.id),
-                "is_final": True,
-            },
+        logger.info("Transcript stored: [%s] %s", speaker_name, text[:80])
+    elif not is_extension:
+        # New utterance (not extending previous) — store it
+        segment = await transcript_manager.add_transcript_segment(
+            db=db,
+            meeting_id=meeting.id,
+            speaker_name=speaker_name,
+            text=text,
+            start_time=start_time,
+            end_time=end_time,
         )
-        logger.info("Transcript FINAL: [%s] %s", speaker_name, text[:80])
-
-        # Check bot brain on final text
-        if bot_brain.should_respond(meeting_id_str, text):
-            asyncio.create_task(
-                _bot_respond(meeting.recall_bot_id, meeting_id_str, text, speaker_name)
-            )
-        else:
-            bot_brain.add_context(meeting_id_str, speaker_name, text)
+        await db.commit()
+        logger.info("Transcript new: [%s] %s", speaker_name, text[:80])
     else:
-        # PARTIAL event: broadcast for live display, check bot brain
-        await broadcast_to_meeting(
-            meeting_id_str,
-            {
-                "type": "transcript_partial",
-                "speaker": speaker_name,
-                "text": text,
-                "start_time": start_time,
-                "end_time": end_time,
-            },
-        )
-        logger.info("Transcript partial: [%s] %s", speaker_name, text[:80])
+        logger.info("Transcript building: [%s] %s", speaker_name, text[:80])
 
-        # Still check bot brain on partials — respond as soon as address detected
-        if bot_brain.should_respond(meeting_id_str, text):
-            asyncio.create_task(
-                _bot_respond(meeting.recall_bot_id, meeting_id_str, text, speaker_name)
-            )
+    # Check bot brain on EVERY webhook (sliding window handles cross-webhook patterns)
+    # _responding gate: only ONE response task per meeting at a time
+    if meeting_id_str not in _responding and bot_brain.should_respond(meeting_id_str, text):
+        _responding.add(meeting_id_str)
+        asyncio.create_task(
+            _bot_respond(meeting.recall_bot_id, meeting_id_str, text, speaker_name)
+        )
+    else:
+        bot_brain.add_context(meeting_id_str, speaker_name, text)
 
     return {"status": "ok"}
 
@@ -187,6 +185,8 @@ async def _bot_respond(bot_id: str, meeting_id: str, text: str, speaker: str):
             logger.info("Pushed %d sentences for meeting %s", sentence_count, meeting_id)
     except Exception as e:
         logger.error("Bot respond failed for %s: %s", meeting_id, e)
+    finally:
+        _responding.discard(meeting_id)
 
 
 @router.post("/events")
