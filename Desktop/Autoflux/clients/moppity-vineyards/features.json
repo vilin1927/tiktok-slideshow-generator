@@ -1,0 +1,617 @@
+{
+  "project": "moppity-vineyards",
+  "milestone": 1,
+  "milestone_name": "Data Foundation",
+  "deadline": "2026-03-09T21:00:00+11:00",
+  "definition_of_done": "Admin panel shows all sources green. Jason can verify row counts match source systems. All core tables populated with structured data (not just staging).",
+  "parallel_streams": {
+    "note": "After M1-01 (blocker), streams A/B/C run in parallel. After all complete, streams D/E run in parallel. M1-09 depends on everything.",
+    "stream_A": ["M1-02", "M1-03"],
+    "stream_B": ["M1-04"],
+    "stream_C": ["M1-05"],
+    "stream_D": ["M1-06", "M1-07"],
+    "stream_E": ["M1-08"]
+  },
+  "features": [
+    {
+      "id": "SEC-01",
+      "title": "Security Audit — Leaked Credentials & Frontend Exposure",
+      "status": "pending",
+      "priority": "critical-urgent",
+      "depends_on": [],
+      "spec": "Full security audit of the entire codebase. Check: (1) Frontend source code for any leaked API keys, secrets, or credentials (Vinsight API key, Xero client secret, Google API key, database passwords). (2) Next.js client-side bundles — ensure no secrets leak into browser-accessible JS. (3) API routes — verify no credentials hardcoded (should all come from env vars). (4) .env.example — verify it has no real values. (5) Git history — check for accidentally committed secrets. (6) VPS nginx config — ensure no exposed debug endpoints. (7) CORS and auth — verify API routes are not publicly writable. (8) SQL injection — verify all queries are parameterized. This is the #1 production readiness gate.",
+      "acceptance_criteria": [
+        {"criterion": "No API keys or secrets in any frontend/client-side code", "done": false},
+        {"criterion": "No credentials in git history (or rotated if found)", "done": false},
+        {"criterion": "All API routes use env vars for secrets, never hardcoded", "done": false},
+        {"criterion": ".env.example contains only placeholder values", "done": false},
+        {"criterion": "All SQL queries use parameterized inputs (no string interpolation)", "done": false},
+        {"criterion": "No debug/admin endpoints exposed without auth", "done": false},
+        {"criterion": "CORS configured to restrict origins appropriately", "done": false},
+        {"criterion": "nginx not exposing internal services or debug info", "done": false}
+      ],
+      "estimated_hours": 1.5,
+      "prd_reference": "Production Readiness",
+      "adr_reference": "N/A",
+      "files": ["dashboard/", "connectors/", "etl/", "scripts/"],
+      "last_updated": "2026-03-11",
+      "model": "opus"
+    },
+    {
+      "id": "M1-01",
+      "title": "VPS Environment Setup",
+      "status": "completed",
+      "priority": "critical",
+      "depends_on": [],
+      "spec": "Hostinger VPS (72.61.210.30). Install: PostgreSQL 16, Python 3.12 + venv, Node.js 20 LTS, PM2, nginx reverse proxy. Configure firewall. Create moppity_db and moppity user.",
+      "acceptance_criteria": [
+        {"criterion": "PostgreSQL running, moppity_db created, moppity user created", "done": true},
+        {"criterion": "Python 3.12+ with venv at /opt/moppity/venv", "done": true},
+        {"criterion": "Node.js 20 with PM2 installed globally", "done": true},
+        {"criterion": "nginx configured as reverse proxy to localhost:3000", "done": true},
+        {"criterion": "UFW: only 22, 80, 443 open", "done": true},
+        {"criterion": "verify-env.sh passes all checks", "done": true}
+      ],
+      "estimated_hours": 1,
+      "prd_reference": "M1-R01",
+      "adr_reference": "ADR-001, ADR-004",
+      "files": ["scripts/verify-env.sh"],
+      "model": "sonnet"
+    },
+    {
+      "id": "M1-02",
+      "title": "PostgreSQL Schema — Core Tables",
+      "status": "completed",
+      "priority": "critical",
+      "depends_on": ["M1-01"],
+      "spec": "Design and create Postgres schema following ADR-005 (staging + core pattern) and ADR-006 (COGS versioning). Tables: entity, wine_range, channel, sku, sku_code_map, customer, customer_code_map, representative, territory, sales_transaction, sku_cogs (with lock_date), month_end_snapshot, etl_run_log. Include vintage as first-class field on sku. Schema must anticipate Phase 2 extensions (bulk_wine, dry_goods tables).",
+      "acceptance_criteria": [
+        {"criterion": "entity table with xero_org_id for 3 entities", "done": true},
+        {"criterion": "sku table with vintage as explicit field", "done": true},
+        {"criterion": "sku_code_map for DWS/ALM code reconciliation", "done": true},
+        {"criterion": "customer_code_map for ALM/DWS customer name mapping", "done": true},
+        {"criterion": "sku_cogs with nominated_grape_price, lock_date, financial_year (ADR-006)", "done": true},
+        {"criterion": "month_end_snapshot with period_closed flag and INSERT trigger (ADR-008)", "done": true},
+        {"criterion": "sales_transaction linking customer, rep, territory, channel with rebates + wholesale_fees fields", "done": true},
+        {"criterion": "etl_run_log for sync tracking", "done": true},
+        {"criterion": "staging_* tables for raw API data (ADR-005)", "done": true},
+        {"criterion": "Foreign keys and indexes defined", "done": true},
+        {"criterion": "Schema versioned in schema/001_initial.sql", "done": true}
+      ],
+      "estimated_hours": 2,
+      "prd_reference": "M1-R02, M1-R11, M1-R12",
+      "adr_reference": "ADR-001, ADR-005, ADR-006, ADR-008",
+      "files": ["schema/001_initial.sql"],
+      "model": "opus"
+    },
+    {
+      "id": "M1-03",
+      "title": "Access DB Migration to Postgres",
+      "status": "completed",
+      "priority": "critical",
+      "depends_on": ["M1-02"],
+      "spec": "Export all core tables from Access DB via mdbtools. Import into Postgres core tables. Core tables: CombinedData (5yr sales history with prices, discounts, rebates, wholesale fees), Customers, Representative, SKU, ItemDescription, tbl_Master_COGS, tbl_StocksONHand, ALMData, DirectData, xtblChannel, tblNewTerritory, tblCustomerGroups, tblGroupRebate. Note: Y&R is legacy name for DWS in Access. Verify row counts match Access.",
+      "acceptance_criteria": [
+        {"criterion": "All core tables exported to CSV via mdbtools", "done": true},
+        {"criterion": "CSVs imported into Postgres with correct data types", "done": true},
+        {"criterion": "Row counts match source Access DB for each table", "done": true},
+        {"criterion": "CombinedData queryable — SELECT count(*) matches Access", "done": true},
+        {"criterion": "tbl_Master_COGS imported — needed for economic COGS", "done": true},
+        {"criterion": "Customers + Representative + tblNewTerritory imported", "done": true},
+        {"criterion": "xtblChannel + tblCustomerGroups + tblGroupRebate imported", "done": true},
+        {"criterion": "Legacy/unused tables skipped (tblDistribution*, tblTop10*, etc.)", "done": true}
+      ],
+      "estimated_hours": 2,
+      "prd_reference": "M1-R03",
+      "adr_reference": "ADR-005",
+      "files": ["etl/migrate_access_db.py", "schema/002_access_import.sql"],
+      "model": "sonnet"
+    },
+    {
+      "id": "M1-04",
+      "title": "Vinsight API Connector",
+      "status": "completed",
+      "priority": "critical",
+      "depends_on": ["M1-01"],
+      "spec": "Python connector for Vinsight REST API. Auth: api-key query param. Endpoints: StockItems (inventory/SOH), SalesOrders (wine sales), Contacts (customers), Products, PackagingRuns. Must use shared rate limiter (ADR-007). Store raw responses in staging tables, then transform to core tables. Jason currently syncs fortnightly — build for daily but default to fortnightly schedule.",
+      "acceptance_criteria": [
+        {"criterion": "Connector pulls StockItems successfully", "done": true},
+        {"criterion": "Connector pulls SalesOrders successfully", "done": true},
+        {"criterion": "Rate limiting via shared rate_limiter.py (ADR-007)", "done": true},
+        {"criterion": "Retry logic on 429/500 errors (3 retries, exponential backoff)", "done": true},
+        {"criterion": "Raw data stored in staging_vinsight_* tables", "done": true},
+        {"criterion": "Parsed data inserted into core tables (sku, customer, sales_transaction)", "done": true},
+        {"criterion": "Last sync timestamp recorded in etl_run_log", "done": true},
+        {"criterion": "Row counts logged per endpoint", "done": true}
+      ],
+      "estimated_hours": 1.5,
+      "prd_reference": "M1-R04",
+      "adr_reference": "ADR-002, ADR-005, ADR-007",
+      "files": ["connectors/vinsight.py", "connectors/rate_limiter.py", "connectors/test_vinsight.py", "etl/transform_vinsight.py"],
+      "model": "sonnet"
+    },
+    {
+      "id": "M1-05",
+      "title": "Xero API Connector",
+      "status": "completed",
+      "priority": "critical",
+      "depends_on": ["M1-01"],
+      "spec": "Python connector for Xero OAuth 2.0 API. Two tenants: Moppity Trust (29614f53...) for grape costs and Wines Pty Ltd (d49e7503...) for wine sales. Endpoints: Invoices, Contacts, Accounts (chart of accounts). Build on existing xero_auth.py in connectors/. Must auto-refresh tokens before expiry. Use shared rate limiter (ADR-007). Granular scopes only (accounting.invoices.read, accounting.settings.read, accounting.contacts.read).",
+      "acceptance_criteria": [
+        {"criterion": "Auto-refresh tokens before expiry using xero_tokens.json", "done": true},
+        {"criterion": "Pull invoices from Trust tenant", "done": true},
+        {"criterion": "Pull invoices from Wines Pty Ltd tenant", "done": true},
+        {"criterion": "Pull chart of accounts from both tenants", "done": true},
+        {"criterion": "Pull contacts from both tenants", "done": true},
+        {"criterion": "Rate limiting via shared rate_limiter.py (ADR-007)", "done": true},
+        {"criterion": "Data stored in staging_xero_* tables", "done": true},
+        {"criterion": "Parsed data transformed into core tables", "done": true},
+        {"criterion": "Last sync timestamp per tenant recorded in etl_run_log", "done": true}
+      ],
+      "estimated_hours": 1.5,
+      "prd_reference": "M1-R05",
+      "adr_reference": "ADR-002, ADR-005, ADR-007",
+      "files": ["connectors/xero.py", "connectors/test_xero.py", "etl/transform_xero.py"],
+      "model": "sonnet"
+    },
+    {
+      "id": "M1-06",
+      "title": "Google Sheets Connector",
+      "status": "completed",
+      "priority": "medium",
+      "depends_on": ["M1-01"],
+      "spec": "Python connector using gspread + service account. Read-only access to 4 sheets: Scheduling, Cashflow, Crop 2026, Inventory. Pull Scheduling 'Plan' tab into Postgres staging table (this contains SKU mapping data, SOH, velocity, COGS breakdown). Jason has shared sheets with service account.",
+      "acceptance_criteria": [
+        {"criterion": "Service account authenticates (switched to API key auth)", "done": true},
+        {"criterion": "Scheduling 'Plan' tab pulled into staging_sheets_scheduling", "done": true},
+        {"criterion": "Cashflow data pulled into staging_sheets_cashflow", "done": true},
+        {"criterion": "Row counts logged in etl_run_log", "done": true},
+        {"criterion": "Connection status reported for admin panel", "done": true}
+      ],
+      "estimated_hours": 1,
+      "prd_reference": "M1-R06",
+      "adr_reference": "ADR-002",
+      "files": ["connectors/google_sheets.py"],
+      "model": "sonnet"
+    },
+    {
+      "id": "M1-07",
+      "title": "DWS SKU + Customer Code Mapping",
+      "status": "completed",
+      "priority": "medium",
+      "depends_on": ["M1-02", "M1-06"],
+      "spec": "Populate sku_code_map and customer_code_map tables from Scheduling spreadsheet code match columns (MV Code ↔ DWS Code) and Access DB customer data. Enable automated reconciliation. ALM/DWS/Direct all use different SKU codes AND different customer names.",
+      "acceptance_criteria": [
+        {"criterion": "sku_code_map populated with all known MV↔DWS mappings", "done": true},
+        {"criterion": "customer_code_map populated with known ALM/DWS/Direct customer name variants", "done": true},
+        {"criterion": "Lookup function: given DWS code, return MV code and vice versa", "done": true},
+        {"criterion": "Unknown codes flagged for manual review (not silently dropped)", "done": true}
+      ],
+      "estimated_hours": 1,
+      "prd_reference": "M1-R07",
+      "adr_reference": "ADR-005",
+      "files": ["etl/build_code_mappings.py"],
+      "model": "sonnet"
+    },
+    {
+      "id": "M1-08",
+      "title": "Monthly Upload Workflow (ALM/DWS/Direct)",
+      "status": "completed",
+      "status_note": "All 3 parsers tested on VPS with real sample files. DWS: 453 rows, ALM: 413 rows, Direct: 280 rows imported.",
+      "priority": "medium",
+      "depends_on": ["M1-02", "M1-07"],
+      "spec": "Python scripts to process monthly report uploads replacing the Access DB manual process. DWS: Excel sell-through report. ALM: Excel sell-through report. Direct: CSV from Vinsight. Each script: parse file, validate, match SKU codes via sku_code_map, match customer names via customer_code_map, detect duplicates, flag unrecognized entities, insert into Postgres. Note: Y&R is legacy name for DWS channel in Access.",
+      "acceptance_criteria": [
+        {"criterion": "DWS report parser works with June 2025 sample file", "done": true},
+        {"criterion": "ALM report parser works with July 2025 sample files", "done": true},
+        {"criterion": "Direct CSV parser works with Jul 25 sample", "done": true},
+        {"criterion": "Duplicate detection prevents double-imports", "done": true},
+        {"criterion": "Unrecognized SKU codes flagged (not dropped)", "done": true},
+        {"criterion": "Unrecognized customer names flagged (not dropped)", "done": true},
+        {"criterion": "Error rows logged with detail, not silently dropped", "done": true},
+        {"criterion": "Successful rows inserted into sales_transaction table", "done": true}
+      ],
+      "estimated_hours": 2,
+      "prd_reference": "M1-R08",
+      "adr_reference": "ADR-005",
+      "files": ["etl/import_dws.py", "etl/import_alm.py", "etl/import_direct.py"],
+      "model": "sonnet"
+    },
+    {
+      "id": "M1-09",
+      "title": "ETL Shared Infrastructure",
+      "status": "completed",
+      "priority": "critical",
+      "depends_on": ["M1-01"],
+      "spec": "Shared rate limiter (ADR-007: token bucket, 60/min, daily counter at 4500 cap) and centralized ETL logger. etl_run_log table in Postgres tracks every sync: timestamp, source, rows processed, rows skipped, errors. Failed records stored in dead letter table, not lost.",
+      "acceptance_criteria": [
+        {"criterion": "rate_limiter.py implements token bucket (60 tokens, refill 1/sec)", "done": true},
+        {"criterion": "Daily call counter persisted to Postgres, stops at 4500", "done": true},
+        {"criterion": "Centralized logger writes to etl_run_log table", "done": true},
+        {"criterion": "All connectors import and use the shared rate limiter", "done": true},
+        {"criterion": "Failed records stored in etl_dead_letter table", "done": true}
+      ],
+      "estimated_hours": 1,
+      "prd_reference": "M1-R10",
+      "adr_reference": "ADR-007",
+      "files": ["connectors/rate_limiter.py", "etl/logger.py", "schema/003_etl_logging.sql"],
+      "model": "sonnet"
+    },
+    {
+      "id": "M1-10",
+      "title": "Admin Panel — Dashboard",
+      "status": "completed",
+      "priority": "critical",
+      "depends_on": ["M1-02", "M1-03", "M1-04", "M1-05", "M1-06", "M1-09"],
+      "spec": "Next.js 14 web dashboard (ADR-003). Shows: connection status per source (green/yellow/red), last sync time per source, row counts per table, error alerts, last 10 ETL runs from etl_run_log. Must be live on VPS URL via nginx reverse proxy. This is the M1 demo deliverable — Jason sees it and verifies data.",
+      "acceptance_criteria": [
+        {"criterion": "Dashboard accessible via http://72.61.210.30", "done": true},
+        {"criterion": "Vinsight: connection status + last sync + row count", "done": true},
+        {"criterion": "Xero: connection status per tenant + last sync", "done": true},
+        {"criterion": "Postgres/Access: table list + row counts per table", "done": true},
+        {"criterion": "Google Sheets: connection status", "done": true},
+        {"criterion": "Last 10 ETL runs visible with status/errors", "done": true},
+        {"criterion": "Error log visible", "done": true},
+        {"criterion": "Looks professional — not a dev debug page", "done": true},
+        {"criterion": "No localhost references in production build", "done": true}
+      ],
+      "estimated_hours": 2,
+      "prd_reference": "M1-R09",
+      "adr_reference": "ADR-003, ADR-004",
+      "files": ["dashboard/"],
+      "model": "sonnet"
+    },
+    {
+      "id": "M1-11",
+      "title": "Business Insights API Route",
+      "status": "completed",
+      "priority": "critical",
+      "depends_on": ["M1-02", "M1-03"],
+      "spec": "New API route /api/insights with 6 cross-source SQL queries that demonstrate the value of unified data. Queries: (1) Revenue by Channel 5yr, (2) Top 10 Customers by Revenue, (3) Monthly Sales Trend last 12mo, (4) Top Wines by Revenue, (5) Territory Performance, (6) SKU Code Mapping Coverage. Use parameterized queries, COALESCE for NULLs, LEFT JOINs for sparse tables. Currency formatted as AUD.",
+      "acceptance_criteria": [
+        {"criterion": "API route /api/insights returns data for query=revenue_by_channel", "done": true},
+        {"criterion": "API route returns data for query=top_customers", "done": true},
+        {"criterion": "API route returns data for query=monthly_trend", "done": true},
+        {"criterion": "API route returns data for query=top_wines_revenue", "done": true},
+        {"criterion": "API route returns data for query=territory_performance", "done": true},
+        {"criterion": "API route returns data for query=code_mapping_coverage", "done": true},
+        {"criterion": "All queries use parameterized SQL (no string interpolation)", "done": true},
+        {"criterion": "Queries handle NULLs with COALESCE and sparse tables with LEFT JOIN", "done": true}
+      ],
+      "estimated_hours": 0.5,
+      "prd_reference": "M1-R09",
+      "adr_reference": "ADR-001",
+      "files": ["dashboard/src/app/api/insights/route.ts"],
+      "model": "sonnet"
+    },
+    {
+      "id": "M1-12",
+      "title": "Data Architecture Visual Component",
+      "status": "completed",
+      "priority": "critical",
+      "depends_on": ["M1-10"],
+      "spec": "New React component showing 'Before vs After' data architecture. Left: 4 source system boxes (Vinsight, Xero, Access DB, Google Sheets) with icons, descriptions, and real record counts. Center: Arrow/pipeline showing ETL flow. Right: Unified Postgres database with key stats. Summary bar: '4 systems → 1 database → 160,000+ records unified'. Fetch real numbers from /api/tables. Placed at top of page before status cards.",
+      "acceptance_criteria": [
+        {"criterion": "4 source boxes display with icons and descriptions", "done": true},
+        {"criterion": "Real record counts fetched from /api/tables for each source", "done": true},
+        {"criterion": "ETL flow arrows/pipeline visually connecting sources to Postgres", "done": true},
+        {"criterion": "Summary bar shows total unified record count", "done": true},
+        {"criterion": "Responsive layout (works on desktop and tablet)", "done": true},
+        {"criterion": "Pure React + Tailwind CSS (no charting library)", "done": true}
+      ],
+      "estimated_hours": 0.5,
+      "prd_reference": "M1-R09",
+      "adr_reference": "ADR-003",
+      "files": ["dashboard/src/components/DataArchitecture.tsx"],
+      "model": "sonnet"
+    },
+    {
+      "id": "M1-13",
+      "title": "Business Insights Dashboard Component",
+      "status": "completed",
+      "priority": "critical",
+      "depends_on": ["M1-11"],
+      "spec": "New React component replacing current Data Explorer with 6 business insight queries. Each query has a button, title, and one-line explanation of why it matters. Results displayed as clean tables with formatted AUD currency. Queries: Revenue by Channel, Top Customers, Monthly Trend, Top Wines by Revenue, Territory Performance, Code Mapping Coverage. Demonstrates cross-source queries that were impossible with disconnected systems.",
+      "acceptance_criteria": [
+        {"criterion": "6 query buttons displayed with titles and descriptions", "done": true},
+        {"criterion": "Clicking a query fetches from /api/insights and displays results table", "done": true},
+        {"criterion": "Revenue values formatted as AUD currency", "done": true},
+        {"criterion": "Each query shows 'why it matters' explanation", "done": true},
+        {"criterion": "Loading state while query executes", "done": true},
+        {"criterion": "Error handling for failed queries", "done": true}
+      ],
+      "estimated_hours": 0.5,
+      "prd_reference": "M1-R09",
+      "adr_reference": "ADR-003",
+      "files": ["dashboard/src/components/BusinessInsights.tsx"],
+      "model": "sonnet"
+    },
+    {
+      "id": "M1-14",
+      "title": "Database Schema Overview Component",
+      "status": "completed",
+      "priority": "medium",
+      "depends_on": ["M1-10"],
+      "spec": "New React component showing the structured database schema in 3 grouped cards: Core Tables (13), System Tables (2), Staging Tables (8). Each table shows name, one-line purpose description, and row count. Highlights key relationships (e.g. sku_code_map links DWS codes to MV codes). Shows M2 preview: 'sku_cogs table ready for economic vs accounting margin analysis'. Data from existing /api/tables endpoint.",
+      "acceptance_criteria": [
+        {"criterion": "3 grouped cards: Core (13), System (2), Staging (8)", "done": true},
+        {"criterion": "Each table shows name, purpose description, and row count", "done": true},
+        {"criterion": "Row counts fetched from /api/tables endpoint", "done": true},
+        {"criterion": "Key relationships highlighted (sku_code_map, customer_code_map)", "done": true},
+        {"criterion": "M2 preview callout for sku_cogs table", "done": true}
+      ],
+      "estimated_hours": 0.33,
+      "prd_reference": "M1-R09",
+      "adr_reference": "ADR-003",
+      "files": ["dashboard/src/components/SchemaOverview.tsx"],
+      "model": "sonnet"
+    },
+    {
+      "id": "M1-15",
+      "title": "Dashboard Demo Integration & Deploy",
+      "status": "completed",
+      "priority": "critical",
+      "depends_on": ["M1-12", "M1-13", "M1-14"],
+      "spec": "Wire all 3 new components into page.tsx in correct order: Data Architecture Visual (top) → Status Cards → Business Insights → Schema Overview → ETL Log. Keep existing queries working. Test locally, then deploy to VPS via deploy.sh. Verify all sections render with real data on 72.61.210.30.",
+      "acceptance_criteria": [
+        {"criterion": "Page layout matches spec: Architecture → Status → Insights → Schema → ETL Log", "done": true},
+        {"criterion": "All 3 new components render correctly on page", "done": true},
+        {"criterion": "Existing status cards and ETL log still work", "done": true},
+        {"criterion": "Local test passes — all sections load with data", "done": true},
+        {"criterion": "Deployed to VPS via deploy.sh", "done": true},
+        {"criterion": "Live on http://72.61.210.30 with all sections working", "done": true},
+        {"criterion": "No localhost references in production build", "done": true}
+      ],
+      "estimated_hours": 0.33,
+      "prd_reference": "M1-R09",
+      "adr_reference": "ADR-003, ADR-004",
+      "files": ["dashboard/src/app/page.tsx"],
+      "model": "sonnet"
+    },
+    {
+      "id": "FIX-01",
+      "title": "Database Tables — Group by Source Instead of Alphabetical",
+      "status": "completed",
+      "priority": "critical-urgent",
+      "depends_on": [],
+      "spec": "Jason flagged (Mar 11 call): Database Tables section shows access_* tables first alphabetically, making it look like only Access DB is connected. Fix: reorder the table list to show Core tables first (sales_transaction, customer, sku, etc.), then System tables, then Staging tables — matching the Schema Overview grouping. Alternatively, add source labels or tabs (Core / Staging / System) to the table list.",
+      "acceptance_criteria": [
+        {"criterion": "Core tables (sales_transaction, customer, sku, etc.) appear first in the list", "done": true},
+        {"criterion": "Tables are visually grouped by type (Core / System / Staging) or sorted so core tables are prominent", "done": true},
+        {"criterion": "Jason can immediately see data from all 4 sources, not just Access DB", "done": true}
+      ],
+      "estimated_hours": 0.5,
+      "prd_reference": "M1-R09",
+      "files": ["dashboard/src/app/page.tsx", "dashboard/src/components/TableCounts.tsx"],
+      "last_updated": "2026-03-11",
+      "model": "sonnet"
+    },
+    {
+      "id": "FIX-02",
+      "title": "Data Explorer — Fix [object Object] Display for JSONB Columns",
+      "status": "completed",
+      "priority": "critical-urgent",
+      "depends_on": [],
+      "spec": "Jason flagged (Mar 11 call): All Access staging tables (access_channel, access_combined_data, etc.) show '[object Object]' in every cell instead of actual data. Root cause: these tables store data as JSONB in a raw_data column. The TableBrowser/DataExplorer component renders the JSONB object as a string, which produces '[object Object]'. Fix: detect JSONB columns and either (a) flatten key fields into readable columns, or (b) render as formatted JSON, or (c) show a summary of key fields.",
+      "acceptance_criteria": [
+        {"criterion": "Access staging tables no longer show [object Object] in the Data Explorer", "done": true},
+        {"criterion": "JSONB raw_data is displayed as readable key-value pairs or flattened columns", "done": true},
+        {"criterion": "Non-JSONB tables (core tables) continue to display normally", "done": true}
+      ],
+      "estimated_hours": 0.5,
+      "prd_reference": "M1-R09",
+      "files": ["dashboard/src/components/TableBrowser.tsx", "dashboard/src/app/api/browse/route.ts"],
+      "last_updated": "2026-03-11",
+      "model": "sonnet"
+    },
+    {
+      "id": "FIX-03",
+      "title": "Customer Table — Show Cross-Reference Codes from All Systems",
+      "status": "completed",
+      "priority": "critical-urgent",
+      "depends_on": [],
+      "spec": "Jason flagged (Mar 11 call): When viewing the customer table in Data Explorer, it only shows partial data (customer_id, customer_name). Jason expects to see each customer's alias codes from all systems — DWS code, ALM code, Vinsight code, ILG code — in one view. In the Access DB, these were columns on the customer table (ALMCustomerCode, DIRCustomerCode, YNRCustomerCode). In our schema, these codes are in customer_code_map (a separate table). Fix: either (a) create a joined view/API endpoint that shows customer + all their code mappings in one table, or (b) add a detail panel that shows linked codes when clicking a customer row.",
+      "acceptance_criteria": [
+        {"criterion": "Customer view shows cross-reference codes from DWS, ALM, Direct, Vinsight, Xero alongside customer name", "done": true},
+        {"criterion": "Jason can see which customer maps to which code in each system from a single view", "done": true},
+        {"criterion": "Customers with no mappings still display (with empty/dash in code columns)", "done": true}
+      ],
+      "estimated_hours": 1,
+      "prd_reference": "M1-R07",
+      "files": ["dashboard/src/app/api/browse/route.ts", "dashboard/src/components/TableBrowser.tsx"],
+      "last_updated": "2026-03-11",
+      "model": "sonnet"
+    },
+    {
+      "id": "FIX-04",
+      "title": "Business Insights — Fix Missing SKU Description in Top Wines",
+      "status": "completed",
+      "priority": "critical-urgent",
+      "depends_on": [],
+      "spec": "Jason flagged (Mar 11 call): In Business Insights → Top Wines by Revenue, the #1 SKU entry has no description. This is likely a NULL sku_name or the query is referencing the wrong column. Fix: check the top_wines_revenue SQL query in /api/insights, verify it joins correctly to sku table and reads the correct description/name field. Handle NULLs with COALESCE to show 'Unknown SKU' instead of blank.",
+      "acceptance_criteria": [
+        {"criterion": "All SKUs in Top Wines query show a description/name (no blanks)", "done": true},
+        {"criterion": "NULL descriptions show 'Unknown SKU' via COALESCE", "done": true},
+        {"criterion": "Query verified against actual sku table column names", "done": true}
+      ],
+      "estimated_hours": 0.25,
+      "prd_reference": "M1-R09",
+      "files": ["dashboard/src/app/api/insights/route.ts"],
+      "last_updated": "2026-03-11",
+      "model": "sonnet"
+    },
+    {
+      "id": "FIX-05",
+      "title": "Business Insights — Fix Missing Variety Field",
+      "status": "completed",
+      "priority": "critical-urgent",
+      "depends_on": [],
+      "spec": "Jason flagged (Mar 11 call): Wine variety doesn't show in Business Insights results. Likely the query references a column name that doesn't exist or is named differently in our schema. Fix: check which column stores variety in sku table (could be variety, grape_variety, wine_type, or embedded in sku_name). Update the insights queries to include the correct variety field.",
+      "acceptance_criteria": [
+        {"criterion": "Wine variety is visible in relevant Business Insights queries (Top Wines, Revenue by Channel)", "done": true},
+        {"criterion": "Variety field correctly mapped to the actual column in sku table", "done": true},
+        {"criterion": "NULLs handled gracefully (show 'Unknown' not blank)", "done": true}
+      ],
+      "estimated_hours": 0.25,
+      "prd_reference": "M1-R09",
+      "files": ["dashboard/src/app/api/insights/route.ts"],
+      "last_updated": "2026-03-11",
+      "model": "sonnet"
+    },
+    {
+      "id": "FIX-05B",
+      "title": "Database Tables — Show Source System for Each Table",
+      "status": "completed",
+      "priority": "high",
+      "depends_on": ["FIX-01"],
+      "spec": "Add a 'Source' column to the Database Tables list showing which system(s) each table's data comes from (e.g., 'Access DB + Vinsight + Xero' for customer, 'Seed data' for channel, 'Access DB — CombinedData' for staging tables).",
+      "acceptance_criteria": [
+        {"criterion": "Every table in the Database Tables list shows its source system(s)", "done": true},
+        {"criterion": "Core tables show multi-source attribution (e.g., Access DB + Vinsight)", "done": true},
+        {"criterion": "Staging tables show original Access DB table name", "done": true}
+      ],
+      "estimated_hours": 0.25,
+      "prd_reference": "M1-R09",
+      "files": ["dashboard/src/components/TableCounts.tsx"],
+      "last_updated": "2026-03-11",
+      "model": "sonnet"
+    },
+    {
+      "id": "FIX-06",
+      "title": "Schema Change — SKU Must Be Vintage-Specific with Non-Vintage Grouping",
+      "status": "completed",
+      "priority": "high",
+      "depends_on": [],
+      "spec": "Jason clarified (Mar 11 call): 'An SKU really IS the vintage.' Currently our sku table treats SKUs as non-vintage. But Vinsight and DWS both use vintage-specific SKUs (e.g., 'Lock & Key Shiraz 2021'). Jason wants a hierarchy: multiple vintage SKUs belong to one non-vintage SKU group. Example: 'Twelve Signs Pinot Grigio 2021', '2022', '2023' all belong to parent group 'Twelve Signs Pinot Grigio'. Fix: add sku_group table (or parent_sku_id self-reference on sku table) so vintage SKUs can be grouped under a non-vintage alias. This affects reporting — revenue rollups by SKU group vs individual vintage.",
+      "acceptance_criteria": [
+        {"criterion": "SKU table stores vintage-specific records (e.g., 'Lock & Key Shiraz 2021')", "done": true},
+        {"criterion": "SKU grouping mechanism exists (parent_sku_id or sku_group table) for non-vintage rollups", "done": true},
+        {"criterion": "Existing SKU data re-mapped to vintage-specific entries where vintage is known", "done": true},
+        {"criterion": "Queries can report by individual vintage SKU or by SKU group", "done": true}
+      ],
+      "estimated_hours": 2,
+      "prd_reference": "M1-R02, M2",
+      "adr_reference": "ADR-005",
+      "files": ["schema/005_sku_vintage.sql", "etl/transform_to_core.py"],
+      "last_updated": "2026-03-11",
+      "model": "opus"
+    },
+    {
+      "id": "FIX-07",
+      "title": "Schema Change — Representative ↔ Territory Many-to-Many Relationship",
+      "status": "completed",
+      "priority": "high",
+      "depends_on": [],
+      "spec": "Jason clarified (Mar 11 call): Sales reps can cross into multiple territories. Territory is geographic — based on postcode/suburb groups. Customer belongs to a territory by their postcode. A rep may sell to customers in multiple territories. Current schema implies 1:1 (rep has territory_id FK). Fix: create rep_territory junction table for many-to-many. Territory assignment is on the customer (by postcode), not on the rep. Rep just happens to service customers in various territories.",
+      "acceptance_criteria": [
+        {"criterion": "rep_territory junction table created (rep_id, territory_id)", "done": true},
+        {"criterion": "Territory linked to customer by postcode/suburb, not to rep directly", "done": true},
+        {"criterion": "Existing rep-territory data migrated to junction table", "done": true},
+        {"criterion": "Queries updated to use many-to-many join for territory reporting", "done": true}
+      ],
+      "estimated_hours": 1,
+      "prd_reference": "M1-R02",
+      "adr_reference": "ADR-005",
+      "files": ["schema/006_rep_territory.sql"],
+      "last_updated": "2026-03-11",
+      "model": "sonnet"
+    },
+    {
+      "id": "FIX-08",
+      "title": "Xero Sync — Fix 504 Gateway Timeout (nginx proxy_read_timeout)",
+      "status": "completed",
+      "priority": "critical-urgent",
+      "depends_on": [],
+      "spec": "Xero 'Sync Now' button returns 504 Gateway Timeout. Root cause: nginx default proxy_read_timeout is 60s, but Xero sync takes ~90-120s (token refresh + 18K invoices across 2 tenants). Fix: increase nginx proxy_read_timeout to 180s on VPS. Also increase proxy_connect_timeout and proxy_send_timeout.",
+      "acceptance_criteria": [
+        {"criterion": "nginx proxy_read_timeout set to 180s on VPS", "done": true},
+        {"criterion": "Xero Sync Now button completes successfully (no 504)", "done": true},
+        {"criterion": "Both Xero cards (Trust + Wines Pty Ltd) show 'Connected' after sync", "done": false, "note": "Xero daily rate limit hit (429 with 28368s Retry-After). Fixed connector to cap at 120s and abort. Will verify after daily cron runs tonight."}
+      ],
+      "estimated_hours": 0.25,
+      "prd_reference": "M1-R05",
+      "files": [],
+      "last_updated": "2026-03-11",
+      "model": "sonnet"
+    },
+    {
+      "id": "FIX-09",
+      "title": "Daily Cron Sync — Auto-Sync All Sources Once Per Day",
+      "status": "completed",
+      "priority": "high",
+      "depends_on": ["FIX-08"],
+      "spec": "All 4 source connections show 'Stale' because there is no automated sync. Fix: deploy scripts/sync-all.sh to VPS and set up cron job to run daily at 6:00 AM AEST (20:00 UTC). Script runs Vinsight, Xero, and Google Sheets connectors sequentially. Logs to /var/log/moppity-sync.log. Access DB is a one-time migration, no recurring sync needed.",
+      "acceptance_criteria": [
+        {"criterion": "sync-all.sh deployed to /opt/moppity/scripts/ on VPS", "done": true},
+        {"criterion": "Cron job running daily at 6:00 AM AEST", "done": true},
+        {"criterion": "All source cards show 'Connected' (green) after cron runs", "done": false, "note": "Vinsight + Sheets confirmed green. Xero pending — hit daily rate limit, will verify after cron tonight."},
+        {"criterion": "Sync logs written to /var/log/moppity-sync.log", "done": true}
+      ],
+      "estimated_hours": 0.25,
+      "prd_reference": "M1-R04, M1-R05, M1-R06",
+      "files": ["scripts/sync-all.sh"],
+      "last_updated": "2026-03-11",
+      "model": "sonnet"
+    },
+    {
+      "id": "FIX-10",
+      "title": "Dashboard Tables — Show All Sources Not Just Access (Stale Status Fix)",
+      "status": "in_progress",
+      "priority": "high",
+      "depends_on": ["FIX-09"],
+      "spec": "Consequence of no daily cron: all source connection cards show yellow 'Stale' badges. Once FIX-08 (nginx timeout) and FIX-09 (cron) are deployed, verify that all 4 cards (Vinsight, Xero Trust, Xero Wines Pty Ltd, Google Sheets) show green 'Connected' status with 'Last sync: today'. This is a verification task after FIX-08 and FIX-09 are complete.",
+      "acceptance_criteria": [
+        {"criterion": "Vinsight card shows 'Connected' (green) with today's date", "done": true},
+        {"criterion": "Xero Trust card shows 'Connected' (green) with today's date", "done": false, "note": "Xero daily rate limit hit. Will verify after cron tonight at 20:00 UTC."},
+        {"criterion": "Xero Wines Pty Ltd card shows 'Connected' (green) with today's date", "done": false, "note": "Xero daily rate limit hit. Will verify after cron tonight at 20:00 UTC."},
+        {"criterion": "Google Sheets card shows 'Connected' (green) with today's date", "done": true}
+      ],
+      "estimated_hours": 0.25,
+      "prd_reference": "M1-R09",
+      "files": [],
+      "last_updated": "2026-03-11",
+      "model": "sonnet"
+    },
+    {
+      "id": "FIX-11",
+      "title": "Dashboard — Show staging_vinsight_* and staging_xero_* Tables",
+      "status": "completed",
+      "priority": "high",
+      "depends_on": [],
+      "spec": "Dashboard Database Tables section shows Core Tables (13), System Tables (2), and Staging Tables (8) — but Staging Tables only displays access_* tables. The staging_vinsight_* (stock_items: 3123, sales_orders: 10191, contacts: 4629) and staging_xero_* (invoices: 18795, contacts: 3183) tables exist in database (confirmed via psql) but are missing from the dashboard UI. Fix: update SchemaOverview.tsx or page.tsx to include staging_vinsight_* and staging_xero_* tables in the Staging Tables section.",
+      "acceptance_criteria": [
+        {"criterion": "staging_vinsight_stock_items visible in Dashboard Staging Tables section", "done": true},
+        {"criterion": "staging_vinsight_sales_orders visible in Dashboard Staging Tables section", "done": true},
+        {"criterion": "staging_vinsight_contacts visible in Dashboard Staging Tables section", "done": true},
+        {"criterion": "staging_xero_invoices visible in Dashboard Staging Tables section", "done": true},
+        {"criterion": "staging_xero_contacts visible in Dashboard Staging Tables section", "done": true},
+        {"criterion": "Row counts displayed correctly for all staging tables", "done": true}
+      ],
+      "estimated_hours": 0.5,
+      "prd_reference": "M1-R09",
+      "files": ["dashboard/src/app/api/tables/route.ts"],
+      "last_updated": "2026-03-12",
+      "model": "sonnet"
+    },
+    {
+      "id": "M1-16",
+      "title": "Bottling Run Tracking (from prev-dev ER diagram)",
+      "status": "pending",
+      "priority": "low",
+      "depends_on": ["M1-02"],
+      "spec": "Create bottling_run table to track bottling events per SKU. Links to sku table via FK. Supports future integration with sku_cogs lock_date to freeze COGS at bottling time. Admin panel should allow bottling data entry. Based on previous developer's ER diagram.",
+      "acceptance_criteria": [
+        {"criterion": "bottling_run table created (bottling_id, sku_id, bottling_date, cases_to_bottle)", "done": false},
+        {"criterion": "FK to sku table", "done": false},
+        {"criterion": "Bottling data entry in admin panel", "done": false},
+        {"criterion": "Integration with sku_cogs lock_date", "done": false}
+      ],
+      "estimated_hours": 2,
+      "prd_reference": "Future",
+      "adr_reference": "ADR-006",
+      "files": ["schema/004_bottling_run.sql", "dashboard/src/components/BottlingRunEntry.tsx"],
+      "last_updated": "2026-03-10",
+      "model": "sonnet"
+    }
+  ]
+}
