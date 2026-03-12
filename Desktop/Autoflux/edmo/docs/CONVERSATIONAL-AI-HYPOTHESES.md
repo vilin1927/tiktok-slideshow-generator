@@ -14,7 +14,7 @@ Make EDMO bot feel like a natural human conversation participant:
 | Component | Status | Latency |
 |-----------|--------|---------|
 | Transcript webhook delivery | Working | ~300ms |
-| Pause detection | 1.5s timer | 1500ms |
+| Pause detection | 0.5s timer (Hypothesis 1) | 500ms |
 | Filler phrase | Pre-cached | ~50ms |
 | Gemini response | Streaming | 800-1500ms |
 | Deepgram TTS | Per-sentence | 200-400ms |

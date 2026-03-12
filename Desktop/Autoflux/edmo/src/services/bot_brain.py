@@ -31,7 +31,8 @@ RECENT_WINDOW_SECONDS = 5.0
 ALWAYS_RESPOND = True
 # Pause detection: wait for X seconds of silence before responding
 # This replaces speech_off events (which Recall.ai doesn't support)
-PAUSE_DETECTION_SECONDS = 1.5
+# Hypothesis 1: 500ms is enough to detect end-of-sentence in natural speech
+PAUSE_DETECTION_SECONDS = 0.5
 
 # Wake word: "EDMO" — distinctive name, unlikely ASR false positives.
 # Possible misrecognitions: "ed mo", "at mo", "edmo", "edmow", "ed more"
@@ -134,6 +135,9 @@ def _check_and_prepare_response(meeting_id: str, speaker: str) -> tuple[bool, st
     """Check if we should respond after pause detected.
 
     Returns (should_respond, full_text, speaker).
+
+    Hypothesis 1 mitigation: With 500ms pause, we also check for sentence-ending
+    punctuation to avoid triggering on natural mid-sentence pauses ("I want to... um").
     """
     # Check cooldown
     last = _last_response_time.get(meeting_id, 0)
