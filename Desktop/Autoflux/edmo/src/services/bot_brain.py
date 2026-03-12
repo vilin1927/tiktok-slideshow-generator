@@ -14,11 +14,24 @@ _meeting_contexts: dict[str, list[dict]] = defaultdict(list)
 _last_response_time: dict[str, float] = {}
 # Sliding window: last N seconds of text per meeting for cross-webhook matching
 _recent_segments: dict[str, list[tuple[float, str]]] = defaultdict(list)
+# Buffer for current utterance (filled during speech, processed after pause)
+_utterance_buffer: dict[str, list[tuple[str, str]]] = defaultdict(list)  # meeting_id -> [(speaker, text)]
+# Track who is currently speaking
+_current_speaker: dict[str, str] = {}  # meeting_id -> speaker_name
+# Track last transcript time for pause detection
+_last_transcript_time: dict[str, float] = {}  # meeting_id -> timestamp
+# Pending response tasks (for cancellation on new speech)
+_pending_response_tasks: dict[str, asyncio.Task] = {}  # meeting_id -> scheduled task
 
 # Minimum seconds between bot responses
-RESPONSE_COOLDOWN = 5.0
+RESPONSE_COOLDOWN = 3.0
 # How many seconds of recent text to concatenate for pattern matching
 RECENT_WINDOW_SECONDS = 5.0
+# Always respond mode: bot participates in ALL conversation, not just when addressed
+ALWAYS_RESPOND = True
+# Pause detection: wait for X seconds of silence before responding
+# This replaces speech_off events (which Recall.ai doesn't support)
+PAUSE_DETECTION_SECONDS = 1.5
 
 # Wake word: "EDMO" — distinctive name, unlikely ASR false positives.
 # Possible misrecognitions: "ed mo", "at mo", "edmo", "edmow", "ed more"
@@ -55,7 +68,7 @@ BOT_ADDRESS_PATTERNS = [
 GREETING_TEXT = (
     "Hi everyone, I'm EDMO, your meeting assistant. "
     "This call is being recorded and transcribed. "
-    "Say hey EDMO if you need me."
+    "I'm here to help throughout the conversation."
 )
 
 # Sentence boundary regex — splits on ./?/! followed by space or end
@@ -63,6 +76,102 @@ _SENTENCE_END = re.compile(r'(?<=[.!?])\s+')
 
 # Sentinel to signal streaming is done
 _STREAM_DONE = object()
+
+
+import asyncio as _asyncio
+
+
+def buffer_transcript_with_pause_detection(
+    meeting_id: str,
+    speaker: str,
+    text: str,
+    on_pause_callback
+) -> None:
+    """Buffer transcript and schedule response after pause.
+
+    Pause detection flow:
+    1. Transcript arrives → buffer it, cancel any pending response
+    2. Schedule new response for PAUSE_DETECTION_SECONDS later
+    3. If more transcript arrives → cancel and reschedule
+    4. If pause timer fires → user finished speaking → trigger response
+    """
+    now = time.time()
+    _last_transcript_time[meeting_id] = now
+    _current_speaker[meeting_id] = speaker
+
+    # Buffer the transcript
+    _utterance_buffer[meeting_id].append((speaker, text))
+
+    # Also add to context
+    add_context(meeting_id, speaker, text)
+
+    # Cancel any pending response task
+    if meeting_id in _pending_response_tasks:
+        _pending_response_tasks[meeting_id].cancel()
+        logger.debug("Cancelled pending response for %s (new speech)", meeting_id)
+
+    # Schedule new response after pause
+    async def delayed_response():
+        try:
+            await _asyncio.sleep(PAUSE_DETECTION_SECONDS)
+            # Check if this is still the latest transcript (no new speech arrived)
+            if _last_transcript_time.get(meeting_id) == now:
+                result = _check_and_prepare_response(meeting_id, speaker)
+                if result[0]:  # should_respond
+                    await on_pause_callback(result[1], result[2])  # text, speaker
+        except _asyncio.CancelledError:
+            pass  # New speech arrived, this response was cancelled
+        finally:
+            _pending_response_tasks.pop(meeting_id, None)
+
+    # Create and store the task
+    loop = _asyncio.get_event_loop()
+    task = loop.create_task(delayed_response())
+    _pending_response_tasks[meeting_id] = task
+
+
+def _check_and_prepare_response(meeting_id: str, speaker: str) -> tuple[bool, str, str]:
+    """Check if we should respond after pause detected.
+
+    Returns (should_respond, full_text, speaker).
+    """
+    # Check cooldown
+    last = _last_response_time.get(meeting_id, 0)
+    if time.time() - last < RESPONSE_COOLDOWN:
+        logger.debug("Pause detected but cooldown active for %s", meeting_id)
+        _utterance_buffer[meeting_id].clear()
+        return False, "", ""
+
+    # Get buffered utterance
+    buffer = _utterance_buffer.get(meeting_id, [])
+    if not buffer:
+        return False, "", ""
+
+    # Combine all text from this utterance
+    full_text = " ".join(text for _, text in buffer)
+    last_speaker = buffer[-1][0] if buffer else speaker
+
+    # Clear buffer
+    _utterance_buffer[meeting_id].clear()
+    _current_speaker.pop(meeting_id, None)
+
+    # Check if we should respond
+    if len(full_text.strip()) < 10:
+        logger.debug("Utterance too short to respond: '%s'", full_text)
+        return False, "", ""
+
+    # Claim response (set cooldown)
+    _last_response_time[meeting_id] = time.time()
+    logger.info("Pause detected (%.1fs), responding to: '%s'", PAUSE_DETECTION_SECONDS, full_text[:80])
+
+    return True, full_text, last_speaker
+
+
+def cancel_pending_response(meeting_id: str):
+    """Cancel any pending response for a meeting."""
+    if meeting_id in _pending_response_tasks:
+        _pending_response_tasks[meeting_id].cancel()
+        _pending_response_tasks.pop(meeting_id, None)
 
 
 def _get_recent_text(meeting_id: str, new_text: str) -> str:
@@ -95,14 +204,25 @@ def _claim_response(meeting_id: str):
 def should_respond(meeting_id: str, transcript_text: str) -> bool:
     """Check if the bot should respond to the current transcript segment.
 
-    Uses a sliding window of recent text to handle cases where "hey" and
-    "bot" arrive as separate webhooks from Recall.ai low-latency mode.
+    If ALWAYS_RESPOND=True, bot responds to ALL conversation (after cooldown).
+    Otherwise, uses wake word detection ("hey edmo", etc.).
     """
     # Check cooldown first
     last = _last_response_time.get(meeting_id, 0)
     if time.time() - last < RESPONSE_COOLDOWN:
         return False
 
+    # ALWAYS_RESPOND mode: respond to any speech (no wake word needed)
+    if ALWAYS_RESPOND:
+        # Need at least some meaningful text (not just "um" or "uh")
+        text_stripped = transcript_text.strip()
+        if len(text_stripped) > 10:  # At least 10 chars of speech
+            logger.info("Always-respond mode: triggering on '%s'", text_stripped[:60])
+            _claim_response(meeting_id)
+            return True
+        return False
+
+    # Wake word mode: check for "hey edmo" patterns
     # Build sliding window text (last 5 seconds including this segment)
     window_text = _get_recent_text(meeting_id, transcript_text).lower()
     # Also check just this segment alone

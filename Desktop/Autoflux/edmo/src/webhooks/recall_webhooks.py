@@ -7,10 +7,12 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.config import settings
 from src.database import get_db
 from src.models import Meeting, Speaker
 from src.routes.websocket import broadcast_to_meeting
 from src.services import bot_brain, recall_service, transcript_manager, tts_service
+from src.services import hume_evi_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/webhooks/recall", tags=["webhooks"])
@@ -132,15 +134,29 @@ async def handle_transcript_webhook(request: Request, db: AsyncSession = Depends
     else:
         logger.info("Transcript building: [%s] %s", speaker_name, text[:80])
 
-    # Check bot brain on EVERY webhook (sliding window handles cross-webhook patterns)
-    # _responding gate: only ONE response task per meeting at a time
-    if meeting_id_str not in _responding and bot_brain.should_respond(meeting_id_str, text):
-        _responding.add(meeting_id_str)
-        asyncio.create_task(
-            _bot_respond(meeting.recall_bot_id, meeting_id_str, text, speaker_name)
+    # Pause detection mode: buffer transcript, respond after 1.5s of silence
+    if bot_brain.ALWAYS_RESPOND:
+        async def on_pause_detected(full_text: str, speaker: str):
+            """Called when pause is detected (user finished speaking)."""
+            if meeting_id_str not in _responding:
+                _responding.add(meeting_id_str)
+                await _bot_respond(meeting.recall_bot_id, meeting_id_str, full_text, speaker)
+
+        bot_brain.buffer_transcript_with_pause_detection(
+            meeting_id_str,
+            speaker_name,
+            text,
+            on_pause_detected
         )
     else:
-        bot_brain.add_context(meeting_id_str, speaker_name, text)
+        # Wake word mode: check bot brain on EVERY webhook
+        if meeting_id_str not in _responding and bot_brain.should_respond(meeting_id_str, text):
+            _responding.add(meeting_id_str)
+            asyncio.create_task(
+                _bot_respond(meeting.recall_bot_id, meeting_id_str, text, speaker_name)
+            )
+        else:
+            bot_brain.add_context(meeting_id_str, speaker_name, text)
 
     return {"status": "ok"}
 
@@ -148,45 +164,122 @@ async def handle_transcript_webhook(request: Request, db: AsyncSession = Depends
 async def _bot_respond(bot_id: str, meeting_id: str, text: str, speaker: str):
     """Generate AI response and push audio to bot via Output Audio API.
 
+    Two pipelines:
+    A) EVI (settings.use_evi=True): Send text → EVI returns audio directly
+    B) Legacy (settings.use_evi=False): Filler → Gemini stream → TTS → push
+    """
+    try:
+        if settings.use_evi:
+            await _bot_respond_evi(bot_id, meeting_id, text, speaker)
+        else:
+            await _bot_respond_legacy(bot_id, meeting_id, text, speaker)
+    except Exception as e:
+        logger.error("Bot respond failed for %s: %s", meeting_id, e)
+    finally:
+        _responding.discard(meeting_id)
+
+
+async def _bot_respond_evi(bot_id: str, meeting_id: str, text: str, speaker: str):
+    """EVI pipeline: Send text, get audio, push to meeting.
+
+    Timeline: text → EVI (~300-500ms) → audio chunks → Recall.ai
+    No filler needed — EVI is fast enough.
+    """
+    try:
+        # Send to EVI and collect audio response
+        audio_chunks = await hume_evi_service.send_and_get_response(
+            meeting_id=meeting_id,
+            text=text,
+            speaker=speaker,
+        )
+
+        if not audio_chunks:
+            logger.warning("EVI returned no audio for %s", meeting_id)
+            return
+
+        # EVI returns WAV audio at 48kHz — need to convert to MP3 for Recall.ai
+        # For now, concatenate and convert
+        import io
+        import subprocess
+
+        # Concatenate all WAV chunks
+        all_audio = b"".join(audio_chunks)
+
+        # Convert WAV to MP3 using ffmpeg
+        try:
+            process = await asyncio.create_subprocess_exec(
+                "ffmpeg", "-y",
+                "-f", "wav", "-i", "pipe:0",
+                "-acodec", "libmp3lame", "-ab", "128k",
+                "-f", "mp3", "pipe:1",
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            mp3_bytes, _ = await process.communicate(all_audio)
+
+            if not mp3_bytes:
+                logger.error("ffmpeg conversion failed for %s", meeting_id)
+                return
+
+            ok = await recall_service.push_audio_to_bot(bot_id, mp3_bytes)
+            if not ok:
+                logger.warning("Bot %s left call, audio not pushed", bot_id)
+                return
+
+            logger.info("EVI audio pushed for %s (%d bytes)", meeting_id, len(mp3_bytes))
+
+        except FileNotFoundError:
+            logger.error("ffmpeg not found — cannot convert EVI audio")
+            # Fallback: try pushing raw WAV (may not work with Recall.ai)
+            ok = await recall_service.push_audio_to_bot(bot_id, all_audio)
+            if ok:
+                logger.info("Pushed raw WAV for %s", meeting_id)
+
+    except Exception as e:
+        logger.error("EVI response failed for %s: %s", meeting_id, e)
+        # Fallback to legacy pipeline
+        logger.info("Falling back to legacy pipeline for %s", meeting_id)
+        await _bot_respond_legacy(bot_id, meeting_id, text, speaker)
+
+
+async def _bot_respond_legacy(bot_id: str, meeting_id: str, text: str, speaker: str):
+    """Legacy pipeline: Filler → Gemini stream → TTS → push.
+
     Streaming pipeline:
     1. Push filler phrase INSTANTLY (pre-cached MP3, ~0ms)
     2. Gemini streams response → sentences yielded in real-time
     3. Each sentence → TTS → push to bot (stop if bot left call)
     """
+    # Step 1: Filler phrase — instant while AI thinks
     try:
-        # Step 1: Filler phrase — instant while AI thinks
-        try:
-            filler_category = tts_service.classify_filler(text)
-            filler_audio, filler_text = await tts_service.get_filler_audio(filler_category)
-            ok = await recall_service.push_audio_to_bot(bot_id, filler_audio)
-            if not ok:
-                logger.warning("Bot %s left call, aborting response", bot_id)
-                return
-            logger.info("Filler pushed for %s: '%s'", meeting_id, filler_text)
-        except Exception as e:
-            logger.warning("Filler failed (continuing): %s", e)
-
-        # Step 2-3: Stream Gemini → TTS → push (stop if bot leaves)
-        sentence_count = 0
-        async for sentence in bot_brain.generate_response_stream(meeting_id, text, speaker):
-            try:
-                audio_bytes = await tts_service.text_to_speech(sentence)
-                ok = await recall_service.push_audio_to_bot(bot_id, audio_bytes)
-                if not ok:
-                    logger.warning("Bot %s left call mid-response, stopping", bot_id)
-                    break
-                sentence_count += 1
-            except Exception as e:
-                logger.error("TTS/push failed for sentence in %s: %s", meeting_id, e)
-
-        if sentence_count == 0:
-            logger.warning("No sentences generated for %s", meeting_id)
-        else:
-            logger.info("Pushed %d sentences for meeting %s", sentence_count, meeting_id)
+        filler_category = tts_service.classify_filler(text)
+        filler_audio, filler_text = await tts_service.get_filler_audio(filler_category)
+        ok = await recall_service.push_audio_to_bot(bot_id, filler_audio)
+        if not ok:
+            logger.warning("Bot %s left call, aborting response", bot_id)
+            return
+        logger.info("Filler pushed for %s: '%s'", meeting_id, filler_text)
     except Exception as e:
-        logger.error("Bot respond failed for %s: %s", meeting_id, e)
-    finally:
-        _responding.discard(meeting_id)
+        logger.warning("Filler failed (continuing): %s", e)
+
+    # Step 2-3: Stream Gemini → TTS → push (stop if bot leaves)
+    sentence_count = 0
+    async for sentence in bot_brain.generate_response_stream(meeting_id, text, speaker):
+        try:
+            audio_bytes = await tts_service.text_to_speech(sentence)
+            ok = await recall_service.push_audio_to_bot(bot_id, audio_bytes)
+            if not ok:
+                logger.warning("Bot %s left call mid-response, stopping", bot_id)
+                break
+            sentence_count += 1
+        except Exception as e:
+            logger.error("TTS/push failed for sentence in %s: %s", meeting_id, e)
+
+    if sentence_count == 0:
+        logger.warning("No sentences generated for %s", meeting_id)
+    else:
+        logger.info("Pushed %d sentences for meeting %s", sentence_count, meeting_id)
 
 
 @router.post("/events")
@@ -270,6 +363,13 @@ async def handle_status_webhook(request: Request, db: AsyncSession = Depends(get
                 (meeting.ended_at - meeting.started_at).total_seconds()
             )
     elif status_code == "bot.done":
+        # Close EVI session if active
+        if settings.use_evi:
+            try:
+                await hume_evi_service.close_session(str(meeting.id))
+            except Exception as e:
+                logger.warning("Failed to close EVI session: %s", e)
+
         # Trigger AI processing
         await db.commit()
         await transcript_manager.process_meeting_ai(db, meeting.id)
