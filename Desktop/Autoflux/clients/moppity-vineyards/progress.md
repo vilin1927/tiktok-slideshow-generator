@@ -1,10 +1,20 @@
 # Progress — Moppity Vineyards
 
 ## Current Status
-**Date:** 2026-03-11
-**Phase:** Milestone 1 COMPLETE — Moving to Milestone 2
+**Date:** 2026-03-12
+**Phase:** Milestone 1 COMPLETE — Starting Milestone 2
 **M1 Payment:** $800 released by Jason (Mar 11, 11:22 AM)
-**Next:** Milestone 2 — Frontend implementation, margin analysis, economic COGS
+**Next:** Milestone 2 — What-if grape pricing calculator, economic COGS, margin analysis
+
+## M2 Readiness — Nothing Pending from Jason
+We have everything needed to start M2:
+- ✅ **Vinsight COGS data:** WineBatches (420), Vessels (180), PackagingOperations (497) — all accessible via API
+- ✅ **4-tier pricing structure:** Region+Vintage → Region+Color+Vintage → Region+Color+Grade+Vintage → Region+Color+Grade+Variety+Vintage (from Mar 9 call)
+- ✅ **3 fixed grades:** Reserved/Ascalia, Single Block/Crest, Single Vineyard/Lock&Key
+- ✅ **Vinsight flow confirmed:** grapes → wine batch → vessel → packaging operation → stock item (Jason, Mar 12)
+- ✅ **Validation:** We pick any SKU, build calculation, show Jason — he validates. No prep needed from him.
+
+**Internal action needed:** Create PRD for 4-tier grape pricing structure before implementation (task M2-PLAN in features.json)
 
 ## What's Done
 - [x] VPS purchased (Hostinger KVM 2, IP: 72.61.210.30)
@@ -53,9 +63,11 @@
 VPS staging table schemas don't match schema/001_initial.sql (tables were ALTER'd during deploy) — known, non-blocking.
 
 ## Known Blockers
-- Google Sheets: Jason shared with service account ✅ (confirmed Mar 8)
-- DWS SKU mapping: data exists in Scheduling spreadsheet + Access DB
-- Customer name mapping needed (ALM/DWS/Direct use different customer names — not just SKU codes)
+~~All resolved for M2 start.~~
+- ~~Google Sheets: Jason shared with service account~~ ✅ (confirmed Mar 8)
+- ~~DWS SKU mapping~~ ✅ (data in Scheduling + Access DB, imported)
+- ~~Customer name mapping~~ ✅ (customer_code_map populated, 6,651 rows)
+- ~~Vinsight COGS data~~ ✅ (API confirmed: 420 batches, 180 vessels, 497 packaging ops)
 
 ## Session Log
 | Date | Session | Tasks | Outcome |
@@ -98,25 +110,26 @@ VPS staging table schemas don't match schema/001_initial.sql (tables were ALTER'
 - Blockers: Xero daily rate limit hit — must wait for limit reset (~8 hrs) before Xero cards go green.
 - **JSONB flattening DEPLOYED**: Browse API now detects raw_data JSONB columns and flattens keys into individual readable columns. Staging tables show proper data (ID, CustomerName, Suburb, etc.) instead of raw JSON blobs.
 
-### VINSIGHT DATA GAP — INVESTIGATED (2026-03-11)
-**Root cause: API user permissions.** The `apiaccess@moppity.com.au` API user can only see 20 stock items (additives + packaging). Zero packaged wines, zero bulk wines, zero batches/lots/bottling runs visible.
+### VINSIGHT DATA GAP — RESOLVED (2026-03-12)
+~~**Root cause: API user permissions.**~~ **FIXED via pagination fix.**
 
-**Evidence from live API calls:**
-- StockItems.json: 20 items total (10 additives, 9 packaging, 1 bad debt). 0 IsPackagedWine, 0 IsBulkWine.
-- StockGroups.json: 10 groups exist including "Bottled Wine", "Bulk Wine", "Grapes" — so wine data IS in Vinsight, just not accessible.
-- SalesOrders.json: 20 orders visible (same 20 on every page — pagination broken).
-- Batches.json, Lots.json, BottlingRuns.json: all return 0 items.
-- Wines.json: 20 grape variety definitions (Shiraz, Cab Sav, etc.) — not actual products.
-- Pagination broken: `pageSize` and `page` parameters completely ignored. Always returns default 20 items.
+The issue was NOT permissions — it was pagination parameters. Vinsight uses OData (`$top`, `$skip`), not `pageSize`/`page`. Once fixed:
+- StockItems.json: **943 items** (419 packaged wines)
+- SalesOrders.json: **9,011 orders**
+- Contacts.json: **3,449 contacts**
+- WineBatches.json: **420 batches**
+- Vessels.json: **180 vessels**
+- PackagingOperations.json: **497 packaging operations**
 
-**Fix needed from Jason:** Go to Vinsight Settings > Setup > Users > edit `apiaccess@moppity.com.au` > assign a role with full data access (e.g. Manager or Admin role, not just SalesReps). This is documented in reference/technical-notes.md line 25.
+All COGS traceability data now accessible via API.
 
-**Impact:** Our connector code is correct (pagination, error handling, staging inserts all work). Once Jason fixes the API user role, re-running sync will pull all wine products, bulk wines, batches, and sales orders.
+### Jason's Updates (2026-03-12)
+1. **What-if pricing confirmed:** "I'm looking for an interface where I can change grape prices on a what-if basis — not one-off changes to static data."
+2. **Vinsight data flow explained:** "grapes → wine batch → vessel → packaging operation → stock item. Many vessels can go to a packaging operation to make a SKU."
+3. ~~Grape Price Matrix tab needed~~ → **Not needed.** We build the what-if interface, Jason uses it.
+4. ~~Validation SKU needed~~ → **Not needed.** We pick any SKU, show calculation, Jason validates.
 
-### Jason's Response (2026-03-12)
-- Jason will look into fixing Vinsight API user permissions
-- **Key insight from Jason:** Grape costs are NOT a single price per SKU. Multiple batches with different grape costs get blended to make one SKU. Cost must be traced from batch level through the blend. This means our `sku_cogs` schema needs a batch-level costing layer, not just `nominated_grape_price` per SKU.
-- Schema implication: need `batch` table with grape cost per batch, `blend_component` junction table (batch → SKU with proportion), then SKU grape cost = weighted average of blend components.
+**Nothing pending from Jason for M2 start.**
 
 ### Jason's Clarification — Grape Pricing UI (2026-03-12)
 **Jason:** "With grape pricing, I'm looking for an interface where I can change grape prices on a 'what-if' basis — not one-off changes to static data. The table I made in the spreadsheet demonstrates the idea but the specific values don't matter at this point. The idea is that I can change them."
@@ -152,6 +165,29 @@ stock item / SKU (finished product)
 - `packaging_operation` table (packaging_op_id, sku_id, bottling_date, vinsight_packaging_id)
 - `packaging_vessel` junction (packaging_op_id, vessel_id, proportion)
 - SKU grape cost = weighted average of vessels in the packaging operation
+
+---
+
+## M2 Internal Planning Required
+
+**Before implementation, we need internal discussion (task M2-PLAN) to create PRD for:**
+
+1. **4-Tier Grape Price Hierarchy**
+   - How cascading override logic works (Level 4 > Level 3 > Level 2 > Level 1)
+   - Schema design for `grape_price_rule` table
+   - UI wireframe for what-if calculator
+
+2. **Vinsight COGS Schema Integration**
+   - How batch/vessel/packaging tables integrate with 4-tier pricing
+   - Where grape cost is assigned (batch level) vs where it's overridden (what-if UI)
+   - SQL function for weighted average cost calculation
+
+3. **What-If Calculator UX**
+   - Real-time recalculation approach (client-side vs API)
+   - Export/save scenarios
+   - Comparison view (accounting vs economic COGS)
+
+**Reference:** `reference/call-insights-2026-03-09.md` section 1, features.json tasks M2-PLAN, M2-01, M2-02
 
 ### Session: 2026-03-12
 
