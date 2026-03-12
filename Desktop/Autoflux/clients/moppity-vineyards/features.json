@@ -612,6 +612,50 @@
       "files": ["schema/004_bottling_run.sql", "dashboard/src/components/BottlingRunEntry.tsx"],
       "last_updated": "2026-03-10",
       "model": "sonnet"
+    },
+    {
+      "id": "M2-01",
+      "title": "Grape Price What-If Calculator (Scenario Tool)",
+      "status": "pending",
+      "priority": "critical",
+      "depends_on": [],
+      "spec": "Interactive scenario tool where Jason can adjust grape prices and instantly see margin impact across SKUs. NOT static data entry — this is a what-if calculator. UI: sliders or input fields for grape prices (by variety, grade, region), real-time recalculation of contribution margin per SKU/channel/customer. Must support batch→blend→SKU cost traceability (multiple batches with different grape costs blend into one SKU). Jason's clarification (Mar 12): 'I'm looking for an interface where I can change grape prices on a what-if basis — not one-off changes to static data.'",
+      "acceptance_criteria": [
+        {"criterion": "Grape price inputs (variety, grade, region) with real-time adjustment", "done": false},
+        {"criterion": "Margin recalculation happens instantly on price change (no page reload)", "done": false},
+        {"criterion": "SKU margin table updates in real-time as grape prices change", "done": false},
+        {"criterion": "Changes are NOT persisted to database (what-if only, not static edits)", "done": false},
+        {"criterion": "Batch→Blend→SKU cost traceability supported (weighted average of blend components)", "done": false},
+        {"criterion": "Can compare 'Accounting COGS' vs 'Economic COGS' side-by-side", "done": false},
+        {"criterion": "Export scenario results to CSV or clipboard", "done": false}
+      ],
+      "estimated_hours": 8,
+      "prd_reference": "M2-R02, M2-R03, M2-R08",
+      "adr_reference": "ADR-006",
+      "files": ["dashboard/src/components/GrapePriceCalculator.tsx", "dashboard/src/app/api/margins/route.ts"],
+      "last_updated": "2026-03-12",
+      "model": "opus"
+    },
+    {
+      "id": "M2-02",
+      "title": "Batch & Blend Schema for COGS Traceability",
+      "status": "pending",
+      "priority": "critical",
+      "depends_on": [],
+      "spec": "Schema extension to support batch-level grape costing. Jason clarified (Mar 12): grape costs are NOT per SKU — multiple batches with different grape costs get blended to make one SKU. Tables needed: batch (batch_id, grape_variety, vintage, grape_cost_per_ton, source_vineyard), blend_component (blend_id, batch_id, sku_id, proportion). SKU grape cost = weighted average of blend components. Must integrate with existing sku_cogs table.",
+      "acceptance_criteria": [
+        {"criterion": "batch table created with grape_cost_per_ton field", "done": false},
+        {"criterion": "blend_component junction table links batches to SKUs with proportions", "done": false},
+        {"criterion": "SQL function calculates SKU grape cost as weighted average of blend components", "done": false},
+        {"criterion": "Existing sku_cogs table updated to reference batch/blend data", "done": false},
+        {"criterion": "Sample data imported for 2-3 SKUs to validate calculations", "done": false}
+      ],
+      "estimated_hours": 4,
+      "prd_reference": "M2-R01, M2-R02",
+      "adr_reference": "ADR-006",
+      "files": ["schema/010_batch_blend.sql"],
+      "last_updated": "2026-03-12",
+      "model": "opus"
     }
   ]
 }

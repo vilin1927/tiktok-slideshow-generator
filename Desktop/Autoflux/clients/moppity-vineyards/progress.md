@@ -118,6 +118,16 @@ VPS staging table schemas don't match schema/001_initial.sql (tables were ALTER'
 - **Key insight from Jason:** Grape costs are NOT a single price per SKU. Multiple batches with different grape costs get blended to make one SKU. Cost must be traced from batch level through the blend. This means our `sku_cogs` schema needs a batch-level costing layer, not just `nominated_grape_price` per SKU.
 - Schema implication: need `batch` table with grape cost per batch, `blend_component` junction table (batch → SKU with proportion), then SKU grape cost = weighted average of blend components.
 
+### Jason's Clarification — Grape Pricing UI (2026-03-12)
+**Jason:** "With grape pricing, I'm looking for an interface where I can change grape prices on a 'what-if' basis — not one-off changes to static data. The table I made in the spreadsheet demonstrates the idea but the specific values don't matter at this point. The idea is that I can change them."
+
+**Key requirement for M2:** Grape pricing interface must be a **what-if calculator** (scenario tool with sliders/inputs), NOT a static data entry form. Jason wants to:
+1. Adjust grape prices dynamically
+2. See real-time impact on margins across SKUs
+3. Test scenarios without permanently changing data
+
+This aligns with **PRD M2-R08:** "Scenario tool: grape price + selling price sliders → real-time GP impact"
+
 ### Session: 2026-03-12
 
 **FIX-11 DEPLOYED: Dashboard now shows staging_vinsight_* and staging_xero_* tables**
