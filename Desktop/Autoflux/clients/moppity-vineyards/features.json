@@ -658,22 +658,24 @@
     },
     {
       "id": "M2-02",
-      "title": "Batch & Blend Schema for COGS Traceability",
+      "title": "Vinsight COGS Traceability Schema (Batch → Vessel → Packaging → SKU)",
       "status": "pending",
       "priority": "critical",
       "depends_on": [],
-      "spec": "Schema extension to support batch-level grape costing. Jason clarified (Mar 12): grape costs are NOT per SKU — multiple batches with different grape costs get blended to make one SKU. Tables needed: batch (batch_id, grape_variety, vintage, grape_cost_per_ton, source_vineyard), blend_component (blend_id, batch_id, sku_id, proportion). SKU grape cost = weighted average of blend components. Must integrate with existing sku_cogs table.",
+      "spec": "Schema to match Vinsight's actual data model. Jason clarified (Mar 12): 'grapes → wine batch → vessel → packaging operation → stock item. Many vessels can go to a packaging operation to make a SKU.' Tables needed: wine_batch (grape cost assigned here), vessel (tank/barrel where wine ages), packaging_operation (bottling run = blend point), packaging_vessel junction (many vessels → one packaging op). SKU grape cost = weighted average of vessels in the packaging operation.",
       "acceptance_criteria": [
-        {"criterion": "batch table created with grape_cost_per_ton field", "done": false},
-        {"criterion": "blend_component junction table links batches to SKUs with proportions", "done": false},
-        {"criterion": "SQL function calculates SKU grape cost as weighted average of blend components", "done": false},
-        {"criterion": "Existing sku_cogs table updated to reference batch/blend data", "done": false},
-        {"criterion": "Sample data imported for 2-3 SKUs to validate calculations", "done": false}
+        {"criterion": "wine_batch table created (batch_id, grape_variety, vintage, grape_cost_per_ton, vinsight_batch_id)", "done": false},
+        {"criterion": "vessel table created (vessel_id, batch_id FK, vessel_name, volume, vinsight_vessel_id)", "done": false},
+        {"criterion": "packaging_operation table created (packaging_op_id, sku_id FK, bottling_date, vinsight_packaging_id)", "done": false},
+        {"criterion": "packaging_vessel junction table (packaging_op_id, vessel_id, proportion)", "done": false},
+        {"criterion": "SQL function calculates SKU grape cost as weighted average of vessels in packaging op", "done": false},
+        {"criterion": "Vinsight API endpoints identified for batch/vessel/packaging data", "done": false},
+        {"criterion": "Sample data imported for 2-3 SKUs to validate cost traceability", "done": false}
       ],
-      "estimated_hours": 4,
+      "estimated_hours": 6,
       "prd_reference": "M2-R01, M2-R02",
       "adr_reference": "ADR-006",
-      "files": ["schema/010_batch_blend.sql"],
+      "files": ["schema/010_vinsight_cogs.sql", "connectors/vinsight_cogs.py"],
       "last_updated": "2026-03-12",
       "model": "opus"
     }

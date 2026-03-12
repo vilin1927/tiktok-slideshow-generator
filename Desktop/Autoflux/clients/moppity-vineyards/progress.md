@@ -128,6 +128,31 @@ VPS staging table schemas don't match schema/001_initial.sql (tables were ALTER'
 
 This aligns with **PRD M2-R08:** "Scenario tool: grape price + selling price sliders → real-time GP impact"
 
+### Jason's Clarification — Vinsight Data Flow (2026-03-12, 2:59 PM)
+**Jason:** "In Vinsight: grapes → wine batch → vessel → packaging operation → stock item. Many vessels can go to a packaging operation to make a SKU."
+
+**Vinsight COGS traceability model:**
+```
+grapes (cost/ton)
+    ↓
+wine batch (grape cost assigned here)
+    ↓
+vessel (tank/barrel where wine ages)
+    ↓
+packaging operation (bottling run — MANY vessels → ONE packaging op)
+    ↓
+stock item / SKU (finished product)
+```
+
+**Key insight:** Multiple vessels (tanks/barrels) blend into ONE packaging operation → ONE SKU. This is the blend point. Grape cost traces: grape → batch → vessel → packaging op → SKU.
+
+**Schema implication for M2-02:**
+- `wine_batch` table (batch_id, grape_variety, vintage, grape_cost_per_ton, vinsight_batch_id)
+- `vessel` table (vessel_id, batch_id, vessel_name, volume, vinsight_vessel_id)
+- `packaging_operation` table (packaging_op_id, sku_id, bottling_date, vinsight_packaging_id)
+- `packaging_vessel` junction (packaging_op_id, vessel_id, proportion)
+- SKU grape cost = weighted average of vessels in the packaging operation
+
 ### Session: 2026-03-12
 
 **FIX-11 DEPLOYED: Dashboard now shows staging_vinsight_* and staging_xero_* tables**
